@@ -97,31 +97,31 @@ export async function exportCampaignPdf(actor: Actor, campaignId: string) {
     y -= size + 6;
   };
 
-  drawText(`Relatório: ${campaign.name}`, 18, true);
-  y -= 6;
-  drawText(`Descrição: ${campaign.description || "—"}`);
-  drawText(`Objetivo: ${campaign.objective || "—"}`);
-  drawText(`Status: ${campaign.status}`);
-  drawText(`Cliente: ${campaign.client?.name ?? "—"}`);
-  drawText(`Responsável: ${campaign.responsible?.name ?? "—"}`);
-  drawText(`Período: ${campaign.startDate ? new Date(campaign.startDate).toLocaleDateString("pt-BR") : "—"} a ${campaign.endDate ? new Date(campaign.endDate).toLocaleDateString("pt-BR") : "—"}`);
-  y -= 6;
+   drawText(`Relatório: ${campaign.name}`, 18);
+   y -= 6;
+   drawText(`Descrição: ${campaign.description || "—"}`);
+   drawText(`Objetivo: ${campaign.objective || "—"}`);
+   drawText(`Status: ${campaign.status}`);
+   drawText(`Cliente: ${campaign.client?.name ?? "—"}`);
+   drawText(`Responsável: ${campaign.responsible?.name ?? "—"}`);
+   drawText(`Período: ${campaign.startDate ? new Date(campaign.startDate).toLocaleDateString("pt-BR") : "—"} a ${campaign.endDate ? new Date(campaign.endDate).toLocaleDateString("pt-BR") : "—"}`);
+   y -= 6;
 
-  drawText("Canais", 14, true);
-  for (const ch of campaign.channels) {
-    drawText(`• ${ch.name} (${ch.type}): ${ch.destinationUrl}`);
-    drawText(`  UTM: source=${ch.utmSource ?? "—"} medium=${ch.utmMedium ?? "—"} campaign=${ch.utmCampaign ?? "—"}`);
-    drawText(`  Monitoramento: ${ch.monitorEnabled ? `A cada ${ch.monitorFrequencyMinutes} min` : "Desativado"}`);
-  }
-  y -= 6;
+   drawText("Canais", 14);
+   for (const ch of campaign.channels) {
+     drawText(`• ${ch.name} (${ch.type}): ${ch.destinationUrl}`);
+     drawText(`  UTM: source=${ch.utmSource ?? "—"} medium=${ch.utmMedium ?? "—"} campaign=${ch.utmCampaign ?? "—"}`);
+     drawText(`  Monitoramento: ${ch.monitorEnabled ? `A cada ${ch.monitorFrequencyMinutes} min` : "Desativado"}`);
+   }
+   y -= 6;
 
-  drawText("Checklist", 14, true);
-  for (const item of campaign.checklistItems) {
-    drawText(`• [${item.status.toUpperCase()}] ${item.label} (${item.severity})`);
-  }
-  y -= 6;
+   drawText("Checklist", 14);
+   for (const item of campaign.checklistItems) {
+     drawText(`• [${item.status.toUpperCase()}] ${item.label} (${item.severity})`);
+   }
+   y -= 6;
 
-  drawText("Aprovação", 14, true);
+   drawText("Aprovação", 14);
   for (const approval of campaign.approvals) {
     drawText(`• ${approval.action.toUpperCase()} por ${approval.approver.name} em ${new Date(approval.createdAt).toLocaleString("pt-BR")}`);
     drawText(`  Notas: ${approval.notes || "—"}`);

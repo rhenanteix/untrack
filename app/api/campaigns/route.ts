@@ -6,12 +6,13 @@ import { enforceRateLimit } from "@/lib/rate-limit";
 import { requireActor } from "@/modules/workspaces/context";
 import { assertPermission } from "@/modules/workspaces/policy";
 import { listCampaigns, getCampaign, createCampaign, updateCampaign, deleteCampaign } from "@/modules/campaigns/service";
+import { createChannel, updateChannel, deleteChannel, updateChecklistItem, approveCampaign } from "@/modules/campaigns/service";
 import { proposeKit, saveKit } from "@/modules/campaigns/kit";
 import { runChecklist } from "@/modules/campaigns/checklist";
 import { recordMonitorCheck } from "@/modules/campaigns/monitoring";
 import { confirmIncident, recoverIncident } from "@/modules/campaigns/incidents";
 import { testNotification } from "@/modules/campaigns/notifications";
-import { updateCampaignSchema, updateChannelSchema } from "@/modules/campaigns/schemas";
+import { createCampaignSchema, updateCampaignSchema, updateChannelSchema, campaignKitInputSchema, campaignKitProposalSchema } from "@/modules/campaigns/schemas";
 
 export const runtime = "nodejs";
 
