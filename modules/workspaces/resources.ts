@@ -85,10 +85,12 @@ export async function mutateResource(actor: Actor, module: string, raw: unknown,
       if (resource) await releaseQuota(tx, workspaceId, resource);
       await audit(tx, actor, `${module}.deleted`, id!, before); return { ok: true };
     }
-    const input = module === "campaigns" ? z.object({ name: nameSchema, clientId: z.string().nullable().optional(), status: z.enum(["draft", "active", "archived"]).default("draft") }).strict().parse(envelope.data) : z.object({ name: nameSchema }).strict().parse(envelope.data);
-    if ("clientId" in input) await assertReferences(tx, workspaceId, { clientId: typeof input.clientId === "string" ? input.clientId : null });
+    const isCampaign = module === "campaigns";
+    const input = isCampaign ? z.object({ name: nameSchema, description: z.string().max(2000).optional(), objective: z.string().max(1000).optional(), clientId: z.string().nullable().optional(), responsibleId: z.string().nullable().optional(), status: z.enum(["draft", "scheduled", "active", "paused", "completed"]).default("draft") }).strict().parse(envelope.data) : z.object({ name: nameSchema }).strict().parse(envelope.data);
+    if (isCampaign && "clientId" in input) await assertReferences(tx, workspaceId, { clientId: typeof (input as { clientId?: string | null }).clientId === "string" ? (input as { clientId?: string | null }).clientId! : null });
     if (!id && resource) await reserveQuota(tx, workspaceId, plan, resource);
-    const data = { ...input, workspaceId };
+    const base = { ...input, workspaceId } as { name: string; workspaceId: string };
+    const data = isCampaign ? { ...base, description: (input as { description?: string }).description ?? "", objective: (input as { objective?: string }).objective ?? "" } : base;
     const saved = module === "clients" ? id ? await tx.client.update({ where: { id }, data }) : await tx.client.create({ data }) : module === "campaigns" ? id ? await tx.campaign.update({ where: { id }, data }) : await tx.campaign.create({ data }) : id ? await tx.linkFolder.update({ where: { id }, data }) : await tx.linkFolder.create({ data });
     await audit(tx, actor, `${module}.${id ? "updated" : "created"}`, saved.id, { before, after: input }); return saved;
   });

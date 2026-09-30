@@ -29,6 +29,8 @@ model User {
   links         ShortLink[]
   history       LinkHistory[]
   memberships   WorkspaceMember[]
+  campaignsResponsible Campaign[]
+  campaignApprovals CampaignApproval[]
 }
 
 model Session {
@@ -144,7 +146,6 @@ model LinkHistory {
   @@index([userId, createdAt])
 }
 
-
 enum WorkspaceRole {
   owner
   admin
@@ -177,6 +178,12 @@ model Workspace {
   folders LinkFolder[]
   domains CustomDomain[]
   qrs QrAsset[]
+  channels CampaignChannel[]
+  checklistItems CampaignChecklist[]
+  approvals CampaignApproval[]
+  monitorChecks CampaignMonitorCheck[]
+  incidents CampaignIncident[]
+  deliveries NotificationDelivery[]
 }
 
 model WorkspaceMember {
@@ -226,46 +233,162 @@ model Campaign {
   id String @id @default(cuid())
   workspaceId String
   name String @db.VarChar(120)
-  status String @default("draft")
+  description String? @db.VarChar(2000)
   clientId String?
-  createdAt DateTime @default(now())
-  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  client Client? @relation(fields: [clientId, workspaceId], references: [id, workspaceId])
-  utmLinks UtmLink[]
-  shortLinks ShortLink[]
-  qrs QrAsset[]
-  @@unique([id, workspaceId])
-  @@index([workspaceId, createdAt])
-}
-
-model UtmTemplate {
-  id String @id @default(cuid())
-  workspaceId String
-  name String @db.VarChar(120)
-  values Json
-  favorite Boolean @default(false)
+  responsibleId String?
+  objective String? @db.VarChar(1000)
+  startDate DateTime?
+  endDate DateTime?
+  status String @default("draft") @db.VarChar(20)
+  approvalStatus String? @db.VarChar(20)
+  approvedAt DateTime?
+  approvedById String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  client Client? @relation(fields: [clientId, workspaceId], references: [id, workspaceId])
+  responsible User? @relation(fields: [responsibleId], references: [id], onDelete: SetNull)
+  utmLinks UtmLink[]
+  shortLinks ShortLink[]
+  qrs QrAsset[]
+  channels CampaignChannel[]
+  checklistItems CampaignChecklist[]
+  monitoringChecks CampaignMonitorCheck[]
+  incidents CampaignIncident[]
+  approvals CampaignApproval[]
+  @@unique([id, workspaceId])
   @@index([workspaceId, createdAt])
+  @@index([workspaceId, status])
+  @@index([workspaceId, clientId])
+  @@index([responsibleId])
 }
 
-model UtmLink {
+model CampaignChannel {
   id String @id @default(cuid())
   workspaceId String
+  campaignId String
   name String @db.VarChar(120)
-  originalUrl String @db.VarChar(4096)
-  resultUrl String @db.VarChar(8192)
-  appliedValues Json
-  governanceSnapshot Json
+  type String @db.VarChar(40)
+  utmSource String? @db.VarChar(120)
+  utmMedium String? @db.VarChar(120)
+  utmCampaign String? @db.VarChar(120)
+  utmTerm String? @db.VarChar(120)
+  utmContent String? @db.VarChar(120)
+  destinationUrl String @db.VarChar(4096)
+  shortLinkId String?
+  qrId String?
   templateId String?
-  clientId String?
-  campaignId String?
+  monitorEnabled Boolean @default(false)
+  monitorFrequencyMinutes Int @default(60)
+  monitorPaused Boolean @default(false)
+  alternativeDestinationUrl String? @db.VarChar(4096)
+  autoRedirectOnIncident Boolean @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  campaign Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  monitorChecks CampaignMonitorCheck[]
+  incidents CampaignIncident[]
+  @@unique([id, workspaceId])
+  @@index([workspaceId, campaignId])
+  @@index([campaignId])
+}
+
+model CampaignChecklist {
+  id String @id @default(cuid())
+  workspaceId String
+  campaignId String
+  channelId String?
+  category String @db.VarChar(60)
+  label String @db.VarChar(200)
+  status String @default("pending") @db.VarChar(20)
+  severity String @default("warning") @db.VarChar(20)
+  details String @db.VarChar(2000)
+  checkedAt DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  campaign Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  @@index([workspaceId, campaignId])
+  @@index([campaignId, status])
+}
+
+model CampaignMonitorCheck {
+  id String @id @default(cuid())
+  workspaceId String
+  campaignId String
+  channelId String?
+  url String @db.VarChar(4096)
+  httpStatus Int?
+  responseTimeMs Int?
+  finalUrl String? @db.VarChar(4096)
+  redirectChain Json
+  connectionError String?
+  certExpiresAt DateTime?
+  certIssuer String? @db.VarChar(200)
+  status String @default("unknown") @db.VarChar(20)
+  checkedAt DateTime @default(now())
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  channel CampaignChannel? @relation(fields: [channelId], references: [id], onDelete: Cascade)
+  campaign Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  @@index([workspaceId, checkedAt])
+  @@index([campaignId, checkedAt])
+  @@index([channelId, checkedAt])
+}
+
+model CampaignIncident {
+  id String @id @default(cuid())
+  workspaceId String
+  campaignId String
+  channelId String?
+  code String @db.VarChar(80)
+  message String @db.VarChar(500)
+  status String @default("open") @db.VarChar(20)
+  severity String @default("warning") @db.VarChar(20)
+  confirmed Boolean @default(false)
+  dedupeKey String @db.VarChar(200)
+  cooldownUntil DateTime?
+  recoveredAt DateTime?
+  metadata Json
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  campaign Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  channel CampaignChannel? @relation(fields: [channelId], references: [id], onDelete: Cascade)
+  @@unique([id, workspaceId])
+  @@index([workspaceId, dedupeKey, createdAt])
+  @@index([campaignId, status])
+  @@index([channelId, status])
+}
+
+model CampaignApproval {
+  id String @id @default(cuid())
+  workspaceId String
+  campaignId String
+  approverId String
+  action String @db.VarChar(40)
+  notes String @db.VarChar(1000)
   createdAt DateTime @default(now())
   workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  client Client? @relation(fields: [clientId, workspaceId], references: [id, workspaceId])
-  campaign Campaign? @relation(fields: [campaignId, workspaceId], references: [id, workspaceId])
-  @@index([workspaceId, createdAt])
+  campaign Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  approver User @relation(fields: [approverId], references: [id], onDelete: Cascade)
+  @@index([workspaceId, campaignId])
+  @@index([campaignId, createdAt])
+}
+
+model NotificationDelivery {
+  id String @id @default(cuid())
+  workspaceId String
+  incidentId String?
+  adapter String @db.VarChar(40)
+  status String @default("pending") @db.VarChar(20)
+  payload Json
+  response Json?
+  sentAt DateTime?
+  createdAt DateTime @default(now())
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  @@index([workspaceId, incidentId])
+  @@index([createdAt])
 }
 
 model LinkFolder {
@@ -317,4 +440,34 @@ model ClickOutbox {
   referrer String @db.VarChar(253)
   device String @db.VarChar(20)
   @@index([createdAt])
+}
+
+model UtmTemplate {
+  id String @id @default(cuid())
+  workspaceId String
+  name String @db.VarChar(120)
+  values Json
+  favorite Boolean @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  @@index([workspaceId, createdAt])
+}
+
+model UtmLink {
+  id String @id @default(cuid())
+  workspaceId String
+  name String @db.VarChar(120)
+  originalUrl String @db.VarChar(4096)
+  resultUrl String @db.VarChar(8192)
+  appliedValues Json
+  governanceSnapshot Json
+  templateId String?
+  clientId String?
+  campaignId String?
+  createdAt DateTime @default(now())
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  client Client? @relation(fields: [clientId, workspaceId], references: [id, workspaceId])
+  campaign Campaign? @relation(fields: [campaignId, workspaceId], references: [id, workspaceId])
+  @@index([workspaceId, createdAt])
 }
