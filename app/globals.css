@@ -935,3 +935,30 @@ code {
     transition: none !important;
   }
 }
+
+.health-result {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.health-result dt {
+  font-weight: 700;
+}
+.health-result dd {
+  margin: 0 0 12px;
+}
+.health-result li p {
+  margin-top: 4px;
+}
+
+/* Keep the expanded tool navigation accessible on tablet widths. */
+@media (min-width: 761px) and (max-width: 1000px) {
+  .header-inner nav.desktop-nav {
+    display: none;
+  }
+  .menu-toggle {
+    display: inline-flex;
+  }
+  .header-cta {
+    margin-left: auto;
+  }
+}

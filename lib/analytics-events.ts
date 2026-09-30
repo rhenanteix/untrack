@@ -39,6 +39,7 @@ export const ANALYTICS_PATHS = [
   "/gerar-utm",
   "/gerar-qrcode",
   "/encurtar",
+  "/link-health",
   "/conta",
   "/entrar",
   "/cadastro",

@@ -176,7 +176,7 @@ Para observar os eventos no terminal local, defina `ANALYTICS_CONSOLE=true` em `
 
 ## Segurança SSRF
 
-`POST /api/links/check` é o único fluxo que acessa uma URL fornecida pelo usuário. A implementação:
+`POST /api/links/check` é o verificador legado de URLs. Sua implementação:
 
 - aceita somente HTTP/HTTPS e rejeita credenciais;
 - resolve DNS antes de cada requisição e rejeita o host se **qualquer** resposta não for unicast pública;
@@ -186,6 +186,12 @@ Para observar os eventos no terminal local, defina `ANALYTICS_CONSOLE=true` em `
 - bloqueia loopback, link-local/metadata (`169.254.169.254`), redes privadas e IPv6 reservado.
 
 Essas medidas são defesa em profundidade, não autorização para acessar redes confiáveis. Mantenha a aplicação isolada de serviços internos, atualize dependências e preserve egress/firewall restritivos.
+
+O Link Analyzer (`POST /api/link-analyzer`) e o Link Health (`POST /api/link-health`) também acessam URLs. Eles compartilham um transporte com timeout total de 10 segundos, DNS fixado ao IP validado, revalidação de redirects e limites de resposta.
+
+## Link Health
+
+Acesse `/link-health` para ver Health Score, checks com razões e pontos, problemas, avisos e recomendações. A política fica em `modules/link-health/config.ts`; nenhum parâmetro é removido e o resultado não garante segurança. Contrato, regras e exemplos: [Link Health](docs/link-health.md).
 
 ## Rate limiting
 

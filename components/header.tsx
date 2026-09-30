@@ -9,6 +9,7 @@ const links = [
   { href: "/gerar-utm", label: "Criar UTM" },
   { href: "/gerar-qrcode", label: "QR Code" },
   { href: "/encurtar", label: "Encurtar" },
+  { href: "/link-health", label: "Link Health" },
 ] as const;
 
 export function Header() {
