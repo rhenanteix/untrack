@@ -28,6 +28,7 @@ model User {
   accounts      Account[]
   links         ShortLink[]
   history       LinkHistory[]
+  memberships   WorkspaceMember[]
 }
 
 model Session {
@@ -84,7 +85,18 @@ model RateLimit {
 
 model ShortLink {
   id             String      @id @default(cuid())
-  slug           String      @unique
+  slug           String
+  domainKey      String      @default("platform")
+  workspaceId    String
+  workspace      Workspace   @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  expiresAt      DateTime?
+  tags           String[]    @default([])
+  folderId       String?
+  folder         LinkFolder? @relation(fields: [folderId, workspaceId], references: [id, workspaceId])
+  campaignId     String?
+  campaign       Campaign?   @relation(fields: [campaignId, workspaceId], references: [id, workspaceId])
+  distribution   String      @default("digital")
+  qr             QrAsset?
   destinationUrl String      @db.VarChar(4096)
   title          String      @default("") @db.VarChar(120)
   description    String      @default("") @db.VarChar(500)
@@ -95,7 +107,11 @@ model ShortLink {
   user           User        @relation(fields: [userId], references: [id], onDelete: Cascade)
   clicks         LinkClick[]
 
+  @@unique([domainKey, slug])
+  @@unique([id, workspaceId])
+
   @@index([userId, createdAt])
+  @@index([workspaceId, createdAt])
 }
 
 model LinkClick {
@@ -120,7 +136,185 @@ model LinkHistory {
   kind        String   @db.VarChar(20)
   createdAt   DateTime @default(now())
   importKey   String?
+  workspaceId String
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
 
-  @@unique([userId, importKey])
+  @@unique([workspaceId, userId, importKey])
+  @@index([workspaceId, createdAt])
   @@index([userId, createdAt])
+}
+
+
+enum WorkspaceRole {
+  owner
+  admin
+  editor
+  viewer
+}
+
+enum Plan {
+  free
+  pro
+  business
+}
+
+model Workspace {
+  id String @id @default(cuid())
+  name String @db.VarChar(120)
+  plan Plan @default(free)
+  governance Json @default("{}")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  members WorkspaceMember[]
+  clients Client[]
+  campaigns Campaign[]
+  usage WorkspaceUsage[]
+  audits AuditLog[]
+  links ShortLink[]
+  history LinkHistory[]
+  templates UtmTemplate[]
+  utmLinks UtmLink[]
+  folders LinkFolder[]
+  domains CustomDomain[]
+  qrs QrAsset[]
+}
+
+model WorkspaceMember {
+  workspaceId String
+  userId String
+  role WorkspaceRole @default(viewer)
+  createdAt DateTime @default(now())
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@id([workspaceId, userId])
+  @@index([userId])
+}
+
+model WorkspaceUsage {
+  workspaceId String
+  resource String
+  count Int @default(0)
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  @@id([workspaceId, resource])
+}
+
+model AuditLog {
+  id String @id @default(cuid())
+  workspaceId String
+  actorId String
+  action String
+  entityId String
+  details Json
+  createdAt DateTime @default(now())
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  @@index([workspaceId, createdAt])
+}
+
+model Client {
+  id String @id @default(cuid())
+  workspaceId String
+  name String @db.VarChar(120)
+  createdAt DateTime @default(now())
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  campaigns Campaign[]
+  utmLinks UtmLink[]
+  @@unique([id, workspaceId])
+  @@index([workspaceId, createdAt])
+}
+
+model Campaign {
+  id String @id @default(cuid())
+  workspaceId String
+  name String @db.VarChar(120)
+  status String @default("draft")
+  clientId String?
+  createdAt DateTime @default(now())
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  client Client? @relation(fields: [clientId, workspaceId], references: [id, workspaceId])
+  utmLinks UtmLink[]
+  shortLinks ShortLink[]
+  qrs QrAsset[]
+  @@unique([id, workspaceId])
+  @@index([workspaceId, createdAt])
+}
+
+model UtmTemplate {
+  id String @id @default(cuid())
+  workspaceId String
+  name String @db.VarChar(120)
+  values Json
+  favorite Boolean @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  @@index([workspaceId, createdAt])
+}
+
+model UtmLink {
+  id String @id @default(cuid())
+  workspaceId String
+  name String @db.VarChar(120)
+  originalUrl String @db.VarChar(4096)
+  resultUrl String @db.VarChar(8192)
+  appliedValues Json
+  governanceSnapshot Json
+  templateId String?
+  clientId String?
+  campaignId String?
+  createdAt DateTime @default(now())
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  client Client? @relation(fields: [clientId, workspaceId], references: [id, workspaceId])
+  campaign Campaign? @relation(fields: [campaignId, workspaceId], references: [id, workspaceId])
+  @@index([workspaceId, createdAt])
+}
+
+model LinkFolder {
+  id String @id @default(cuid())
+  workspaceId String
+  name String @db.VarChar(120)
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  links ShortLink[]
+  @@unique([id, workspaceId])
+  @@unique([workspaceId, name])
+}
+
+model CustomDomain {
+  id String @id @default(cuid())
+  workspaceId String
+  hostname String @unique
+  token String
+  status String @default("pending_dns")
+  verifiedAt DateTime?
+  checkedAt DateTime?
+  lastError String?
+  createdAt DateTime @default(now())
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  @@index([workspaceId])
+}
+
+model QrAsset {
+  id String @id @default(cuid())
+  workspaceId String
+  name String @db.VarChar(120)
+  mode String
+  destinationUrl String @db.VarChar(8192)
+  encodedUrl String @db.VarChar(8192)
+  visual Json
+  campaignId String?
+  redirectId String? @unique
+  createdAt DateTime @default(now())
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  campaign Campaign? @relation(fields: [campaignId, workspaceId], references: [id, workspaceId])
+  redirect ShortLink? @relation(fields: [redirectId], references: [id], onDelete: Restrict)
+  @@index([workspaceId, createdAt])
+}
+
+model ClickOutbox {
+  id String @id @default(cuid())
+  linkId String
+  createdAt DateTime @default(now())
+  day DateTime @db.Date
+  referrer String @db.VarChar(253)
+  device String @db.VarChar(20)
+  @@index([createdAt])
 }

@@ -1,58 +1,32 @@
 import { NextResponse } from "next/server";
-import { requireUser } from "@/lib/session";
+import { requireActor } from "@/modules/workspaces/context";
 import { errorResponse, readJson } from "@/lib/api-response";
 import { enforceSameOrigin } from "@/lib/request-origin";
 import { enforceRateLimit } from "@/lib/rate-limit";
-import { getPrisma } from "@/lib/prisma";
-import { ownedLink, serializeLink, linkMetrics } from "@/lib/short-links";
-import { updateShortLinkSchema } from "@/modules/short-links/schemas";
-
+import { serializeLink, linkMetrics } from "@/lib/short-links";
+import { workspaceLink, updateManagedLink, deleteManagedLink } from "@/modules/link-management/service";
 type Context = { params: Promise<{ id: string }> };
-
 export async function GET(request: Request, context: Context) {
   try {
-    const user = await requireUser(request);
-    const { id } = await context.params;
-    const link = await ownedLink(id, user.id);
-    const metrics = await linkMetrics(id);
-    return NextResponse.json(
-      { link: serializeLink(link), metrics },
-      { headers: { "Cache-Control": "private, no-store" } },
-    );
-  } catch (error) {
-    return errorResponse(error);
-  }
+    const actor = await requireActor(request), { id } = await context.params;
+    const link = await workspaceLink(actor, id);
+    return NextResponse.json({ link: serializeLink(link), metrics: await linkMetrics(id) }, { headers: { "Cache-Control": "private, no-store" } });
+  } catch (error) { return errorResponse(error); }
 }
-
 export async function PATCH(request: Request, context: Context) {
   try {
     enforceSameOrigin(request);
-    const user = await requireUser(request);
-    await enforceRateLimit(request, `short-links:${user.id}`);
-    const { id } = await context.params;
-    const input = updateShortLinkSchema.parse(await readJson(request));
-    await ownedLink(id, user.id);
-    const link = await getPrisma().shortLink.update({
-      where: { id, userId: user.id },
-      data: input,
-      include: { _count: { select: { clicks: true } } },
-    });
-    return NextResponse.json(serializeLink(link));
-  } catch (error) {
-    return errorResponse(error);
-  }
+    const actor = await requireActor(request), { id } = await context.params;
+    await enforceRateLimit(request, `short-links:${actor.userId}`);
+    return NextResponse.json(serializeLink(await updateManagedLink(actor, id, await readJson(request))), { headers: { "Cache-Control": "no-store" } });
+  } catch (error) { return errorResponse(error); }
 }
-
 export async function DELETE(request: Request, context: Context) {
   try {
     enforceSameOrigin(request);
-    const user = await requireUser(request);
-    await enforceRateLimit(request, `short-links:${user.id}`);
-    const { id } = await context.params;
-    await ownedLink(id, user.id);
-    await getPrisma().shortLink.delete({ where: { id, userId: user.id } });
+    const actor = await requireActor(request), { id } = await context.params;
+    await enforceRateLimit(request, `short-links:${actor.userId}`);
+    await deleteManagedLink(actor, id);
     return new NextResponse(null, { status: 204 });
-  } catch (error) {
-    return errorResponse(error);
-  }
+  } catch (error) { return errorResponse(error); }
 }

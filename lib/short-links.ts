@@ -1,9 +1,6 @@
-import { randomBytes } from "node:crypto";
-import { Prisma, type ShortLink } from "@prisma/client";
+import { type ShortLink } from "@prisma/client";
 import { getPrisma } from "@/lib/prisma";
-import { ApiError } from "@/lib/api-response";
 import { appUrl, publicLinkUrl } from "@/lib/app-url";
-import { slugSchema } from "@/modules/short-links/schemas";
 
 export function serializeLink(
   link: ShortLink & { _count?: { clicks: number } },
@@ -13,68 +10,27 @@ export function serializeLink(
     slug: link.slug,
     title: link.title,
     description: link.description,
+    expiresAt: link.expiresAt?.toISOString() ?? null,
+    tags: link.tags,
+    folderId: link.folderId,
     destinationUrl: link.destinationUrl,
     isActive: link.isActive,
     createdAt: link.createdAt.toISOString(),
-    shortUrl: publicLinkUrl(link.slug),
+    shortUrl: link.domainKey === "platform" ? publicLinkUrl(link.slug) : `https://${link.domainKey}/s/${link.slug}`,
     shareUrl: publicLinkUrl(link.slug, true),
     clicks: link._count?.clicks ?? 0,
   };
 }
 
-export async function createShortLink(
-  userId: string,
-  input: { url: string; title: string; description: string },
-) {
-  const destination = new URL(input.url);
-  if (
-    destination.origin === appUrl().origin &&
-    /^\/(s|l)\//.test(destination.pathname)
-  ) {
-    throw new ApiError(
-      400,
-      "NESTED_SHORT_LINK",
-      "Use o endereço de destino original, não outro link curto desta aplicação.",
-    );
+export async function publicLink(slug: string, hostname = appUrl().hostname, distribution = "digital") {
+  if (!/^[A-Za-z0-9_-]{3,64}$/.test(slug)) return null;
+  let domainKey = "platform";
+  if (hostname !== appUrl().hostname) {
+    const domain = await getPrisma().customDomain.findUnique({ where: { hostname } });
+    if (!domain || domain.status !== "active") return null;
+    domainKey = hostname;
   }
-  for (let attempt = 0; attempt < 5; attempt++) {
-    try {
-      return await getPrisma().shortLink.create({
-        data: {
-          userId,
-          slug: randomBytes(8).toString("base64url").slice(0, 10),
-          destinationUrl: destination.href,
-          title: input.title,
-          description: input.description,
-        },
-      });
-    } catch (error) {
-      if (!(
-        error instanceof Prisma.PrismaClientKnownRequestError &&
-        error.code === "P2002"
-      ))
-        throw error;
-    }
-  }
-  throw new ApiError(
-    503,
-    "SLUG_UNAVAILABLE",
-    "Não foi possível gerar o link agora. Tente novamente.",
-  );
-}
-
-export async function ownedLink(id: string, userId: string) {
-  const link = await getPrisma().shortLink.findFirst({
-    where: { id, userId },
-    include: { _count: { select: { clicks: true } } },
-  });
-  if (!link) throw new ApiError(404, "LINK_NOT_FOUND", "Link não encontrado.");
-  return link;
-}
-
-export async function publicLink(slug: string) {
-  if (!slugSchema.safeParse(slug).success) return null;
-  return getPrisma().shortLink.findFirst({ where: { slug, isActive: true } });
+  return getPrisma().shortLink.findFirst({ where: { domainKey, slug, distribution, isActive: true, OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }] } });
 }
 
 export async function linkMetrics(linkId: string) {

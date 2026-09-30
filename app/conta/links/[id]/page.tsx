@@ -3,6 +3,7 @@ import { headers } from "next/headers";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { sessionFromHeaders } from "@/lib/session";
+import { actorFor } from "@/modules/workspaces/context";
 import { getPrisma } from "@/lib/prisma";
 import { linkMetrics, serializeLink } from "@/lib/short-links";
 import { CopyButton } from "@/components/copy-button";
@@ -22,8 +23,9 @@ export default async function LinkPage({
   const session = await sessionFromHeaders(await headers());
   if (!session)
     redirect(`/entrar?next=${encodeURIComponent(`/conta/links/${id}`)}`);
+  const actor = await actorFor(session.user.id, await headers());
   const link = await getPrisma().shortLink.findFirst({
-    where: { id, userId: session.user.id },
+    where: { id, workspaceId: actor.workspaceId },
   });
   if (!link) notFound();
   const view = serializeLink(link);

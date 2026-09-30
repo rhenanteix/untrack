@@ -1,8 +1,7 @@
 import { NextResponse } from "next/server";
-import { requireUser } from "@/lib/session";
+import { requireActor, workspaceTransaction, releaseQuota, audit } from "@/modules/workspaces/context";
 import { ApiError, errorResponse } from "@/lib/api-response";
 import { enforceSameOrigin } from "@/lib/request-origin";
-import { getPrisma } from "@/lib/prisma";
 
 export async function DELETE(
   request: Request,
@@ -10,13 +9,14 @@ export async function DELETE(
 ) {
   try {
     enforceSameOrigin(request);
-    const user = await requireUser(request);
+    const actor = await requireActor(request);
     const { id } = await context.params;
-    const result = await getPrisma().linkHistory.deleteMany({
-      where: { id, userId: user.id },
+    await workspaceTransaction(actor, "write", async (tx) => {
+      const result = await tx.linkHistory.deleteMany({ where: { id, workspaceId: actor.workspaceId } });
+      if (!result.count) throw new ApiError(404, "HISTORY_NOT_FOUND", "Registro não encontrado.");
+      await releaseQuota(tx, actor.workspaceId, "history");
+      await audit(tx, actor, "history.deleted", id);
     });
-    if (!result.count)
-      throw new ApiError(404, "HISTORY_NOT_FOUND", "Registro não encontrado.");
     return new NextResponse(null, { status: 204 });
   } catch (error) {
     return errorResponse(error);

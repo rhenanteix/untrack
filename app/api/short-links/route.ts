@@ -1,19 +1,20 @@
 import { NextResponse } from "next/server";
-import { requireUser } from "@/lib/session";
+import { requireActor } from "@/modules/workspaces/context";
+import { createManagedLink } from "@/modules/link-management/service";
 import { errorResponse, readJson } from "@/lib/api-response";
 import { enforceRateLimit } from "@/lib/rate-limit";
 import { enforceSameOrigin } from "@/lib/request-origin";
 import { getPrisma } from "@/lib/prisma";
-import { createShortLink, serializeLink } from "@/lib/short-links";
+import { serializeLink } from "@/lib/short-links";
 import { shortLinkInputSchema } from "@/modules/short-links/schemas";
 import { pageNumber, PAGE_SIZE } from "@/lib/pagination";
 
 export async function GET(request: Request) {
   try {
-    const user = await requireUser(request);
+    const actor = await requireActor(request);
     const page = pageNumber(request);
     const items = await getPrisma().shortLink.findMany({
-      where: { userId: user.id },
+      where: { workspaceId: actor.workspaceId, distribution: "digital" },
       orderBy: [{ createdAt: "desc" }, { id: "desc" }],
       skip: (page - 1) * PAGE_SIZE,
       take: PAGE_SIZE + 1,
@@ -35,10 +36,10 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   try {
     enforceSameOrigin(request);
-    const user = await requireUser(request);
-    const headers = await enforceRateLimit(request, `short-links:${user.id}`);
+    const actor = await requireActor(request);
+    const headers = await enforceRateLimit(request, `short-links:${actor.userId}`);
     const input = shortLinkInputSchema.parse(await readJson(request));
-    const link = await createShortLink(user.id, input);
+    const link = await createManagedLink(actor, input);
     return NextResponse.json(serializeLink(link), { status: 201, headers });
   } catch (error) {
     return errorResponse(error);

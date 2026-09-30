@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { requireUser } from "@/lib/session";
+import { requireActor, workspaceTransaction, reserveQuota, audit } from "@/modules/workspaces/context";
 import { errorResponse, readJson } from "@/lib/api-response";
 import { enforceSameOrigin } from "@/lib/request-origin";
 import { enforceRateLimit } from "@/lib/rate-limit";
@@ -9,10 +9,10 @@ import { pageNumber, PAGE_SIZE } from "@/lib/pagination";
 
 export async function GET(request: Request) {
   try {
-    const user = await requireUser(request);
+    const actor = await requireActor(request);
     const page = pageNumber(request);
     const items = await getPrisma().linkHistory.findMany({
-      where: { userId: user.id },
+      where: { workspaceId: actor.workspaceId },
       orderBy: [{ createdAt: "desc" }, { id: "desc" }],
       skip: (page - 1) * PAGE_SIZE,
       take: PAGE_SIZE + 1,
@@ -40,19 +40,17 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   try {
     enforceSameOrigin(request);
-    const user = await requireUser(request);
-    await enforceRateLimit(request, `history:${user.id}`);
+    const actor = await requireActor(request);
+    await enforceRateLimit(request, `history:${actor.userId}`);
     const input = historyImportSchema.parse(await readJson(request));
-    const result = await getPrisma().linkHistory.createMany({
-      data: input.items.map((item) => ({
-        userId: user.id,
-        importKey: item.id,
-        originalUrl: item.originalUrl,
-        resultUrl: item.cleanUrl,
-        kind: "clean",
-        createdAt: new Date(item.createdAt),
-      })),
-      skipDuplicates: true,
+    const result = await workspaceTransaction(actor, "write", async (tx, plan) => {
+      const existing = await tx.linkHistory.findMany({ where: { workspaceId: actor.workspaceId, userId: actor.userId, importKey: { in: input.items.map((item) => item.id) } }, select: { importKey: true } });
+      const keys = new Set(existing.map((item) => item.importKey));
+      const fresh = input.items.filter((item) => { if (keys.has(item.id)) return false; keys.add(item.id); return true; });
+      await reserveQuota(tx, actor.workspaceId, plan, "history", fresh.length);
+      const result = await tx.linkHistory.createMany({ data: fresh.map((item) => ({ workspaceId: actor.workspaceId, userId: actor.userId, importKey: item.id, originalUrl: item.originalUrl, resultUrl: item.cleanUrl, kind: "clean", createdAt: new Date(item.createdAt) })) });
+      await audit(tx, actor, "history.imported", actor.workspaceId, { count: result.count });
+      return result;
     });
     return NextResponse.json({ imported: result.count });
   } catch (error) {

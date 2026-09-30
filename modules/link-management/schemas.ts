@@ -1,0 +1,6 @@
+import { z } from "zod";
+import { webUrlSchema } from "@/modules/validation/url-validation";
+export const RESERVED_SLUGS = new Set(["api", "app", "s", "l", "q", "conta", "entrar", "cadastro", "untrack", "utm", "qr", "admin", "health", "robots.txt", "sitemap.xml", ".well-known"]);
+export const managedSlugSchema = z.string().min(3).max(64).regex(/^[A-Za-z0-9_-]+$/).refine((value) => !RESERVED_SLUGS.has(value.toLowerCase()), "Slug reservado pela aplicação.");
+export const managedLinkSchema = z.object({ url: webUrlSchema, title: z.string().trim().max(120).default(""), description: z.string().trim().max(500).default(""), slug: managedSlugSchema.optional(), domainId: z.string().optional(), expiresAt: z.iso.datetime().nullable().optional(), tags: z.array(z.string().trim().min(1).max(40)).max(20).default([]), folderId: z.string().nullable().optional(), campaignId: z.string().nullable().optional() }).strict();
+export const managedUpdateSchema = z.object({ destinationUrl: webUrlSchema.optional(), title: z.string().trim().max(120).optional(), description: z.string().trim().max(500).optional(), isActive: z.boolean().optional(), expiresAt: z.iso.datetime().nullable().optional(), tags: z.array(z.string().trim().min(1).max(40)).max(20).optional(), folderId: z.string().nullable().optional(), campaignId: z.string().nullable().optional() }).strict();
