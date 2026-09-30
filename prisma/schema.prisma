@@ -1,0 +1,126 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model AnalyticsEvent {
+  id         String   @id @default(cuid())
+  name       String
+  occurredAt DateTime @default(now())
+  metadata   Json
+
+  @@index([name, occurredAt])
+}
+
+model User {
+  id            String        @id
+  name          String
+  email         String        @unique
+  emailVerified Boolean       @default(false)
+  image         String?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+  sessions      Session[]
+  accounts      Account[]
+  links         ShortLink[]
+  history       LinkHistory[]
+}
+
+model Session {
+  id        String   @id
+  token     String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  ipAddress String?
+  userAgent String?
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model Account {
+  id                    String    @id
+  accountId             String
+  providerId            String
+  userId                String
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  accessToken           String?
+  refreshToken          String?
+  idToken               String?
+  accessTokenExpiresAt  DateTime?
+  refreshTokenExpiresAt DateTime?
+  scope                 String?
+  password              String?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  @@unique([providerId, accountId])
+  @@index([userId])
+}
+
+model Verification {
+  id         String   @id
+  identifier String
+  value      String
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([identifier])
+}
+
+model RateLimit {
+  id          String @id
+  key         String @unique
+  count       Int
+  lastRequest BigInt
+}
+
+model ShortLink {
+  id             String      @id @default(cuid())
+  slug           String      @unique
+  destinationUrl String      @db.VarChar(4096)
+  title          String      @default("") @db.VarChar(120)
+  description    String      @default("") @db.VarChar(500)
+  isActive       Boolean     @default(true)
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+  userId         String
+  user           User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  clicks         LinkClick[]
+
+  @@index([userId, createdAt])
+}
+
+model LinkClick {
+  id        String    @id @default(cuid())
+  linkId    String
+  link      ShortLink @relation(fields: [linkId], references: [id], onDelete: Cascade)
+  createdAt DateTime  @default(now())
+  day       DateTime  @db.Date
+  referrer  String    @db.VarChar(253)
+  device    String    @db.VarChar(20)
+
+  @@index([linkId, createdAt])
+  @@index([linkId, day])
+}
+
+model LinkHistory {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  originalUrl String   @db.VarChar(4096)
+  resultUrl   String   @db.VarChar(8192)
+  kind        String   @db.VarChar(20)
+  createdAt   DateTime @default(now())
+  importKey   String?
+
+  @@unique([userId, importKey])
+  @@index([userId, createdAt])
+}
