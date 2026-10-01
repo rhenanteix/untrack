@@ -16,7 +16,19 @@ export async function apiRequest<T>(
   if (!response.ok) {
     if (response.status === 401)
       throw new Error("Sua sessão expirou. Entre novamente na sua conta.");
-    throw new Error(body.error ?? "Não foi possível concluir a solicitação.");
+    const details = Array.isArray(body.fields)
+      ? body.fields
+          .map(
+            (item: { field?: string; message?: string }) =>
+              `${item.field ? `${item.field}: ` : ""}${item.message ?? "Valor inválido"}`,
+          )
+          .join(" ")
+      : "";
+    throw new Error(
+      [body.error ?? "Não foi possível concluir a solicitação.", details]
+        .filter(Boolean)
+        .join(" "),
+    );
   }
   return body as T;
 }

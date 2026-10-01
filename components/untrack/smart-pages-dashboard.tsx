@@ -1,11 +1,21 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
+import { CopyButton } from "@/components/copy-button";
 import { ActionStatus, apiRequest, useAction } from "./shared";
 
 type PageStatus = "draft" | "published";
-type ThemePreset = "minimal" | "creator" | "business" | "dark" | "editorial" | "bold";
-type SocialNetwork = "instagram" | "tiktok" | "youtube" | "linkedin" | "x" | "facebook" | "whatsapp" | "website";
+type ThemePreset =
+  "minimal" | "creator" | "business" | "dark" | "editorial" | "bold";
+type SocialNetwork =
+  | "instagram"
+  | "tiktok"
+  | "youtube"
+  | "linkedin"
+  | "x"
+  | "facebook"
+  | "whatsapp"
+  | "website";
 
 const themePresets: { value: ThemePreset; label: string }[] = [
   { value: "minimal", label: "Minimal" },
@@ -90,7 +100,10 @@ function publicUrl(slug: string) {
 
 function SmartPagePreview({ page }: { page: SmartPageDetail }) {
   return (
-    <div className={`smart-page-preview smart-page-theme-${page.theme.preset}`} aria-label="Prévia da Smart Page">
+    <div
+      className={`smart-page-preview smart-page-theme-${page.theme.preset}`}
+      aria-label="Prévia da Smart Page"
+    >
       <div className="smart-page-preview-profile">
         {page.avatarUrl ? (
           // eslint-disable-next-line @next/next/no-img-element
@@ -125,20 +138,89 @@ function SmartPagePreview({ page }: { page: SmartPageDetail }) {
 export function SmartPagesDashboard({
   initial,
   managedLinks,
+  canEdit = true,
+  publicOrigin = "",
 }: {
   initial: { items: SmartPageSummary[]; page: number; hasMore: boolean };
   managedLinks: ManagedLink[];
+  canEdit?: boolean;
+  publicOrigin?: string;
 }) {
   const [pages, setPages] = useState(initial.items);
   const [selected, setSelected] = useState<SmartPageDetail | null>(null);
   const [editorTab, setEditorTab] = useState<"editor" | "preview">("editor");
   const [metrics, setMetrics] = useState<SmartPageMetrics | null>(null);
   const action = useAction();
+  const [search, setSearch] = useState("");
+  const [appliedSearch, setAppliedSearch] = useState("");
+  const [listPage, setListPage] = useState(initial.page);
+  const [hasMore, setHasMore] = useState(initial.hasMore);
+  const [showCreate, setShowCreate] = useState(initial.items.length === 0);
+  const [profileDraft, setProfileDraft] = useState<Partial<SmartPageSummary>>(
+    {},
+  );
+  const [dirty, setDirty] = useState(false);
+  const [dirtyBlocks, setDirtyBlocks] = useState<string[]>([]);
+  const editorRef = useRef<HTMLHeadingElement>(null);
+  const hasUnsaved = dirty || dirtyBlocks.length > 0;
+  useEffect(() => {
+    if (!hasUnsaved) return;
+    const warn = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+      event.returnValue = "";
+    };
+    window.addEventListener("beforeunload", warn);
+    return () => window.removeEventListener("beforeunload", warn);
+  }, [hasUnsaved]);
+  async function loadPages(page: number, query = appliedSearch) {
+    await action.run(async () => {
+      const data = await apiRequest<typeof initial>(
+        `/api/smart-pages?page=${page}&search=${encodeURIComponent(query)}`,
+      );
+      setPages(data.items);
+      setListPage(data.page);
+      setHasMore(data.hasMore);
+      setAppliedSearch(query);
+    });
+  }
+  function profileChanged(event: FormEvent<HTMLFormElement>) {
+    const data = new FormData(event.currentTarget);
+    setDirty(true);
+    setProfileDraft({
+      title: String(data.get("title") ?? ""),
+      description: String(data.get("description") ?? ""),
+      avatarUrl: String(data.get("avatarUrl") ?? "") || null,
+      theme: {
+        preset: String(data.get("themePreset") ?? "minimal") as ThemePreset,
+      },
+      socialLinks: socialNetworks.flatMap(({ value }) => {
+        const url = String(data.get(`social-${value}`) ?? "").trim();
+        return url ? [{ network: value, url }] : [];
+      }),
+    });
+  }
 
   async function selectPage(id: string) {
+    if (
+      action.busy ||
+      (hasUnsaved &&
+        !window.confirm(
+          "Há alterações não salvas. Deseja descartá-las e trocar de página?",
+        ))
+    )
+      return;
     await action.run(async () => {
       const page = await apiRequest<SmartPageDetail>(`/api/smart-pages/${id}`);
-      setSelected(page);
+      setSelected({
+        ...page,
+        theme: { preset: page.theme?.preset ?? "minimal" },
+        socialLinks: page.socialLinks ?? [],
+      });
+      setProfileDraft({});
+      setDirty(false);
+      setDirtyBlocks([]);
+      setShowCreate(false);
+      requestAnimationFrame(() => editorRef.current?.focus());
       setMetrics(null);
       setEditorTab("editor");
     });
@@ -146,6 +228,14 @@ export function SmartPagesDashboard({
 
   async function createPage(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (
+      !canEdit ||
+      (hasUnsaved &&
+        !window.confirm(
+          "Descartar alterações não salvas para criar outra página?",
+        ))
+    )
+      return;
     const form = event.currentTarget;
     const data = new FormData(form);
     await action.run(async () => {
@@ -160,6 +250,13 @@ export function SmartPagesDashboard({
       setPages((current) => [page, ...current]);
       setSelected({ ...page, blocks: [] });
       setMetrics(null);
+      setProfileDraft({});
+      setDirty(false);
+      setDirtyBlocks([]);
+      setShowCreate(false);
+      action.setNotice(
+        "Rascunho criado. Adicione seus links e publique quando estiver pronto.",
+      );
       form.reset();
     });
   }
@@ -194,6 +291,8 @@ export function SmartPagesDashboard({
           item.id === page.id ? { ...item, ...page } : item,
         ),
       );
+      setProfileDraft({});
+      setDirty(false);
       action.setNotice("Perfil salvo.");
     });
   }
@@ -262,6 +361,7 @@ export function SmartPagesDashboard({
             }
           : current,
       );
+      setDirtyBlocks((ids) => ids.filter((id) => id !== block.id));
       action.setNotice("Link atualizado.");
     });
   }
@@ -281,6 +381,7 @@ export function SmartPagesDashboard({
             }
           : current,
       );
+      setDirtyBlocks((ids) => ids.filter((id) => id !== blockId));
       action.setNotice("Link excluído.");
     });
   }
@@ -305,7 +406,14 @@ export function SmartPagesDashboard({
   }
 
   async function setPublished(published: boolean) {
-    if (!selected) return;
+    if (!selected || !canEdit || hasUnsaved) return;
+    if (
+      !published &&
+      !window.confirm(
+        "Despublicar esta página? O endereço público ficará indisponível até você publicar novamente.",
+      )
+    )
+      return;
     await action.run(async () => {
       const page = await apiRequest<SmartPageDetail>(
         `/api/smart-pages/${selected.id}/publish`,
@@ -346,36 +454,80 @@ export function SmartPagesDashboard({
             Páginas públicas para organizar, compartilhar e entender seus links.
           </p>
         </div>
+        {canEdit && (
+          <button
+            className="button"
+            disabled={action.busy}
+            onClick={() => setShowCreate((open) => !open)}
+          >
+            {showCreate ? "Fechar nova página" : "+ Nova página"}
+          </button>
+        )}
       </div>
-
+      <div className="smart-page-feedback">
+        <ActionStatus {...action} />
+        {!canEdit && (
+          <p className="smart-page-readonly">
+            Você tem acesso de leitura. Peça a um editor ou administrador para
+            alterar páginas.
+          </p>
+        )}
+      </div>
       <div className="smart-pages-grid">
         <aside className="smart-pages-sidebar" aria-label="Suas Smart Pages">
-          <form className="smart-page-create" onSubmit={createPage}>
-            <h2>Nova página</h2>
-            <label>
-              Nome ou marca
-              <input required name="title" maxLength={120} />
-            </label>
-            <label>
-              Slug
-              <input
-                required
-                name="slug"
-                minLength={3}
-                maxLength={60}
-                pattern="[a-z0-9-]+"
-              />
-            </label>
-            <label>
-              Descrição curta
-              <textarea name="description" maxLength={500} rows={3} />
-            </label>
-            <button className="button" disabled={action.busy}>
-              Criar página
-            </button>
-          </form>
+          {canEdit && showCreate && (
+            <form className="smart-page-create" onSubmit={createPage}>
+              <h2>Nova página</h2>
+              <label>
+                Nome ou marca
+                <input required name="title" maxLength={120} />
+              </label>
+              <label>
+                Slug
+                <input
+                  required
+                  name="slug"
+                  minLength={3}
+                  maxLength={60}
+                  pattern="[a-z0-9-]+"
+                />
+              </label>
+              <label>
+                Descrição curta
+                <textarea name="description" maxLength={500} rows={3} />
+              </label>
+              <button className="button" disabled={action.busy}>
+                Criar página
+              </button>
+            </form>
+          )}
           <div className="smart-page-list">
             <h2>Suas páginas</h2>
+            <form
+              className="smart-page-search"
+              role="search"
+              onSubmit={(event) => {
+                event.preventDefault();
+                void loadPages(1, search);
+              }}
+            >
+              <label>
+                Buscar por nome ou endereço
+                <input
+                  type="search"
+                  value={search}
+                  maxLength={120}
+                  placeholder="Encontre uma página..."
+                  onChange={(event) => setSearch(event.target.value)}
+                />
+              </label>
+              <button
+                className="button button-secondary"
+                disabled={action.busy}
+              >
+                Buscar
+              </button>
+            </form>
             {pages.map((page) => (
               <button
                 key={page.id}
@@ -385,6 +537,8 @@ export function SmartPagesDashboard({
                     ? "smart-page-list-item active"
                     : "smart-page-list-item"
                 }
+                disabled={action.busy}
+                aria-pressed={selected?.id === page.id}
                 onClick={() => void selectPage(page.id)}
               >
                 <strong>{page.title}</strong>
@@ -395,29 +549,49 @@ export function SmartPagesDashboard({
               </button>
             ))}
             {!pages.length ? (
-              <p className="muted">Crie sua primeira página.</p>
+              <p className="muted">
+                {appliedSearch
+                  ? "Nenhuma página encontrada. Tente outro nome ou endereço."
+                  : "Nenhuma página neste workspace. Crie a primeira para começar."}
+              </p>
             ) : null}
+            {(hasMore || listPage > 1) && (
+              <div className="smart-page-pagination">
+                <button
+                  className="button button-secondary"
+                  disabled={action.busy || listPage === 1}
+                  onClick={() => void loadPages(listPage - 1)}
+                >
+                  Anterior
+                </button>
+                <span>Página {listPage}</span>
+                <button
+                  className="button button-secondary"
+                  disabled={action.busy || !hasMore}
+                  onClick={() => void loadPages(listPage + 1)}
+                >
+                  Próxima
+                </button>
+              </div>
+            )}
           </div>
         </aside>
 
-        <div className="smart-page-workbench">
+        <div className="smart-page-workbench" aria-busy={action.busy}>
           <div
             className="smart-page-mobile-tabs"
-            role="tablist"
             aria-label="Editor da Smart Page"
           >
             <button
               type="button"
-              role="tab"
-              aria-selected={editorTab === "editor"}
+              aria-pressed={editorTab === "editor"}
               onClick={() => setEditorTab("editor")}
             >
               Editor
             </button>
             <button
               type="button"
-              role="tab"
-              aria-selected={editorTab === "preview"}
+              aria-pressed={editorTab === "preview"}
               onClick={() => setEditorTab("preview")}
             >
               Prévia
@@ -425,12 +599,24 @@ export function SmartPagesDashboard({
           </div>
           {!selected ? (
             <div className="smart-page-editor-empty">
-              <h2>Selecione ou crie uma Smart Page</h2>
-              <p>O editor, a prévia e a publicação aparecem aqui.</p>
+              <span className="smart-page-empty-icon" aria-hidden="true">
+                ↗
+              </span>
+              <h2>
+                {pages.length
+                  ? "Qual página vamos trabalhar?"
+                  : "Seus links, em um só lugar"}
+              </h2>
+              <p>
+                {pages.length
+                  ? "Escolha uma página na lista para editar o perfil, organizar os links e acompanhar os resultados."
+                  : "Crie um rascunho, adicione seus links e confira a prévia antes de publicar."}
+              </p>
             </div>
           ) : (
             <>
               <div
+                key={selected.id}
                 className={
                   editorTab === "preview"
                     ? "smart-page-editor mobile-hidden"
@@ -439,21 +625,47 @@ export function SmartPagesDashboard({
               >
                 <div className="smart-page-editor-heading">
                   <div>
-                    <h2>{selected.title}</h2>
-                    <p>/{selected.slug}</p>
+                    <span
+                      className={
+                        selected.status === "published"
+                          ? "success-badge"
+                          : "inactive-badge"
+                      }
+                    >
+                      {selected.status === "published"
+                        ? "Publicada"
+                        : "Rascunho"}
+                    </span>
+                    <h2 ref={editorRef} tabIndex={-1}>
+                      {selected.title}
+                    </h2>
+                    <p>/page/{selected.slug}</p>
+                    <p className="smart-page-save-status" role="status">
+                      {hasUnsaved
+                        ? "Alterações não salvas — salve antes de publicar ou trocar de página."
+                        : "Todas as alterações salvas"}
+                    </p>
                   </div>
                   <div className="action-row">
-                    <a
-                      className="button button-secondary"
-                      href={publicUrl(selected.slug)}
-                      target="_blank"
-                      rel="noreferrer"
-                    >
-                      Abrir página
-                    </a>
+                    {selected.status === "published" && (
+                      <a
+                        className="button button-secondary"
+                        href={publicUrl(selected.slug)}
+                        target="_blank"
+                        rel="noreferrer"
+                      >
+                        Abrir página
+                      </a>
+                    )}
+                    {selected.status === "published" && (
+                      <CopyButton
+                        value={`${publicOrigin}${publicUrl(selected.slug)}`}
+                        label="Copiar endereço"
+                      />
+                    )}
                     <button
                       className="button"
-                      disabled={action.busy}
+                      disabled={action.busy || !canEdit || hasUnsaved}
                       onClick={() =>
                         void setPublished(selected.status !== "published")
                       }
@@ -468,79 +680,91 @@ export function SmartPagesDashboard({
                 <form
                   className="smart-page-profile-form"
                   onSubmit={saveProfile}
+                  onChange={profileChanged}
                 >
-                  <h3>Perfil</h3>
-                  <label>
-                    Nome
-                    <input
-                      required
-                      name="title"
-                      maxLength={120}
-                      defaultValue={selected.title}
-                    />
-                  </label>
-                  <label>
-                    Descrição
-                    <textarea
-                      name="description"
-                      maxLength={500}
-                      rows={3}
-                      defaultValue={selected.description}
-                    />
-                  </label>
-                  <label>
-                    Avatar (URL)
-                    <input
-                      type="url"
-                      name="avatarUrl"
-                      defaultValue={selected.avatarUrl ?? ""}
-                    />
-                  </label>
-                  <label>
-                    Slug
-                    <input
-                      required
-                      name="slug"
-                      minLength={3}
-                      maxLength={60}
-                      pattern="[a-z0-9-]+"
-                      defaultValue={selected.slug}
-                    />
-                  </label>
-                  <label>
-                    Tema
-                    <select name="themePreset" defaultValue={selected.theme.preset}>
-                      {themePresets.map((theme) => (
-                        <option key={theme.value} value={theme.value}>
-                          {theme.label}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                  <fieldset className="smart-page-social-inputs">
-                    <legend>Redes sociais</legend>
-                    {socialNetworks.map((network) => (
-                      <label key={network.value}>
-                        {network.label}
-                        <input
-                          type="url"
-                          name={`social-${network.value}`}
-                          placeholder="https://"
-                          defaultValue={
-                            selected.socialLinks.find(
-                              (social) => social.network === network.value,
-                            )?.url ?? ""
-                          }
-                        />
-                      </label>
-                    ))}
-                  </fieldset>
-                  <button
-                    className="button button-secondary"
-                    disabled={action.busy}
+                  <fieldset
+                    className="smart-page-form-fields"
+                    disabled={!canEdit || action.busy}
                   >
-                    Salvar perfil
-                  </button>
+                    <legend>Perfil</legend>
+                    <label>
+                      Nome
+                      <input
+                        required
+                        name="title"
+                        maxLength={120}
+                        defaultValue={selected.title}
+                      />
+                    </label>
+                    <label>
+                      Descrição
+                      <textarea
+                        name="description"
+                        maxLength={500}
+                        rows={3}
+                        defaultValue={selected.description}
+                      />
+                    </label>
+                    <label>
+                      Avatar (URL)
+                      <input
+                        type="url"
+                        name="avatarUrl"
+                        defaultValue={selected.avatarUrl ?? ""}
+                      />
+                    </label>
+                    <label>
+                      Endereço da página
+                      <input
+                        required
+                        name="slug"
+                        minLength={3}
+                        maxLength={60}
+                        pattern="[a-z0-9-]+"
+                        defaultValue={selected.slug}
+                      />
+                    </label>
+                    <label>
+                      Tema
+                      <select
+                        name="themePreset"
+                        defaultValue={selected.theme.preset}
+                      >
+                        {themePresets.map((theme) => (
+                          <option key={theme.value} value={theme.value}>
+                            {theme.label}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    <details className="smart-page-social-details">
+                      <summary>Redes sociais (opcional)</summary>
+                      <fieldset className="smart-page-social-inputs">
+                        <legend>Redes sociais</legend>
+                        {socialNetworks.map((network) => (
+                          <label key={network.value}>
+                            {network.label}
+                            <input
+                              type="url"
+                              name={`social-${network.value}`}
+                              placeholder="https://"
+                              defaultValue={
+                                selected.socialLinks.find(
+                                  (social) => social.network === network.value,
+                                )?.url ?? ""
+                              }
+                            />
+                          </label>
+                        ))}
+                      </fieldset>
+                    </details>
+                    <button
+                      className="button button-secondary"
+                      disabled={action.busy}
+                    >
+                      Salvar perfil
+                    </button>
+                  </fieldset>
                 </form>
 
                 <section
@@ -548,147 +772,169 @@ export function SmartPagesDashboard({
                   aria-labelledby="smart-page-content-heading"
                 >
                   <h3 id="smart-page-content-heading">Conteúdo</h3>
-                  <form className="smart-page-add-block" onSubmit={addBlock}>
-                    <label>
-                      Título
-                      <input
-                        required
-                        name="title"
-                        maxLength={120}
-                        placeholder="Meu portfólio"
-                      />
-                    </label>
-                    <label>
-                      URL externa
-                      <input
-                        type="url"
-                        name="destinationUrl"
-                        placeholder="https://exemplo.com"
-                      />
-                    </label>
-                    <label>
-                      Link gerenciado
-                      <select name="linkId" defaultValue="">
-                        <option value="">Nenhum</option>
-                        {managedLinks.map((link) => (
-                          <option key={link.id} value={link.id}>
-                            {link.title || link.slug}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-                    <label className="smart-page-check">
-                      <input
-                        type="checkbox"
-                        name="openInNewTab"
-                        defaultChecked
-                      />{" "}
-                      Abrir em nova aba
-                    </label>
-                    <button className="button" disabled={action.busy}>
-                      Adicionar link
-                    </button>
-                  </form>
-                  <ol className="smart-page-block-list">
-                    {selected.blocks.map((block, index) => (
-                      <li key={block.id}>
-                        <form onSubmit={(event) => saveBlock(event, block)}>
-                          <label>
-                            Título
-                            <input
-                              required
-                              name="title"
-                              maxLength={120}
-                              defaultValue={block.settings.title}
-                            />
-                          </label>
-                          <label>
-                            URL externa
-                            <input
-                              type="url"
-                              name="destinationUrl"
-                              defaultValue={block.settings.destinationUrl ?? ""}
-                            />
-                          </label>
-                          <label>
-                            Link gerenciado
-                            <select
-                              name="linkId"
-                              defaultValue={block.linkId ?? ""}
-                            >
-                              <option value="">Nenhum</option>
-                              {managedLinks.map((link) => (
-                                <option key={link.id} value={link.id}>
-                                  {link.title || link.slug}
-                                </option>
-                              ))}
-                            </select>
-                          </label>
-                          <div className="smart-page-block-options">
-                            <label className="smart-page-check">
+                  <p className="muted">
+                    Use uma URL externa ou selecione um link gerenciado. Você
+                    pode reordenar os links abaixo.
+                  </p>
+                  <fieldset
+                    className="smart-page-form-fields"
+                    disabled={!canEdit || action.busy}
+                  >
+                    <form className="smart-page-add-block" onSubmit={addBlock}>
+                      <label>
+                        Título
+                        <input
+                          required
+                          name="title"
+                          maxLength={120}
+                          placeholder="Meu portfólio"
+                        />
+                      </label>
+                      <label>
+                        URL externa
+                        <input
+                          type="url"
+                          name="destinationUrl"
+                          placeholder="https://exemplo.com"
+                        />
+                      </label>
+                      <label>
+                        Link gerenciado
+                        <select name="linkId" defaultValue="">
+                          <option value="">Nenhum</option>
+                          {managedLinks.map((link) => (
+                            <option key={link.id} value={link.id}>
+                              {link.title || link.slug}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                      <label className="smart-page-check">
+                        <input
+                          type="checkbox"
+                          name="openInNewTab"
+                          defaultChecked
+                        />{" "}
+                        Abrir em nova aba
+                      </label>
+                      <button className="button" disabled={action.busy}>
+                        Adicionar link
+                      </button>
+                    </form>
+                    <ol className="smart-page-block-list">
+                      {selected.blocks.map((block, index) => (
+                        <li
+                          key={`${block.id}:${block.settings.title}:${block.visible}:${block.linkId}`}
+                        >
+                          <form
+                            onChange={() =>
+                              setDirtyBlocks((ids) =>
+                                ids.includes(block.id)
+                                  ? ids
+                                  : [...ids, block.id],
+                              )
+                            }
+                            onSubmit={(event) => saveBlock(event, block)}
+                          >
+                            <label>
+                              Título
                               <input
-                                type="checkbox"
-                                name="visible"
-                                defaultChecked={block.visible}
-                              />{" "}
-                              Visível
+                                required
+                                name="title"
+                                maxLength={120}
+                                defaultValue={block.settings.title}
+                              />
                             </label>
-                            <label className="smart-page-check">
+                            <label>
+                              URL externa
                               <input
-                                type="checkbox"
-                                name="analyticsEnabled"
-                                defaultChecked={block.analyticsEnabled}
-                              />{" "}
-                              Medir cliques
+                                type="url"
+                                name="destinationUrl"
+                                defaultValue={
+                                  block.settings.destinationUrl ?? ""
+                                }
+                              />
                             </label>
-                            <label className="smart-page-check">
-                              <input
-                                type="checkbox"
-                                name="openInNewTab"
-                                defaultChecked={block.settings.openInNewTab}
-                              />{" "}
-                              Nova aba
+                            <label>
+                              Link gerenciado
+                              <select
+                                name="linkId"
+                                defaultValue={block.linkId ?? ""}
+                              >
+                                <option value="">Nenhum</option>
+                                {managedLinks.map((link) => (
+                                  <option key={link.id} value={link.id}>
+                                    {link.title || link.slug}
+                                  </option>
+                                ))}
+                              </select>
                             </label>
-                          </div>
-                          <div className="action-row">
-                            <button
-                              className="button button-secondary"
-                              disabled={action.busy}
-                            >
-                              Salvar
-                            </button>
-                            <button
-                              type="button"
-                              className="button button-quiet"
-                              disabled={action.busy || index === 0}
-                              onClick={() => void moveBlock(block.id, -1)}
-                            >
-                              Mover acima
-                            </button>
-                            <button
-                              type="button"
-                              className="button button-quiet"
-                              disabled={
-                                action.busy ||
-                                index === selected.blocks.length - 1
-                              }
-                              onClick={() => void moveBlock(block.id, 1)}
-                            >
-                              Mover abaixo
-                            </button>
-                            <button
-                              type="button"
-                              className="button button-quiet danger-text"
-                              disabled={action.busy}
-                              onClick={() => void deleteBlock(block.id)}
-                            >
-                              Excluir
-                            </button>
-                          </div>
-                        </form>
-                      </li>
-                    ))}
-                  </ol>
+                            <div className="smart-page-block-options">
+                              <label className="smart-page-check">
+                                <input
+                                  type="checkbox"
+                                  name="visible"
+                                  defaultChecked={block.visible}
+                                />{" "}
+                                Visível
+                              </label>
+                              <label className="smart-page-check">
+                                <input
+                                  type="checkbox"
+                                  name="analyticsEnabled"
+                                  defaultChecked={block.analyticsEnabled}
+                                />{" "}
+                                Medir cliques
+                              </label>
+                              <label className="smart-page-check">
+                                <input
+                                  type="checkbox"
+                                  name="openInNewTab"
+                                  defaultChecked={block.settings.openInNewTab}
+                                />{" "}
+                                Nova aba
+                              </label>
+                            </div>
+                            <div className="action-row">
+                              <button
+                                className="button button-secondary"
+                                disabled={action.busy}
+                              >
+                                Salvar
+                              </button>
+                              <button
+                                type="button"
+                                className="button button-quiet"
+                                disabled={action.busy || index === 0}
+                                onClick={() => void moveBlock(block.id, -1)}
+                              >
+                                Mover acima
+                              </button>
+                              <button
+                                type="button"
+                                className="button button-quiet"
+                                disabled={
+                                  action.busy ||
+                                  index === selected.blocks.length - 1
+                                }
+                                onClick={() => void moveBlock(block.id, 1)}
+                              >
+                                Mover abaixo
+                              </button>
+                              <button
+                                type="button"
+                                className="button button-quiet danger-text"
+                                disabled={action.busy}
+                                onClick={() => void deleteBlock(block.id)}
+                              >
+                                Excluir
+                              </button>
+                            </div>
+                          </form>
+                        </li>
+                      ))}
+                    </ol>
+                  </fieldset>
                 </section>
                 <section
                   className="smart-page-metrics"
@@ -788,11 +1034,15 @@ export function SmartPagesDashboard({
                 }
               >
                 <h2>Prévia</h2>
-                <SmartPagePreview page={selected} />
+                <p className="muted">
+                  {dirty
+                    ? "Prévia das alterações do perfil. Salve para atualizar sua página."
+                    : "Confira a aparência antes de compartilhar."}
+                </p>
+                <SmartPagePreview page={{ ...selected, ...profileDraft }} />
               </div>
             </>
           )}
-          <ActionStatus {...action} />
         </div>
       </div>
     </section>

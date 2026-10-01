@@ -333,3 +333,21 @@ Na Vercel, importe o repositório, configure as variáveis no ambiente Productio
 
 Contribuições devem manter a lógica testável em `modules/`, nunca relaxar a
 validação SSRF e incluir testes para qualquer novo tracker ou contrato de API.
+
+### Recuperação de Smart Pages e atualização do Prisma
+
+`npm run dev` e `npm run test:e2e` regeneram o Prisma Client antes de iniciar.
+Depois de atualizar o projeto, aplique as migrations com `npm run prisma:deploy`
+e reinicie um servidor de desenvolvimento que já estava aberto. A migration
+`20261001000000_smart_page_profile` acrescenta `theme` e `socialLinks` sem apagar
+páginas, inclusive em instalações que aplicaram a primeira versão de Smart Pages.
+
+Em desenvolvimento, `.env.local` tem precedência sobre `.env`. Verifique o banco
+apontado pelo comando de migration; mudar apenas `.env` não altera uma URL já
+configurada em `.env.local`. Nunca copie credenciais para mensagens de erro.
+
+O painel oferece busca por nome/endereço, paginação, prévia do perfil antes de
+salvar, indicação de alterações pendentes e recuperação da seleção de workspace.
+Usuários `viewer` recebem controles de edição desabilitados; as permissões também
+continuam sendo verificadas pelas APIs. Erros de banco e seleção de workspace
+exibem ações de recuperação em vez de deixar o painel vazio.

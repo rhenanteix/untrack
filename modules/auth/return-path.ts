@@ -4,7 +4,7 @@ export function safeReturnPath(value: string | null | undefined): string {
     const parsed = new URL(value, "https://app.invalid");
     if (
       parsed.origin !== "https://app.invalid" ||
-      !/^\/(conta|encurtar)(\/|$)/.test(parsed.pathname)
+      !/^\/(conta|encurtar|untrack)(\/|$)/.test(parsed.pathname)
     )
       return "/conta";
     return parsed.pathname + parsed.search;

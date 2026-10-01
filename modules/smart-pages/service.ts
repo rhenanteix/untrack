@@ -60,9 +60,29 @@ async function workspacePage(actor: Actor, id: string) {
   return page;
 }
 
-export async function listSmartPages(actor: Actor, page: number) {
+export async function listSmartPages(actor: Actor, page: number, search = "") {
   const items = await getPrisma().smartPage.findMany({
-    where: { workspaceId: actor.workspaceId },
+    where: {
+      workspaceId: actor.workspaceId,
+      ...(search.trim()
+        ? {
+            OR: [
+              {
+                title: {
+                  contains: search.trim().slice(0, 120),
+                  mode: "insensitive" as const,
+                },
+              },
+              {
+                slug: {
+                  contains: search.trim().slice(0, 120),
+                  mode: "insensitive" as const,
+                },
+              },
+            ],
+          }
+        : {}),
+    },
     orderBy: [{ updatedAt: "desc" }, { id: "desc" }],
     skip: (page - 1) * PAGE_SIZE,
     take: PAGE_SIZE + 1,

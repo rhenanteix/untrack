@@ -1,11 +1,12 @@
 "use client";
-import { useEffect, useState, useCallback } from "react";
+import { use, useEffect, useState, useCallback } from "react";
 import { apiRequest, useAction, ActionStatus } from "@/components/untrack/shared";
 import type { CampaignKitProposal } from "@/modules/campaigns/schemas";
 
 interface Campaign { id: string; name: string; }
 
-export default function CampaignKitPage({ params }: { params: { id: string } }) {
+export default function CampaignKitPage({ params: paramsPromise }: { params: Promise<{ id: string }> }) {
+  const params = use(paramsPromise);
   const [campaign, setCampaign] = useState<Campaign | null>(null);
   const [destination, setDestination] = useState("");
   const [channels, setChannels] = useState<Array<{ type: string; name: string }>>([{ type: "link", name: "Canal 1" }]);

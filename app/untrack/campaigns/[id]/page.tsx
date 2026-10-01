@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState, useCallback } from "react";
+import { use, useEffect, useState, useCallback } from "react";
 import Link from "next/link";
 import { apiRequest, useAction, ActionStatus } from "@/components/untrack/shared";
 import type { CampaignStatus, ChannelType, ChecklistStatus, ChecklistSeverity, MonitorStatus, IncidentStatus } from "@/modules/campaigns/schemas";
@@ -68,7 +68,8 @@ interface Incident {
 
 type Tab = "overview" | "channels" | "checklist" | "monitor" | "incidents" | "history";
 
-export default function CampaignDetailPage({ params }: { params: { id: string } }) {
+export default function CampaignDetailPage({ params: paramsPromise }: { params: Promise<{ id: string }> }) {
+  const params = use(paramsPromise);
   const [campaign, setCampaign] = useState<Campaign | null>(null);
   const [tab, setTab] = useState<Tab>("overview");
   const [monitors, setMonitors] = useState<MonitorCheck[]>([]);

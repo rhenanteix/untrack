@@ -21,7 +21,9 @@
     "prisma:deploy": "node scripts/prisma.mjs migrate deploy",
     "db:up": "docker compose --env-file .env.local up -d --wait db",
     "setup:local": "node scripts/setup-local.mjs && npm run db:up && npm run prisma:generate && npm run prisma:deploy",
-    "db:stop": "docker compose --env-file .env.local stop db"
+    "db:stop": "docker compose --env-file .env.local stop db",
+    "predev": "npm run prisma:generate",
+    "pretest:e2e": "npm run prisma:generate"
   },
   "dependencies": {
     "@better-auth/prisma-adapter": "^1.7.6",

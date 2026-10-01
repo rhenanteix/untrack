@@ -6,7 +6,7 @@ import { enforceRateLimit } from "@/lib/rate-limit";
 import { requireActor } from "@/modules/workspaces/context";
 import { assertPermission } from "@/modules/workspaces/policy";
 import { listCampaigns, getCampaign, createCampaign, updateCampaign, deleteCampaign } from "@/modules/campaigns/service";
-import { createChannel, updateChannel, deleteChannel, updateChecklistItem, approveCampaign } from "@/modules/campaigns/service";
+import { updateChannel, deleteChannel, updateChecklistItem, approveCampaign } from "@/modules/campaigns/service";
 import { proposeKit, saveKit } from "@/modules/campaigns/kit";
 import { runChecklist } from "@/modules/campaigns/checklist";
 import { recordMonitorCheck } from "@/modules/campaigns/monitoring";

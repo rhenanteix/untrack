@@ -9,9 +9,16 @@ import { createSmartPage, listSmartPages } from "@/modules/smart-pages/service";
 export async function GET(request: Request) {
   try {
     const actor = await requireActor(request);
-    return NextResponse.json(await listSmartPages(actor, pageNumber(request)), {
-      headers: { "Cache-Control": "private, no-store" },
-    });
+    return NextResponse.json(
+      await listSmartPages(
+        actor,
+        pageNumber(request),
+        new URL(request.url).searchParams.get("search") ?? "",
+      ),
+      {
+        headers: { "Cache-Control": "private, no-store" },
+      },
+    );
   } catch (error) {
     return errorResponse(error);
   }
