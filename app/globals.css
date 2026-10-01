@@ -965,7 +965,8 @@ code {
   padding: clamp(26px, 6vw, 48px);
   border: 1px solid #ced9cd;
   border-radius: 8px;
-  background: #fffefb;
+  background: var(--smart-page-background, #fffefb);
+  color: var(--smart-page-text, var(--ink));
   box-shadow: 0 24px 64px rgba(23, 42, 58, 0.12);
 }
 .smart-page-profile {
@@ -1012,8 +1013,8 @@ code {
   align-items: center;
   justify-content: center;
   border: 1px solid var(--ink);
-  border-radius: 8px;
-  background: var(--ink);
+  border-radius: var(--smart-page-radius, 8px);
+  background: var(--smart-page-button, var(--ink));
   color: #fff;
   padding: 12px 18px;
   font-weight: 750;
@@ -1022,8 +1023,58 @@ code {
   overflow-wrap: anywhere;
 }
 .smart-page-link:hover {
-  background: #234156;
+  filter: brightness(0.9);
 }
+.smart-page-socials {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+  margin-top: 24px;
+  flex-wrap: wrap;
+}
+.smart-page-socials a {
+  border-bottom: 1px solid currentColor;
+  color: inherit;
+  font-size: 12px;
+  font-weight: 800;
+  text-decoration: none;
+  text-transform: capitalize;
+}
+.smart-page-social-inputs {
+  display: grid;
+  gap: 12px;
+  grid-column: 1 / -1;
+  margin: 0;
+  padding: 14px;
+}
+.smart-page-social-inputs legend {
+  padding: 0 4px;
+  font-weight: 800;
+}
+.smart-page-preview-socials {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 16px;
+  flex-wrap: wrap;
+}
+.smart-page-preview-socials span {
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: capitalize;
+}
+.smart-page-theme-dark {
+  --smart-page-background: #172a3a;
+  --smart-page-text: #ffffff;
+  --smart-page-button: #d8f768;
+}
+.smart-page-theme-dark .smart-page-link {
+  color: #172a3a;
+}
+.smart-page-theme-creator { --smart-page-background: #f5efff; --smart-page-button: #6a3ed1; }
+.smart-page-theme-business { --smart-page-background: #eef7f4; --smart-page-button: #176c53; }
+.smart-page-theme-editorial { --smart-page-background: #fff7ed; --smart-page-button: #9a3412; }
+.smart-page-theme-bold { --smart-page-background: #fff04d; --smart-page-button: #111827; }
 .smart-page-empty {
   margin: 34px 0 0;
   color: var(--muted);

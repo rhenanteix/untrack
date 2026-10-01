@@ -4,6 +4,10 @@ import { SmartPagesDashboard } from "@/components/untrack/smart-pages-dashboard"
 import { getPrisma } from "@/lib/prisma";
 import { sessionFromHeaders } from "@/lib/session";
 import { listSmartPages } from "@/modules/smart-pages/service";
+import {
+  smartPageThemeSchema,
+  socialLinksSchema,
+} from "@/modules/smart-pages/schemas";
 import { actorFor } from "@/modules/workspaces/context";
 
 export default async function SmartPagesPage() {
@@ -29,6 +33,11 @@ export default async function SmartPagesPage() {
           publishedAt: page.publishedAt?.toISOString() ?? null,
           createdAt: page.createdAt.toISOString(),
           updatedAt: page.updatedAt.toISOString(),
+          theme:
+            smartPageThemeSchema.safeParse(page.theme).data ?? {
+              preset: "minimal",
+            },
+          socialLinks: socialLinksSchema.safeParse(page.socialLinks).data ?? [],
         })),
       }}
       managedLinks={managedLinks}

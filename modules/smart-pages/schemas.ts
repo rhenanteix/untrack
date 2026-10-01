@@ -17,12 +17,40 @@ export const smartPageSlugSchema = z
 
 export const smartPageStatusSchema = z.enum(["draft", "published"]);
 
+export const smartPageThemeSchema = z
+  .object({
+    preset: z.enum(["minimal", "creator", "business", "dark", "editorial", "bold"]).default("minimal"),
+    background: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional(),
+    textColor: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional(),
+    buttonColor: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional(),
+    buttonRadius: z.number().int().min(0).max(28).optional(),
+  })
+  .strict();
+
+export const socialLinksSchema = z
+  .array(
+    z
+      .object({
+        network: z.enum(["instagram", "tiktok", "youtube", "linkedin", "x", "facebook", "whatsapp", "website"]),
+        url: webUrlSchema,
+      })
+      .strict(),
+  )
+  .max(8)
+  .superRefine((links, context) => {
+    if (new Set(links.map((link) => link.network)).size !== links.length) {
+      context.addIssue({ code: "custom", message: "Cada rede pode ser informada apenas uma vez." });
+    }
+  });
+
 export const smartPageInputSchema = z
   .object({
     slug: smartPageSlugSchema,
     title: z.string().trim().min(1, "Informe um título.").max(120),
     description: z.string().trim().max(500).default(""),
     avatarUrl: webUrlSchema.nullable().optional(),
+    theme: smartPageThemeSchema.default({ preset: "minimal" }),
+    socialLinks: socialLinksSchema.default([]),
   })
   .strict();
 
@@ -31,6 +59,8 @@ export const smartPageUpdateSchema = smartPageInputSchema
   .extend({
     slug: smartPageSlugSchema.optional(),
     avatarUrl: webUrlSchema.nullable().optional(),
+    theme: smartPageThemeSchema.optional(),
+    socialLinks: socialLinksSchema.optional(),
   })
   .partial()
   .strict();

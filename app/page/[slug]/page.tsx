@@ -7,7 +7,7 @@ import {
 } from "@/components/smart-page-tracker";
 import { appUrl } from "@/lib/app-url";
 import { publicSmartPage } from "@/modules/smart-pages/service";
-import { linkBlockSettingsSchema } from "@/modules/smart-pages/schemas";
+import { linkBlockSettingsSchema, smartPageThemeSchema, socialLinksSchema } from "@/modules/smart-pages/schemas";
 
 export const dynamic = "force-dynamic";
 
@@ -61,6 +61,8 @@ export default async function PublicSmartPage({
   const { slug } = await params;
   const page = await findSmartPage(slug);
   if (!page) notFound();
+  const theme = smartPageThemeSchema.safeParse(page.theme).data ?? { preset: "minimal" };
+  const socialLinks = socialLinksSchema.safeParse(page.socialLinks).data ?? [];
 
   const blocks = page.blocks.flatMap((block) => {
     const settings = linkBlockSettingsSchema.safeParse(block.settings);
@@ -78,7 +80,7 @@ export default async function PublicSmartPage({
 
   return (
     <section className="smart-page-shell">
-      <div className="smart-page" aria-labelledby="smart-page-title">
+      <div className={`smart-page smart-page-theme-${theme.preset}`} aria-labelledby="smart-page-title" style={{ "--smart-page-background": theme.background, "--smart-page-text": theme.textColor, "--smart-page-button": theme.buttonColor, "--smart-page-radius": theme.buttonRadius === undefined ? undefined : `${theme.buttonRadius}px` } as React.CSSProperties}>
         <header className="smart-page-profile">
           {page.avatarUrl ? (
             // eslint-disable-next-line @next/next/no-img-element
@@ -114,6 +116,7 @@ export default async function PublicSmartPage({
             </SmartPageLink>
           ))}
         </nav>
+        {socialLinks.length ? <nav className="smart-page-socials" aria-label={`Redes de ${page.title}`}>{socialLinks.map((social) => <a key={social.network} href={social.url} target="_blank" rel="noreferrer">{social.network}</a>)}</nav> : null}
         {!blocks.length ? (
           <p className="smart-page-empty">Nenhum link disponível.</p>
         ) : null}

@@ -18,6 +18,8 @@ CREATE TABLE "SmartPage" (
     "title" VARCHAR(120) NOT NULL,
     "description" VARCHAR(500) NOT NULL DEFAULT '',
     "avatarUrl" VARCHAR(4096),
+    "theme" JSONB NOT NULL DEFAULT '{}',
+    "socialLinks" JSONB NOT NULL DEFAULT '[]',
     "status" "SmartPageStatus" NOT NULL DEFAULT 'draft',
     "publishedAt" TIMESTAMP(3),
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,

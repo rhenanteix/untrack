@@ -4,6 +4,28 @@ import { useState, type FormEvent } from "react";
 import { ActionStatus, apiRequest, useAction } from "./shared";
 
 type PageStatus = "draft" | "published";
+type ThemePreset = "minimal" | "creator" | "business" | "dark" | "editorial" | "bold";
+type SocialNetwork = "instagram" | "tiktok" | "youtube" | "linkedin" | "x" | "facebook" | "whatsapp" | "website";
+
+const themePresets: { value: ThemePreset; label: string }[] = [
+  { value: "minimal", label: "Minimal" },
+  { value: "creator", label: "Creator" },
+  { value: "business", label: "Business" },
+  { value: "dark", label: "Dark" },
+  { value: "editorial", label: "Editorial" },
+  { value: "bold", label: "Bold" },
+];
+
+const socialNetworks: { value: SocialNetwork; label: string }[] = [
+  { value: "instagram", label: "Instagram" },
+  { value: "tiktok", label: "TikTok" },
+  { value: "youtube", label: "YouTube" },
+  { value: "linkedin", label: "LinkedIn" },
+  { value: "x", label: "X" },
+  { value: "facebook", label: "Facebook" },
+  { value: "whatsapp", label: "WhatsApp" },
+  { value: "website", label: "Site" },
+];
 
 interface SmartPageSummary {
   id: string;
@@ -11,6 +33,8 @@ interface SmartPageSummary {
   title: string;
   description: string;
   avatarUrl: string | null;
+  theme: { preset: ThemePreset };
+  socialLinks: { network: SocialNetwork; url: string }[];
   status: PageStatus;
   publishedAt: string | null;
   createdAt: string;
@@ -66,7 +90,7 @@ function publicUrl(slug: string) {
 
 function SmartPagePreview({ page }: { page: SmartPageDetail }) {
   return (
-    <div className="smart-page-preview" aria-label="Prévia da Smart Page">
+    <div className={`smart-page-preview smart-page-theme-${page.theme.preset}`} aria-label="Prévia da Smart Page">
       <div className="smart-page-preview-profile">
         {page.avatarUrl ? (
           // eslint-disable-next-line @next/next/no-img-element
@@ -87,6 +111,13 @@ function SmartPagePreview({ page }: { page: SmartPageDetail }) {
           <small>Adicione seu primeiro link.</small>
         ) : null}
       </div>
+      {page.socialLinks.length ? (
+        <div className="smart-page-preview-socials">
+          {page.socialLinks.map((social) => (
+            <span key={social.network}>{social.network}</span>
+          ))}
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -138,6 +169,10 @@ export function SmartPagesDashboard({
     if (!selected) return;
     const form = event.currentTarget;
     const data = new FormData(form);
+    const socialLinks = socialNetworks.flatMap(({ value }) => {
+      const url = String(data.get(`social-${value}`) ?? "").trim();
+      return url ? [{ network: value, url }] : [];
+    });
     await action.run(async () => {
       const page = await apiRequest<SmartPageDetail>(
         `/api/smart-pages/${selected.id}`,
@@ -148,6 +183,8 @@ export function SmartPagesDashboard({
             title: data.get("title"),
             description: data.get("description"),
             avatarUrl: data.get("avatarUrl") || null,
+            theme: { preset: data.get("themePreset") },
+            socialLinks,
           }),
         },
       );
@@ -470,6 +507,34 @@ export function SmartPagesDashboard({
                       defaultValue={selected.slug}
                     />
                   </label>
+                  <label>
+                    Tema
+                    <select name="themePreset" defaultValue={selected.theme.preset}>
+                      {themePresets.map((theme) => (
+                        <option key={theme.value} value={theme.value}>
+                          {theme.label}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <fieldset className="smart-page-social-inputs">
+                    <legend>Redes sociais</legend>
+                    {socialNetworks.map((network) => (
+                      <label key={network.value}>
+                        {network.label}
+                        <input
+                          type="url"
+                          name={`social-${network.value}`}
+                          placeholder="https://"
+                          defaultValue={
+                            selected.socialLinks.find(
+                              (social) => social.network === network.value,
+                            )?.url ?? ""
+                          }
+                        />
+                      </label>
+                    ))}
+                  </fieldset>
                   <button
                     className="button button-secondary"
                     disabled={action.busy}

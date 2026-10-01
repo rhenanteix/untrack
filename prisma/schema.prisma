@@ -103,6 +103,8 @@ model SmartPage {
   title       String          @db.VarChar(120)
   description String          @default("") @db.VarChar(500)
   avatarUrl   String?         @db.VarChar(4096)
+  theme       Json            @default("{}")
+  socialLinks Json            @default("[]")
   status      SmartPageStatus @default(draft)
   publishedAt DateTime?
   createdAt   DateTime        @default(now())
