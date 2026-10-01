@@ -21,6 +21,10 @@ export const themeIds = [
   "music",
   "kitchen",
   "community",
+  "neon",
+  "mono",
+  "lilac",
+  "signal",
 ] as const;
 export type ThemePreset = (typeof themeIds)[number];
 export type SmartPageTheme = {
@@ -244,6 +248,34 @@ export const themes: {
     category: "Educação",
     description: "Conhecimento e conversas que aproximam.",
     colors: ["#e7ecfa", "#344b87", "#bac8ee"],
+  },
+  {
+    id: "neon",
+    name: "Neon Club",
+    category: "Criadores",
+    description: "Alto contraste para lançamentos, eventos e conteúdo em movimento.",
+    colors: ["#101413", "#e8ff4d", "#f0f0e8"],
+  },
+  {
+    id: "mono",
+    name: "Monocromo",
+    category: "Essenciais",
+    description: "Uma assinatura direta, limpa e impossível de distrair.",
+    colors: ["#f7f7f3", "#111111", "#d8d8d2"],
+  },
+  {
+    id: "lilac",
+    name: "Lilas", 
+    category: "Criadores",
+    description: "Leveza gráfica para newsletters, projetos autorais e comunidade.",
+    colors: ["#f0edff", "#3f2d70", "#c7bcff"],
+  },
+  {
+    id: "signal",
+    name: "Sinal",
+    category: "Negócios",
+    description: "Energia visual para converter atenção em próxima ação.",
+    colors: ["#ff6a3d", "#1d1d1b", "#fff4d7"],
   },
 ];
 export function readableInk(hex: string) {

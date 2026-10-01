@@ -12,6 +12,10 @@ export const qrInputSchema = z
     errorCorrectionLevel: z.enum(["L", "M", "Q", "H"]).default("M"),
     foreground: colorSchema.default("#172A3A"),
     background: colorSchema.default("#FFFFFF"),
+    pattern: z.enum(["square", "dots", "rounded"]).default("square"),
+    cornerStyle: z
+      .enum(["square", "rounded", "extra-rounded"])
+      .default("square"),
     frame: z.enum(["none", "rounded", "scan"]).default("none"),
     frameText: z.string().trim().max(40).default("ESCANEIE"),
   })

@@ -17,6 +17,7 @@ describe("serviço de QR Code", () => {
       width: 256,
       margin: 4,
       errorCorrectionLevel: "M",
+      color: { dark: "#172A3A", light: "#FFFFFF" },
     });
     expect(input.url).toBe(base.url);
   });
@@ -47,6 +48,23 @@ describe("serviço de QR Code", () => {
     const view = new DataView(png);
     expect(view.getUint32(16)).toBe(512);
     expect(view.getUint32(20)).toBe(512);
+  });
+
+  it("renderiza padrões e marcadores selecionados no PNG", async () => {
+    const square = await renderQrDataUrl(
+      qrInputSchema.parse({ ...base, width: 256 }),
+    );
+    const styled = await renderQrDataUrl(
+      qrInputSchema.parse({
+        ...base,
+        width: 256,
+        pattern: "dots",
+        cornerStyle: "extra-rounded",
+      }),
+    );
+
+    expect(styled).toMatch(/^data:image\/png;base64,/);
+    expect(styled).not.toBe(square);
   });
 
   it("recusa URLs fora de http/https antes de codificar", () => {
