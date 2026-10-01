@@ -1217,6 +1217,27 @@ code {
   font-weight: 800;
   text-transform: uppercase;
 }
+.product-nav-advanced {
+  border-top: 1px solid var(--line);
+  padding-top: 12px;
+}
+.product-nav-advanced summary {
+  padding: 0 9px;
+  color: #75817c;
+  cursor: pointer;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+.product-nav-advanced > div {
+  display: grid;
+  gap: 3px;
+  margin-top: 7px;
+}
+.product-nav-advanced[open] summary {
+  color: var(--ink);
+}
 .product-main {
   min-width: 0;
 }
@@ -1403,6 +1424,7 @@ code {
 }
 .account-insights {
   padding: 20px;
+  scroll-margin-top: 24px;
 }
 .account-insights-heading {
   display: flex;

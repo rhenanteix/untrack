@@ -9,26 +9,32 @@ interface Membership {
 }
 const groups = [
   {
-    label: "Espaço pessoal",
+    label: "Comece aqui",
     items: [
-      { href: "/conta", label: "Meu painel" },
+      { href: "/conta#insights", label: "Dashboard e insights" },
       { href: "/untrack/smart-pages", label: "Minha página" },
       { label: "Currículos", status: "Em breve" },
       { label: "Portfólio", status: "Em breve" },
     ],
   },
   {
-    label: "Trabalho profissional",
+    label: "Criar e compartilhar",
     items: [
       { href: "/untrack/short-links", label: "Links rastreáveis" },
       { href: "/untrack/utm", label: "Campanhas UTM" },
       { href: "/untrack/qr", label: "QR Codes" },
-      { href: "/untrack/link-health", label: "Saúde de links" },
+    ],
+  },
+  {
+    label: "Acompanhar",
+    items: [
       { href: "/untrack/campaigns", label: "Campanhas" },
+      { href: "/untrack/link-health", label: "Saúde de links" },
     ],
   },
   {
     label: "Administração",
+    collapsible: true,
     items: [
       { href: "/untrack/clients", label: "Clientes" },
       { href: "/untrack/domains", label: "Domínios" },
@@ -98,6 +104,36 @@ export function WorkspaceShell({ children }: { children: ReactNode }) {
     window.location.reload();
   }
   const current = memberships.find((item) => item.workspace.id === active);
+  function renderItems(
+    items: (typeof groups)[number]["items"],
+  ) {
+    return items.map((item) => {
+      if (!item.href) {
+        return (
+          <span className="product-nav-placeholder" key={item.label} aria-disabled="true">
+            {item.label}
+            <small>{"status" in item ? item.status : ""}</small>
+          </span>
+        );
+      }
+      const itemPath = item.href.split("#", 1)[0];
+      return (
+        <Link
+          key={item.href}
+          href={item.href}
+          onClick={() => setOpenedAt(null)}
+          aria-current={
+            pathname === itemPath ||
+            (itemPath !== "/conta" && pathname.startsWith(`${itemPath}/`))
+              ? "page"
+              : undefined
+          }
+        >
+          {item.label}
+        </Link>
+      );
+    });
+  }
   return (
     <div className="product-shell">
       <div className="product-mobile-bar">
@@ -196,32 +232,17 @@ export function WorkspaceShell({ children }: { children: ReactNode }) {
         )}
         <nav className="product-nav" aria-label="Módulos do workspace">
           {groups.map((group) => (
-            <div key={group.label}>
-              <span>{group.label}</span>
-              {group.items.map((item) =>
-                item.href ? (
-                  <Link
-                    key={item.href}
-                    href={item.href}
-                    onClick={() => setOpenedAt(null)}
-                    aria-current={
-                      pathname === item.href ||
-                      (item.href !== "/conta" &&
-                        pathname.startsWith(`${item.href}/`))
-                        ? "page"
-                        : undefined
-                    }
-                  >
-                    {item.label}
-                  </Link>
-                ) : (
-                  <span className="product-nav-placeholder" key={item.label} aria-disabled="true">
-                    {item.label}
-                    <small>{item.status}</small>
-                  </span>
-                ),
-              )}
-            </div>
+            group.collapsible ? (
+              <details className="product-nav-advanced" key={group.label}>
+                <summary>{group.label}</summary>
+                <div>{renderItems(group.items)}</div>
+              </details>
+            ) : (
+              <div key={group.label}>
+                <span>{group.label}</span>
+                {renderItems(group.items)}
+              </div>
+            )
           ))}
         </nav>
         <ActionStatus {...action} />

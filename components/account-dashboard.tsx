@@ -177,7 +177,7 @@ export function AccountDashboard({
           </form>
         </section>
       )}
-      <section className="account-insights" aria-labelledby="account-insights-heading">
+      <section id="insights" className="account-insights" aria-labelledby="account-insights-heading">
         <div className="account-insights-heading">
           <div>
             <span className="eyebrow">Insights do workspace</span>
