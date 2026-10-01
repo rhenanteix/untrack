@@ -37,6 +37,16 @@ export const ANALYTICS_EVENTS = [
   "whatsapp_optimization_applied",
   "whatsapp_cta_created",
   "whatsapp_campaign_created",
+  "dashboard_viewed",
+  "quick_action_clicked",
+  "module_opened",
+  "create_action_started",
+  "create_action_completed",
+  "anonymous_usage_consumed",
+  "signup_prompt_shown",
+  "signup_started",
+  "signup_completed",
+  "upgrade_clicked",
 ] as const;
 
 export type AnalyticsEventName = (typeof ANALYTICS_EVENTS)[number];
@@ -51,6 +61,13 @@ export const CLIENT_ANALYTICS_EVENTS = [
   "qr_downloaded",
   "url_check_requested",
   "whatsapp_link_copied",
+  "dashboard_viewed",
+  "quick_action_clicked",
+  "module_opened",
+  "create_action_started",
+  "signup_prompt_shown",
+  "signup_started",
+  "upgrade_clicked",
 ] as const satisfies ReadonlyArray<AnalyticsEventName>;
 
 export const ANALYTICS_PATHS = [
@@ -61,9 +78,16 @@ export const ANALYTICS_PATHS = [
   "/encurtar",
   "/link-health",
   "/conta",
+  "/untrack/short-links",
+  "/untrack/whatsapp",
+  "/untrack/campaigns",
+  "/untrack/utm",
+  "/untrack/qr",
+  "/untrack/smart-pages",
+  "/untrack/link-health",
+  "/untrack/usage",
   "/entrar",
   "/cadastro",
-  "/untrack/whatsapp",
 ] as const;
 
 /** DOM event carrying `{ event }`, dispatched by the browser analytics client. */

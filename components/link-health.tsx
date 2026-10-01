@@ -1,8 +1,11 @@
 "use client";
-import { GuestAccessNotice } from "@/components/guest-access-notice";
+import {
+  GuestAccessNotice,
+  GuestSignupPrompt,
+} from "@/components/guest-access-notice";
 
 import { useState, type FormEvent } from "react";
-import { apiRequest } from "@/lib/client/api";
+import { analytics } from "@/lib/client/analytics";
 import type { LinkHealthReport } from "@/modules/link-health/types";
 
 const statusLabels = {
@@ -147,17 +150,28 @@ export function LinkHealth() {
   const [report, setReport] = useState<LinkHealthReport | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [showSignupPrompt, setShowSignupPrompt] = useState(false);
   async function submit(event: FormEvent) {
     event.preventDefault();
     setReport(null);
     setError("");
     setLoading(true);
     try {
-      const { health } = await apiRequest<{ health: LinkHealthReport }>(
-        "/api/link-health",
-        { method: "POST", body: JSON.stringify({ url }) },
-      );
-      setReport(health);
+      const response = await fetch("/api/link-health", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url }),
+      });
+      const data: { health?: LinkHealthReport; error?: string } =
+        await response.json();
+      if (!response.ok || !data.health) {
+        throw new Error(data.error ?? "Não foi possível executar os checks.");
+      }
+      setReport(data.health);
+      if (response.headers.get("X-Untrack-Anonymous-Use") === "consumed") {
+        analytics.track("anonymous_usage_consumed");
+        setShowSignupPrompt(true);
+      }
     } catch (cause) {
       setError(
         cause instanceof Error
@@ -170,6 +184,10 @@ export function LinkHealth() {
   }
   return (
     <div className="tool-stack">
+      <GuestSignupPrompt
+        open={showSignupPrompt}
+        onClose={() => setShowSignupPrompt(false)}
+      />
       <form className="tool-card account-form" onSubmit={submit}>
         <label>
           <span>URL para Link Health</span>

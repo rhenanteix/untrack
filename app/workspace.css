@@ -126,6 +126,28 @@
   justify-content: flex-end;
   gap: 8px;
 }
+.dashboard-period {
+  display: inline-flex;
+  min-height: 40px;
+  padding: 3px;
+  border: 1px solid var(--ws-line);
+  border-radius: 8px;
+  background: var(--ws-panel);
+}
+.dashboard-period a {
+  display: grid;
+  place-items: center;
+  padding: 0 10px;
+  border-radius: 5px;
+  color: var(--ws-muted);
+  font-size: 11px;
+  font-weight: 750;
+  text-decoration: none;
+}
+.dashboard-period a[aria-current="page"] {
+  background: var(--ws-accent-soft);
+  color: var(--ws-green);
+}
 .workspace-page h1,
 .product-main .page-heading h1,
 .product-main .dashboard-heading h1 {
@@ -170,6 +192,76 @@
   margin-bottom: 28px;
   border-bottom: 1px solid var(--ws-line);
   padding-bottom: 28px;
+}
+.workspace-empty-state {
+  display: grid;
+  justify-items: start;
+  gap: 12px;
+  max-width: 680px;
+  margin: 48px auto;
+  padding: 34px;
+  border-left: 3px solid var(--ws-accent);
+  background: var(--ws-panel);
+}
+.workspace-empty-state h2,
+.workspace-empty-state p {
+  margin: 0;
+}
+.workspace-empty-state p {
+  max-width: 510px;
+  color: var(--ws-muted);
+}
+.workspace-empty-actions,
+.workspace-quick-actions > div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.guest-signup-backdrop {
+  position: fixed;
+  z-index: 70;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: #172a3a73;
+}
+.guest-signup-modal {
+  position: relative;
+  width: min(480px, 100%);
+  padding: 28px;
+  border-radius: 8px;
+  background: #fff;
+  box-shadow: 0 16px 48px #172a3a3d;
+}
+.guest-signup-modal h2,
+.guest-signup-modal p {
+  margin: 0;
+}
+.guest-signup-modal p {
+  margin-top: 10px;
+  color: #53615b;
+  line-height: 1.6;
+}
+.guest-signup-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 20px;
+}
+.guest-signup-close {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  display: grid;
+  width: 32px;
+  height: 32px;
+  place-items: center;
+  border: 1px solid #dfe5df;
+  border-radius: 5px;
+  background: #fff;
+  color: #20312d;
+  cursor: pointer;
 }
 .workspace-section-intro h2 {
   margin: 0 0 8px;
@@ -236,6 +328,74 @@
 .workspace-panel p {
   font-size: 13px;
   color: var(--ws-muted);
+}
+.dashboard-chart {
+  margin-bottom: 28px;
+}
+.dashboard-chart-bars {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(10px, 1fr));
+  align-items: end;
+  gap: 6px;
+  height: 210px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border-bottom: 1px solid var(--ws-line);
+}
+.dashboard-chart-bars li {
+  display: grid;
+  grid-template-rows: 1fr auto;
+  align-items: end;
+  min-width: 0;
+  height: 100%;
+  gap: 7px;
+}
+.dashboard-chart-bars li span {
+  display: block;
+  width: 100%;
+  min-height: 2px;
+  background: var(--ws-green);
+}
+.dashboard-chart-bars li small {
+  overflow: hidden;
+  color: var(--ws-muted);
+  font-size: 9px;
+  text-align: center;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.workspace-dashboard-section {
+  margin-bottom: 28px;
+}
+.workspace-dashboard-section > .workspace-section-intro {
+  margin-bottom: 16px;
+}
+.workspace-performance-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  border-top: 1px solid var(--ws-line);
+  border-bottom: 1px solid var(--ws-line);
+}
+.workspace-performance-grid > div {
+  display: grid;
+  align-content: start;
+  gap: 7px;
+  min-height: 118px;
+  padding: 17px;
+  border-left: 1px solid var(--ws-line);
+}
+.workspace-performance-grid > div:first-child {
+  border-left: 0;
+}
+.workspace-performance-grid span,
+.workspace-performance-grid small {
+  color: var(--ws-muted);
+  font-size: 11px;
+}
+.workspace-performance-grid strong {
+  overflow-wrap: anywhere;
+  font-size: 15px;
 }
 .whatsapp-intelligence {
   display: grid;
@@ -691,7 +851,7 @@
   padding: 8px;
   background: white;
   border: 1px solid var(--ws-line);
-  border-radius: 12px;
+  border-radius: 8px;
   box-shadow: 0 8px 20px #20312d10;
 }
 .create-menu a {
@@ -1133,6 +1293,20 @@
   }
   .workspace-overview-grid {
     grid-template-columns: 1fr;
+  }
+  .workspace-performance-grid {
+    grid-template-columns: 1fr;
+  }
+  .workspace-performance-grid > div,
+  .workspace-performance-grid > div:first-child {
+    border-top: 1px solid var(--ws-line);
+    border-left: 0;
+  }
+  .workspace-performance-grid > div:first-child {
+    border-top: 0;
+  }
+  .dashboard-chart-bars li small {
+    font-size: 8px;
   }
   .workspace-kpis {
     grid-template-columns: 1fr 1fr;

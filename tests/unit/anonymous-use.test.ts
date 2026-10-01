@@ -33,6 +33,7 @@ describe("shared anonymous allowance", () => {
     );
     expect(response.status).toBe(200);
     expect(response.headers.get("set-cookie")).toContain("HttpOnly");
+    expect(response.headers.get("X-Untrack-Anonymous-Use")).toBe("consumed");
     expect(mocks.createMany.mock.calls[0][0].data).toHaveLength(2);
     expect(JSON.stringify(mocks.createMany.mock.calls)).not.toContain(
       "198.18.0.1",

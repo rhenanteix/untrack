@@ -1,5 +1,8 @@
 "use client";
-import { GuestAccessNotice } from "@/components/guest-access-notice";
+import {
+  GuestAccessNotice,
+  GuestSignupPrompt,
+} from "@/components/guest-access-notice";
 
 import { FormEvent, useState } from "react";
 import { useSearchParams } from "next/navigation";
@@ -55,6 +58,7 @@ export function QrGenerator() {
   const [cornerStyle, setCornerStyle] = useState<"square" | "rounded" | "extra-rounded">("square");
   const [frameText, setFrameText] = useState("ESCANEIE");
   const [errorCorrectionLevel, setErrorCorrectionLevel] = useState<"L" | "M" | "Q" | "H">("M");
+  const [showSignupPrompt, setShowSignupPrompt] = useState(false);
   const canShare = typeof navigator !== "undefined" && "share" in navigator;
 
   async function submit(event: FormEvent) {
@@ -85,6 +89,10 @@ export function QrGenerator() {
       setDataUrl(data.dataUrl);
       setGeneratedUrl(submittedUrl);
       analytics.track("qr_generated");
+      if (response.headers.get("X-Untrack-Anonymous-Use") === "consumed") {
+        analytics.track("anonymous_usage_consumed");
+        setShowSignupPrompt(true);
+      }
     } catch (cause) {
       setError(
         cause instanceof TypeError
@@ -110,6 +118,10 @@ export function QrGenerator() {
 
   return (
     <div className="tool-stack">
+      <GuestSignupPrompt
+        open={showSignupPrompt}
+        onClose={() => setShowSignupPrompt(false)}
+      />
       <form className="tool-card" onSubmit={submit}>
         <label className="input-label" htmlFor="qr-url">
           URL para o QR Code

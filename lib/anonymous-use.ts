@@ -82,6 +82,7 @@ export async function withAnonymousUse(
       path: "/",
       maxAge: 31536000,
     });
+    result.headers.set("X-Untrack-Anonymous-Use", "consumed");
     result.headers.set("Cache-Control", "private, no-store");
     return result;
   } catch (error) {

@@ -10,6 +10,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
+import { analytics } from "@/lib/client/analytics";
 import { apiRequest, useAction, ActionStatus } from "./shared";
 import { WorkspaceCommandPalette } from "./workspace-command-palette";
 interface Membership {
@@ -17,7 +18,24 @@ interface Membership {
   workspace: { id: string; name: string; plan: string };
 }
 
-const administrationItems = [
+type NavigationItem = { href: string; label: string };
+type NavigationGroup = {
+  label: string;
+  collapsible: boolean;
+  items: NavigationItem[];
+};
+
+const overviewItem = { href: "/conta", label: "Visão geral" };
+
+const restrictedAdministrationHrefs = new Set([
+  "/untrack/members",
+  "/untrack/domains",
+  "/untrack/audit",
+  "/untrack/api",
+]);
+
+const administrationItems: NavigationItem[] = [
+  { href: "/conta/perfil", label: "Perfil" },
   { href: "/untrack/members", label: "Equipe" },
   { href: "/untrack/domains", label: "Domínios" },
   { href: "/untrack/usage", label: "Plano e cotas" },
@@ -25,40 +43,42 @@ const administrationItems = [
   { href: "/untrack/api", label: "API" },
 ];
 
-const groups = [
+const groups: NavigationGroup[] = [
   {
-    label: "Planejar",
+    label: "Links",
     collapsible: false,
     items: [
-      { href: "/conta", label: "Visão geral" },
-      { href: "/untrack/projects", label: "Projetos" },
-      { href: "/untrack/collections", label: "Collections" },
-      { href: "/untrack/favorites", label: "Favoritos" },
-      { href: "/untrack/tags", label: "Tags" },
-      { href: "/untrack/clients", label: "Clientes" },
-      { href: "/untrack/campaigns", label: "Campanhas" },
-    ],
-  },
-  {
-    label: "Publicar",
-    collapsible: false,
-    items: [
-      { href: "/untrack/short-links", label: "Links" },
-      { href: "/untrack/smart-pages", label: "Smart Pages" },
-    ],
-  },
-  {
-    label: "Distribuir e acompanhar",
-    collapsible: false,
-    items: [
+      { href: "/untrack/short-links", label: "Todos os links" },
       { href: "/untrack/whatsapp", label: "WhatsApp" },
-      { href: "/untrack/utm", label: "Construtor UTM" },
-      { href: "/untrack/qr", label: "QR Codes" },
-      { href: "/untrack/link-health", label: "Qualidade" },
     ],
   },
   {
-    label: "Administração",
+    label: "Campanhas",
+    collapsible: false,
+    items: [
+      { href: "/untrack/campaigns", label: "Campanhas" },
+      { href: "/untrack/utm", label: "UTM Builder" },
+      { href: "/untrack/qr", label: "QR Codes" },
+    ],
+  },
+  {
+    label: "Smart Pages",
+    collapsible: false,
+    items: [
+      { href: "/untrack/smart-pages", label: "Minhas páginas" },
+    ],
+  },
+  {
+    label: "Inteligência",
+    collapsible: false,
+    items: [
+      { href: "/conta#desempenho", label: "Analytics" },
+      { href: "/untrack/link-health", label: "Monitoring" },
+      { href: "/conta#atencao", label: "Insights" },
+    ],
+  },
+  {
+    label: "Configurações",
     collapsible: true,
     items: administrationItems,
   },
@@ -143,27 +163,31 @@ export function WorkspaceShell({ children }: { children: ReactNode }) {
       );
   }, [open]);
   const current = memberships.find((item) => item.workspace.id === active);
-  function renderItems(items: (typeof groups)[number]["items"]) {
+  function renderItems(items: NavigationItem[]) {
     return items
       .filter(
         (item) =>
-          !administrationItems.some((admin) => admin.href === item.href) ||
-          item.href === "/untrack/usage" ||
+          !restrictedAdministrationHrefs.has(item.href) ||
           ["owner", "admin"].includes(current?.role ?? ""),
       )
       .map((item) => {
         const itemPath = item.href.split("#", 1)[0];
+        const isAnchor = item.href.includes("#");
         return (
           <Link
             className="workspace-nav-link"
             key={item.href}
             href={item.href}
-            onClick={() => setOpenedAt(null)}
+            onClick={() => {
+              analytics.track("module_opened");
+              setOpenedAt(null);
+            }}
             aria-current={
-              pathname === itemPath ||
+              !isAnchor &&
+              (pathname === itemPath ||
               (itemPath !== "/conta" && pathname.startsWith(`${itemPath}/`))
                 ? "page"
-                : undefined
+                : undefined)
             }
           >
             {item.label}
@@ -308,6 +332,9 @@ export function WorkspaceShell({ children }: { children: ReactNode }) {
             </div>
           )}
           <nav className="product-nav" aria-label="Módulos do workspace">
+            <div className="workspace-nav-group workspace-nav-overview">
+              {renderItems([overviewItem])}
+            </div>
             {groups.map((group) =>
               group.collapsible ? (
                 <details
@@ -326,14 +353,14 @@ export function WorkspaceShell({ children }: { children: ReactNode }) {
             )}
           </nav>
           <details className="product-quick-tools">
-            <summary>Ferramentas rápidas</summary>
+            <summary>Mais ferramentas</summary>
             <Link href="/limpar-link">Limpar link</Link>
-            <Link href="/gerar-utm">UTM público</Link>
-            <Link href="/gerar-qrcode">QR público</Link>
+            <Link href="/link-health">Analisar link</Link>
+            <Link href="/untrack/projects">Projetos</Link>
           </details>
           <details className="product-account-menu">
-            <summary>Minha conta</summary>
-            <Link href="/conta/perfil">Perfil e histórico</Link>
+            <summary>Conta</summary>
+            <Link href="/untrack/usage" onClick={() => analytics.track("upgrade_clicked")}>Plano e upgrade</Link>
             <SignOutButton />
           </details>
           <ActionStatus {...action} />
@@ -346,8 +373,7 @@ export function WorkspaceShell({ children }: { children: ReactNode }) {
               </Link>
               <span aria-hidden="true"> / </span>
               <span>
-                {groups
-                  .flatMap((group) => group.items)
+                {[overviewItem, ...groups.flatMap((group) => group.items)]
                   .find(
                     (item) =>
                       pathname === item.href ||

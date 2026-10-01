@@ -1,5 +1,8 @@
 "use client";
-import { GuestAccessNotice } from "@/components/guest-access-notice";
+import {
+  GuestAccessNotice,
+  GuestSignupPrompt,
+} from "@/components/guest-access-notice";
 
 import { FormEvent, useState } from "react";
 import Link from "next/link";
@@ -26,6 +29,7 @@ export function UtmBuilder() {
   const [result, setResult] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [showSignupPrompt, setShowSignupPrompt] = useState(false);
 
   async function submit(event: FormEvent) {
     event.preventDefault();
@@ -44,6 +48,10 @@ export function UtmBuilder() {
       }
       setResult(data.url);
       analytics.track("utm_generated");
+      if (response.headers.get("X-Untrack-Anonymous-Use") === "consumed") {
+        analytics.track("anonymous_usage_consumed");
+        setShowSignupPrompt(true);
+      }
     } catch (cause) {
       setError(
         cause instanceof TypeError
@@ -59,6 +67,10 @@ export function UtmBuilder() {
 
   return (
     <div className="tool-stack">
+      <GuestSignupPrompt
+        open={showSignupPrompt}
+        onClose={() => setShowSignupPrompt(false)}
+      />
       <form className="tool-card form-grid" onSubmit={submit}>
         <label className="full-field">
           <span>URL de destino</span>

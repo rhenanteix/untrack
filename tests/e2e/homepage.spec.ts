@@ -18,6 +18,30 @@ test("limpa um rastreador pela API da aplicação", async ({ page }) => {
   await expect(result).toContainText(/1\s*parâmetros preservados/);
 });
 
+test("convida para cadastro depois do primeiro resultado anônimo", async ({
+  page,
+}) => {
+  await page.goto("/gerar-utm");
+  await page.route("**/api/utm/generate", (route) =>
+    route.fulfill({
+      status: 200,
+      headers: { "X-Untrack-Anonymous-Use": "consumed" },
+      json: { url: "https://example.com/?utm_source=instagram&utm_medium=social&utm_campaign=lancamento" },
+    }),
+  );
+  const fields = page.locator("input");
+  await fields.nth(0).fill("https://example.com");
+  await fields.nth(1).fill("instagram");
+  await fields.nth(2).fill("social");
+  await fields.nth(3).fill("lancamento");
+  await page.getByRole("button", { name: "Criar URL com UTM" }).click();
+
+  const prompt = page.getByRole("dialog", { name: "Continue gratuitamente" });
+  await expect(prompt).toBeVisible();
+  await expect(prompt.getByRole("link", { name: "Criar conta grátis" })).toBeVisible();
+  await expect(prompt.getByRole("link", { name: "Entrar" })).toBeVisible();
+});
+
 test("exibe erro para URL inválida", async ({ page }) => {
   await page.getByLabel("Cole seu link aqui").fill("isto não é uma url");
   await page.getByRole("button", { name: "Arrumar meu link" }).click();

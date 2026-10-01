@@ -1,5 +1,8 @@
 "use client";
-import { GuestAccessNotice } from "@/components/guest-access-notice";
+import {
+  GuestAccessNotice,
+  GuestSignupPrompt,
+} from "@/components/guest-access-notice";
 
 import { FormEvent, useEffect, useState } from "react";
 import Link from "next/link";
@@ -61,6 +64,7 @@ export function LinkCleaner() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [checking, setChecking] = useState(false);
+  const [showSignupPrompt, setShowSignupPrompt] = useState(false);
 
   useEffect(() => {
     const timer = window.setTimeout(() => setHistory(readHistory()), 0);
@@ -93,6 +97,10 @@ export function LinkCleaner() {
       );
       analytics.track("link_analyzed");
       analytics.track("link_cleaned");
+      if (response.headers.get("X-Untrack-Anonymous-Use") === "consumed") {
+        analytics.track("anonymous_usage_consumed");
+        setShowSignupPrompt(true);
+      }
     } catch (cause) {
       setResult(null);
       setError(
@@ -156,6 +164,10 @@ export function LinkCleaner() {
 
   return (
     <div className="tool-stack">
+      <GuestSignupPrompt
+        open={showSignupPrompt}
+        onClose={() => setShowSignupPrompt(false)}
+      />
       <form className="tool-card" onSubmit={submit} noValidate>
         <label className="input-label" htmlFor="url">
           Cole seu link aqui
