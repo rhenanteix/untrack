@@ -1,9 +1,39 @@
 import { expect, test } from "@playwright/test";
 
 test.beforeEach(async ({ page }) => {
-  await page.goto("/");
+  await page.goto("/limpar-link");
   await page.evaluate(() => localStorage.clear());
   await page.reload();
+});
+
+test("apresenta a plataforma e encaminha para produtos e cadastro", async ({
+  page,
+}) => {
+  await page.goto("/");
+  await expect(
+    page.getByRole("heading", { name: "Todos os seus links em um só lugar." }),
+  ).toBeVisible();
+  await expect(page.getByLabel("Visão do dashboard da Untrack")).toBeVisible();
+  await expect(
+    page.getByRole("link", { name: "Começar grátis" }).first(),
+  ).toHaveAttribute("href", "/cadastro");
+  await page.getByRole("link", { name: "Explorar produtos" }).first().click();
+  await expect(page).toHaveURL(/\/#produtos$/);
+});
+
+test("catálogo e Product Page encaminham o QR Code para a ferramenta", async ({
+  page,
+}) => {
+  await page.goto("/produtos");
+  await page.getByRole("link", { name: "QR Code" }).click();
+  await expect(page).toHaveURL(/\/produtos\/qr-code$/);
+  await expect(
+    page.getByRole("heading", {
+      name: "Crie QR Codes que você consegue acompanhar.",
+    }),
+  ).toBeVisible();
+  await page.getByRole("link", { name: "Testar agora" }).first().click();
+  await expect(page).toHaveURL(/\/gerar-qrcode$/);
 });
 
 test("limpa um rastreador pela API da aplicação", async ({ page }) => {
@@ -26,7 +56,9 @@ test("convida para cadastro depois do primeiro resultado anônimo", async ({
     route.fulfill({
       status: 200,
       headers: { "X-Untrack-Anonymous-Use": "consumed" },
-      json: { url: "https://example.com/?utm_source=instagram&utm_medium=social&utm_campaign=lancamento" },
+      json: {
+        url: "https://example.com/?utm_source=instagram&utm_medium=social&utm_campaign=lancamento",
+      },
     }),
   );
   const fields = page.locator("input");
@@ -38,7 +70,9 @@ test("convida para cadastro depois do primeiro resultado anônimo", async ({
 
   const prompt = page.getByRole("dialog", { name: "Continue gratuitamente" });
   await expect(prompt).toBeVisible();
-  await expect(prompt.getByRole("link", { name: "Criar conta grátis" })).toBeVisible();
+  await expect(
+    prompt.getByRole("link", { name: "Criar conta grátis" }),
+  ).toBeVisible();
   await expect(prompt.getByRole("link", { name: "Entrar" })).toBeVisible();
 });
 

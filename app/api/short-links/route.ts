@@ -5,7 +5,10 @@ import {
 import { z } from "zod";
 import { NextResponse } from "next/server";
 import { requireActor } from "@/modules/workspaces/context";
+import { sessionFromHeaders } from "@/lib/session";
+import { withAnonymousUse } from "@/lib/anonymous-use";
 import { createManagedLink } from "@/modules/link-management/service";
+import { createGuestShortLink } from "@/modules/short-links/guest-service";
 import { errorResponse, readJson } from "@/lib/api-response";
 import { enforceRateLimit } from "@/lib/rate-limit";
 import { enforceSameOrigin } from "@/lib/request-origin";
@@ -71,13 +74,11 @@ export async function GET(request: Request) {
     });
     return NextResponse.json(
       {
-        items: items
-          .slice(0, PAGE_SIZE)
-          .map((link) => ({
-            ...serializeLink(link),
-            updatedAt: link.updatedAt.toISOString(),
-            campaign: link.campaign,
-          })),
+        items: items.slice(0, PAGE_SIZE).map((link) => ({
+          ...serializeLink(link),
+          updatedAt: link.updatedAt.toISOString(),
+          campaign: link.campaign,
+        })),
         clients: await getPrisma().client.findMany({
           where: { workspaceId: actor.workspaceId },
           select: { id: true, name: true },
@@ -100,9 +101,14 @@ export async function GET(request: Request) {
   }
 }
 
-export async function POST(request: Request) {
+async function createShortLink(request: Request) {
   try {
     enforceSameOrigin(request);
+    if (!(await sessionFromHeaders(request.headers))) {
+      const headers = await enforceRateLimit(request, "short-links-guest");
+      const link = await createGuestShortLink(await readJson(request));
+      return NextResponse.json(serializeLink(link), { status: 201, headers });
+    }
     const actor = await requireActor(request);
     const headers = await enforceRateLimit(
       request,
@@ -114,4 +120,8 @@ export async function POST(request: Request) {
   } catch (error) {
     return errorResponse(error);
   }
+}
+
+export async function POST(request: Request) {
+  return withAnonymousUse(request, () => createShortLink(request));
 }

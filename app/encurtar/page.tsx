@@ -1,7 +1,4 @@
 import type { Metadata } from "next";
-import Link from "next/link";
-import { headers } from "next/headers";
-import { sessionFromHeaders } from "@/lib/session";
 import { Shortener } from "@/components/shortener";
 
 export const metadata: Metadata = {
@@ -18,8 +15,6 @@ export default async function ShortenPage({
 }) {
   const params = await searchParams;
   const url = typeof params.url === "string" ? params.url.slice(0, 4096) : "";
-  const session = await sessionFromHeaders(await headers());
-  const returnTo = `/encurtar${url ? `?url=${encodeURIComponent(url)}` : ""}`;
   return (
     <section className="shell page-section">
       <div className="page-heading">
@@ -30,31 +25,7 @@ export default async function ShortenPage({
           métricas.
         </p>
       </div>
-      {session ? (
-        <Shortener initialUrl={url} />
-      ) : (
-        <div className="tool-card auth-card">
-          <h2>Seus links precisam de um lugar para ficar.</h2>
-          <p>
-            Entre ou crie uma conta gratuita para gerenciar seus links e
-            consultar os cliques.
-          </p>
-          <div className="action-row">
-            <Link
-              className="button"
-              href={`/entrar?next=${encodeURIComponent(returnTo)}`}
-            >
-              Entrar
-            </Link>
-            <Link
-              className="button button-secondary"
-              href={`/cadastro?next=${encodeURIComponent(returnTo)}`}
-            >
-              Criar conta
-            </Link>
-          </div>
-        </div>
-      )}
+      <Shortener initialUrl={url} />
     </section>
   );
 }

@@ -3,6 +3,7 @@ import type { Metadata, Viewport } from "next";
 import { Manrope } from "next/font/google";
 import { Footer } from "@/components/footer";
 import { Header } from "@/components/header";
+import { PublicLanguageProvider } from "@/components/public-language-provider";
 import { PageViewTracker } from "@/lib/client/page-view-tracker";
 import "./globals.css";
 import "./workspace.css";
@@ -59,15 +60,17 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       data-scroll-behavior="smooth"
     >
       <body>
-        <a className="skip-link" href="#conteudo">
-          Pular para o conteúdo
-        </a>
-        <Header />
-        <main id="conteudo">
-          <AuthenticatedFrame>{children}</AuthenticatedFrame>
-        </main>
-        <Footer />
-        <PageViewTracker />
+        <PublicLanguageProvider>
+          <a className="skip-link" href="#conteudo">
+            Pular para o conteúdo
+          </a>
+          <Header />
+          <main id="conteudo">
+            <AuthenticatedFrame>{children}</AuthenticatedFrame>
+          </main>
+          <Footer />
+          <PageViewTracker />
+        </PublicLanguageProvider>
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}

@@ -170,6 +170,7 @@ export function LinkHealth() {
       setReport(data.health);
       if (response.headers.get("X-Untrack-Anonymous-Use") === "consumed") {
         analytics.track("anonymous_usage_consumed");
+        analytics.track("free_tool_completed");
         setShowSignupPrompt(true);
       }
     } catch (cause) {

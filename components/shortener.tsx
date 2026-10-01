@@ -2,7 +2,11 @@
 import { FormEvent, useState } from "react";
 import Link from "next/link";
 import { CopyButton } from "@/components/copy-button";
-import { apiRequest } from "@/lib/client/api";
+import {
+  GuestAccessNotice,
+  GuestSignupPrompt,
+} from "@/components/guest-access-notice";
+import { analytics } from "@/lib/client/analytics";
 import type { ShortLinkView } from "@/modules/short-links/types";
 
 export function Shortener({ initialUrl = "" }: { initialUrl?: string }) {
@@ -10,6 +14,8 @@ export function Shortener({ initialUrl = "" }: { initialUrl?: string }) {
   const [result, setResult] = useState<ShortLinkView | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [guestResult, setGuestResult] = useState(false);
+  const [showSignupPrompt, setShowSignupPrompt] = useState(false);
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -17,17 +23,28 @@ export function Shortener({ initialUrl = "" }: { initialUrl?: string }) {
     setBusy(true);
     setError("");
     setResult(null);
+    setGuestResult(false);
     try {
-      setResult(
-        await apiRequest<ShortLinkView>("/api/short-links", {
-          method: "POST",
-          body: JSON.stringify({
-            url,
-            title: data.get("title"),
-            description: data.get("description"),
-          }),
+      const response = await fetch("/api/short-links", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          url,
+          title: data.get("title"),
+          description: data.get("description"),
         }),
-      );
+      });
+      const result: ShortLinkView & { error?: string } = await response.json();
+      if (!response.ok) {
+        throw new Error(result.error ?? "Não foi possível encurtar.");
+      }
+      setResult(result);
+      if (response.headers.get("X-Untrack-Anonymous-Use") === "consumed") {
+        setGuestResult(true);
+        analytics.track("anonymous_usage_consumed");
+        analytics.track("free_tool_completed");
+        setShowSignupPrompt(true);
+      }
     } catch (cause) {
       setError(
         cause instanceof Error ? cause.message : "Não foi possível encurtar.",
@@ -39,6 +56,10 @@ export function Shortener({ initialUrl = "" }: { initialUrl?: string }) {
 
   return (
     <div className="tool-stack">
+      <GuestSignupPrompt
+        open={showSignupPrompt}
+        onClose={() => setShowSignupPrompt(false)}
+      />
       <form className="tool-card account-form" onSubmit={submit}>
         <label>
           <span>Link de destino</span>
@@ -71,6 +92,7 @@ export function Shortener({ initialUrl = "" }: { initialUrl?: string }) {
         <button className="button" disabled={busy} type="submit">
           {busy ? "Encurtando..." : "Criar link curto"}
         </button>
+        <GuestAccessNotice error={error} />
         {error && (
           <p className="form-error" role="alert">
             {error}
@@ -94,12 +116,18 @@ export function Shortener({ initialUrl = "" }: { initialUrl?: string }) {
               value={result.shareUrl}
               label="Copiar página de compartilhamento"
             />
-            <Link
-              className="button button-secondary"
-              href={`/conta/links/${result.id}`}
-            >
-              Ver métricas
-            </Link>
+            {guestResult ? (
+              <Link className="button button-secondary" href="/cadastro">
+                Criar conta grátis
+              </Link>
+            ) : (
+              <Link
+                className="button button-secondary"
+                href={`/conta/links/${result.id}`}
+              >
+                Ver métricas
+              </Link>
+            )}
             <Link className="button button-quiet" href={`/l/${result.slug}`}>
               Ver página pública
             </Link>

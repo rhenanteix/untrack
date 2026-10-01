@@ -54,10 +54,16 @@ export function QrGenerator() {
   const [foreground, setForeground] = useState("#172A3A");
   const [background, setBackground] = useState("#FFFFFF");
   const [frame, setFrame] = useState<"none" | "rounded" | "scan">("none");
-  const [pattern, setPattern] = useState<"square" | "dots" | "rounded">("square");
-  const [cornerStyle, setCornerStyle] = useState<"square" | "rounded" | "extra-rounded">("square");
+  const [pattern, setPattern] = useState<"square" | "dots" | "rounded">(
+    "square",
+  );
+  const [cornerStyle, setCornerStyle] = useState<
+    "square" | "rounded" | "extra-rounded"
+  >("square");
   const [frameText, setFrameText] = useState("ESCANEIE");
-  const [errorCorrectionLevel, setErrorCorrectionLevel] = useState<"L" | "M" | "Q" | "H">("M");
+  const [errorCorrectionLevel, setErrorCorrectionLevel] = useState<
+    "L" | "M" | "Q" | "H"
+  >("M");
   const [showSignupPrompt, setShowSignupPrompt] = useState(false);
   const canShare = typeof navigator !== "undefined" && "share" in navigator;
 
@@ -91,6 +97,7 @@ export function QrGenerator() {
       analytics.track("qr_generated");
       if (response.headers.get("X-Untrack-Anonymous-Use") === "consumed") {
         analytics.track("anonymous_usage_consumed");
+        analytics.track("free_tool_completed");
         setShowSignupPrompt(true);
       }
     } catch (cause) {
@@ -146,11 +153,26 @@ export function QrGenerator() {
               <span>Cor do código</span>
               <label className="qr-custom-color">
                 Personalizar
-                <input type="color" value={foreground} onChange={(event) => setForeground(event.target.value)} />
+                <input
+                  type="color"
+                  value={foreground}
+                  onChange={(event) => setForeground(event.target.value)}
+                />
               </label>
             </div>
             <div className="qr-color-picker" aria-label="Cor do código">
-              {qrColors.map((color) => <button className="qr-color-choice" type="button" key={color.value} aria-label={color.label} aria-pressed={foreground === color.value} onClick={() => setForeground(color.value)}><span style={{ backgroundColor: color.value }} /></button>)}
+              {qrColors.map((color) => (
+                <button
+                  className="qr-color-choice"
+                  type="button"
+                  key={color.value}
+                  aria-label={color.label}
+                  aria-pressed={foreground === color.value}
+                  onClick={() => setForeground(color.value)}
+                >
+                  <span style={{ backgroundColor: color.value }} />
+                </button>
+              ))}
             </div>
           </div>
           <div className="qr-control-section">
@@ -158,42 +180,125 @@ export function QrGenerator() {
               <span>Cor de fundo</span>
               <label className="qr-custom-color">
                 Personalizar
-                <input type="color" value={background} onChange={(event) => setBackground(event.target.value)} />
+                <input
+                  type="color"
+                  value={background}
+                  onChange={(event) => setBackground(event.target.value)}
+                />
               </label>
             </div>
             <div className="qr-color-picker" aria-label="Cor de fundo">
-              {backgroundColors.map((color) => <button className="qr-color-choice" type="button" key={color.value} aria-label={color.label} aria-pressed={background === color.value} onClick={() => setBackground(color.value)}><span style={{ backgroundColor: color.value }} /></button>)}
+              {backgroundColors.map((color) => (
+                <button
+                  className="qr-color-choice"
+                  type="button"
+                  key={color.value}
+                  aria-label={color.label}
+                  aria-pressed={background === color.value}
+                  onClick={() => setBackground(color.value)}
+                >
+                  <span style={{ backgroundColor: color.value }} />
+                </button>
+              ))}
             </div>
           </div>
           <div className="qr-control-section">
             <span className="qr-control-label">Moldura</span>
-            <div className="qr-visual-options" role="group" aria-label="Moldura">
-              {frames.map((option) => <button className="qr-frame-choice" type="button" key={option.value} aria-pressed={frame === option.value} onClick={() => setFrame(option.value)}><span className="qr-frame-sample" data-frame={option.value}><i /><b>SCAN</b></span><span>{option.label}</span></button>)}
+            <div
+              className="qr-visual-options"
+              role="group"
+              aria-label="Moldura"
+            >
+              {frames.map((option) => (
+                <button
+                  className="qr-frame-choice"
+                  type="button"
+                  key={option.value}
+                  aria-pressed={frame === option.value}
+                  onClick={() => setFrame(option.value)}
+                >
+                  <span className="qr-frame-sample" data-frame={option.value}>
+                    <i />
+                    <b>SCAN</b>
+                  </span>
+                  <span>{option.label}</span>
+                </button>
+              ))}
             </div>
           </div>
           <div className="qr-style-row">
             <div className="qr-control-section">
               <span className="qr-control-label">Padrão</span>
-              <div className="qr-visual-options qr-compact-options" role="group" aria-label="Padrão dos módulos">
-                {patterns.map((option) => <button className="qr-pattern-choice" type="button" key={option.value} aria-pressed={pattern === option.value} onClick={() => setPattern(option.value)}><span className="qr-pattern-sample" data-pattern={option.value} /><span>{option.label}</span></button>)}
+              <div
+                className="qr-visual-options qr-compact-options"
+                role="group"
+                aria-label="Padrão dos módulos"
+              >
+                {patterns.map((option) => (
+                  <button
+                    className="qr-pattern-choice"
+                    type="button"
+                    key={option.value}
+                    aria-pressed={pattern === option.value}
+                    onClick={() => setPattern(option.value)}
+                  >
+                    <span
+                      className="qr-pattern-sample"
+                      data-pattern={option.value}
+                    />
+                    <span>{option.label}</span>
+                  </button>
+                ))}
               </div>
             </div>
             <div className="qr-control-section">
               <span className="qr-control-label">Cantos</span>
-              <div className="qr-visual-options qr-compact-options" role="group" aria-label="Estilo dos cantos">
-                {cornerStyles.map((option) => <button className="qr-corner-choice" type="button" key={option.value} aria-pressed={cornerStyle === option.value} onClick={() => setCornerStyle(option.value)}><span className="qr-corner-sample" data-corner={option.value}><i /><b /></span><span>{option.label}</span></button>)}
+              <div
+                className="qr-visual-options qr-compact-options"
+                role="group"
+                aria-label="Estilo dos cantos"
+              >
+                {cornerStyles.map((option) => (
+                  <button
+                    className="qr-corner-choice"
+                    type="button"
+                    key={option.value}
+                    aria-pressed={cornerStyle === option.value}
+                    onClick={() => setCornerStyle(option.value)}
+                  >
+                    <span
+                      className="qr-corner-sample"
+                      data-corner={option.value}
+                    >
+                      <i />
+                      <b />
+                    </span>
+                    <span>{option.label}</span>
+                  </button>
+                ))}
               </div>
             </div>
           </div>
           {frame === "scan" && (
             <label className="qr-frame-text">
               Texto do frame
-              <input maxLength={40} value={frameText} onChange={(event) => setFrameText(event.target.value)} />
+              <input
+                maxLength={40}
+                value={frameText}
+                onChange={(event) => setFrameText(event.target.value)}
+              />
             </label>
           )}
           <label className="qr-correction-level">
             Correção de erro
-            <select value={errorCorrectionLevel} onChange={(event) => setErrorCorrectionLevel(event.target.value as typeof errorCorrectionLevel)}>
+            <select
+              value={errorCorrectionLevel}
+              onChange={(event) =>
+                setErrorCorrectionLevel(
+                  event.target.value as typeof errorCorrectionLevel,
+                )
+              }
+            >
               <option value="L">Baixa</option>
               <option value="M">Média</option>
               <option value="Q">Alta</option>

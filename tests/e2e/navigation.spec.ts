@@ -23,13 +23,15 @@ test("menu mobile abre, navega e fecha ao escolher um destino", async ({
   await expect(
     page.getByRole("button", { name: "Fechar menu" }),
   ).toHaveAttribute("aria-expanded", "true");
-  await expect(
-    page.getByRole("link", { name: "Criar UTM" }).last(),
-  ).toBeVisible();
+  await page
+    .locator(".mobile-nav-group summary")
+    .filter({ hasText: "Campanhas" })
+    .click();
+  await expect(page.getByRole("link", { name: "UTM Builder" })).toBeVisible();
 
-  await page.getByRole("link", { name: "Criar UTM" }).last().click();
+  await page.getByRole("link", { name: "UTM Builder" }).click();
 
-  await expect(page).toHaveURL(/\/gerar-utm$/);
+  await expect(page).toHaveURL(/\/produtos\/utm-builder$/);
   // O menu recolhe ao navegar.
   await expect(
     page.getByRole("button", { name: "Abrir menu" }),
@@ -39,13 +41,27 @@ test("menu mobile abre, navega e fecha ao escolher um destino", async ({
 test("cada destino do menu mobile abre a ferramenta correta", async ({
   page,
 }) => {
-  for (const [link, path, heading] of [
-    ["Arrumar link", "/limpar-link", "Compartilhe só o que importa."],
-    ["QR Code", "/gerar-qrcode", "Leve seu link para qualquer tela."],
+  for (const [category, link, path, heading] of [
+    [
+      "Links",
+      "Link Cleaner",
+      "/produtos/link-cleaner",
+      "Compartilhe links sem o ruído do tracking.",
+    ],
+    [
+      "Campanhas",
+      "QR Code",
+      "/produtos/qr-code",
+      "Crie QR Codes que você consegue acompanhar.",
+    ],
   ] as const) {
     await page.goto("/");
     await page.getByRole("button", { name: "Abrir menu" }).click();
-    await page.getByRole("link", { name: link }).last().click();
+    await page
+      .locator(".mobile-nav-group summary")
+      .filter({ hasText: category })
+      .click();
+    await page.getByRole("link", { name: link }).click();
     await expect(page).toHaveURL(new RegExp(`${path}$`));
     await expect(page.getByRole("heading", { level: 1 })).toHaveText(heading);
   }

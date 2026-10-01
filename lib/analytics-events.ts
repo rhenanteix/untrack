@@ -8,6 +8,16 @@
  */
 export const ANALYTICS_EVENTS = [
   "page_view",
+  "landing_viewed",
+  "product_menu_opened",
+  "product_viewed",
+  "product_cta_clicked",
+  "product_related_clicked",
+  "pricing_viewed",
+  "signup_clicked",
+  "login_clicked",
+  "free_tool_started",
+  "free_tool_completed",
   "link_submitted",
   "link_analyzed",
   "link_cleaned",
@@ -54,6 +64,16 @@ export type AnalyticsEventName = (typeof ANALYTICS_EVENTS)[number];
 // Operation results are recorded by their API handlers, never twice via the browser.
 export const CLIENT_ANALYTICS_EVENTS = [
   "page_view",
+  "landing_viewed",
+  "product_menu_opened",
+  "product_viewed",
+  "product_cta_clicked",
+  "product_related_clicked",
+  "pricing_viewed",
+  "signup_clicked",
+  "login_clicked",
+  "free_tool_started",
+  "free_tool_completed",
   "link_submitted",
   "link_cleaned",
   "link_copied",
@@ -77,6 +97,16 @@ export const ANALYTICS_PATHS = [
   "/gerar-qrcode",
   "/encurtar",
   "/link-health",
+  "/analisar-link",
+  "/produtos",
+  "/precos",
+  "/recursos",
+  "/sobre",
+  "/blog",
+  "/ajuda",
+  "/privacidade",
+  "/termos",
+  "/cookies",
   "/conta",
   "/untrack/short-links",
   "/untrack/whatsapp",
@@ -89,6 +119,13 @@ export const ANALYTICS_PATHS = [
   "/entrar",
   "/cadastro",
 ] as const;
+
+export function isAnalyticsPath(value: string): boolean {
+  return (
+    (ANALYTICS_PATHS as readonly string[]).includes(value) ||
+    /^\/produtos\/[a-z0-9-]+$/.test(value)
+  );
+}
 
 /** DOM event carrying `{ event }`, dispatched by the browser analytics client. */
 export const ANALYTICS_BROWSER_EVENT = "arrume-meu-link:analytics";
