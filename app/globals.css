@@ -2505,6 +2505,54 @@ body:has(.product-shell) .site-footer{display:none}
   border-radius: 10px;
 }
 
+/* Smart Pages editor: hierarchy refinement without changing the grid or flows. */
+.smart-pages-dashboard {
+  --sp-panel: #fff;
+  --sp-subtle: #f5f7f3;
+  --sp-border: #dfe5dc;
+  --sp-ink: #20352d;
+  --sp-muted: #65736b;
+}
+.smart-pages-dashboard > .dashboard-heading { align-items: end; margin-bottom: 24px; }
+.smart-pages-dashboard > .dashboard-heading .muted { max-width: 560px; line-height: 1.55; }
+.smart-pages-grid { align-items: stretch; }
+.smart-pages-sidebar { gap: 18px; border-color: var(--sp-border); border-radius: 12px; background: var(--sp-subtle); box-shadow: none; }
+.smart-page-create { border-radius: 10px; background: var(--sp-panel); box-shadow: 0 1px 2px rgba(32, 53, 45, 0.06); }
+.smart-page-create h2, .smart-page-list h2 { color: var(--sp-ink); font-size: 15px; }
+.smart-page-search { gap: 9px; padding: 0 0 14px; }
+.smart-page-list { gap: 6px; }
+.smart-page-list-item { min-height: 0; border-radius: 9px; padding: 12px; }
+.smart-page-list-item strong { color: var(--sp-ink); font-size: 13px; }
+.smart-page-list-item span { margin-top: 3px; font-size: 11px; }
+.smart-page-list-item:hover { background: #edf2e9; }
+.smart-page-list-item.active, .smart-page-list-item[aria-pressed="true"] { border-color: #b8cfaa; background: #eaf2e4; box-shadow: inset 3px 0 #557a4e; }
+.smart-page-workbench { border-color: var(--sp-border); border-radius: 12px; background: var(--sp-panel); box-shadow: 0 12px 32px rgba(32, 53, 45, 0.06); }
+.smart-page-editor { padding: 28px !important; }
+.smart-page-editor-heading { align-items: center; margin-bottom: 16px; padding-bottom: 20px; }
+.smart-page-editor-heading h2 { margin-top: 9px; color: var(--sp-ink); font-size: 25px; letter-spacing: 0; }
+.smart-page-save-status { margin: 12px 0 0 !important; color: var(--sp-muted) !important; font-size: 11px !important; }
+.sp-editor-sections { gap: 8px; padding: 4px 0 22px; }
+.sp-editor-sections button { justify-content: flex-start; flex: 0 1 auto; min-height: 38px; padding: 8px 11px; border-color: #e2e8df; border-radius: 7px; background: #fff; }
+.sp-editor-sections button[aria-pressed="true"] { border-color: #bfd0b9; background: #edf4e9; color: #294a34; }
+.smart-page-profile-form, .smart-page-block-editor, .smart-page-metrics { margin-top: 0; padding-top: 22px; }
+.smart-page-form-fields > legend, .smart-page-block-editor h3 { color: var(--sp-ink); font-size: 18px; }
+.sp-section-intro, .smart-page-block-editor > .muted { max-width: 620px; color: var(--sp-muted); }
+.sp-save-bar { position: sticky; bottom: 0; z-index: 1; margin: 12px -28px -28px; padding: 14px 28px; background: rgba(255, 255, 255, 0.96); box-shadow: 0 -8px 18px rgba(32, 53, 45, 0.04); }
+.smart-page-add-block, .smart-page-block-list li { border-color: var(--sp-border); border-radius: 10px; background: #fafbf9; }
+.smart-page-block-list li::before { color: #61745b; }
+.smart-page-preview-panel { background: #f3f6f1; }
+.smart-page-preview-panel h2 { color: var(--sp-ink); }
+.smart-page-editor-empty { min-height: 520px; background: #f7faf5; }
+.smart-page-empty-icon { width: 56px; height: 56px; border-radius: 14px; font-size: 26px; }
+@media (max-width: 760px) {
+  .smart-pages-dashboard > .dashboard-heading { gap: 14px; }
+  .smart-pages-dashboard > .dashboard-heading .button { width: 100%; }
+  .smart-page-editor { padding: 20px !important; }
+  .sp-editor-sections { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .sp-editor-sections button { justify-content: center; }
+  .sp-save-bar { margin: 12px -20px -20px; padding: 14px 20px; }
+}
+
 /* ── Sections ─────────────────────────────────────────── */
 .lp-section {
   padding-block: 72px 80px;

@@ -493,7 +493,7 @@ export function SmartPagesDashboard({
           <span className="eyebrow">Untrack</span>
           <h1>Smart Pages</h1>
           <p className="muted">
-            Páginas públicas para organizar, compartilhar e entender seus links.
+            Crie sua presença pública, organize seus links e acompanhe o que funciona.
           </p>
         </div>
         {canEdit && (
@@ -518,7 +518,7 @@ export function SmartPagesDashboard({
               onSubmit={createPage}
               failure={activeForm === "create" ? action.failure : null}
             >
-              <h2>Nova página</h2>
+              <h2>Criar uma página</h2>
               <SmartField>
                 Nome ou marca
                 <input required name="title" maxLength={120} />
@@ -543,7 +543,7 @@ export function SmartPagesDashboard({
             </SmartForm>
           )}
           <div className="smart-page-list">
-            <h2>Suas páginas</h2>
+            <h2>Biblioteca de páginas</h2>
             <form
               className="smart-page-search"
               role="search"
@@ -730,7 +730,7 @@ export function SmartPagesDashboard({
                 >
                   {[
                     ["profile", "01", "Perfil"],
-                    ["appearance", "02", "Modelos"],
+                    ["appearance", "02", "Aparência"],
                     ["links", "03", "Links"],
                     ["analytics", "04", "Resultados"],
                   ].map(([id, number, label]) => (
