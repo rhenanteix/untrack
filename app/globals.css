@@ -1201,6 +1201,22 @@ code {
   background: var(--ink);
   color: #fff;
 }
+.product-nav-placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 9px;
+  color: #89928c;
+  font-size: 13px;
+  font-weight: 700;
+}
+.product-nav-placeholder small {
+  color: #7b8d65;
+  font-size: 10px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
 .product-main {
   min-width: 0;
 }
@@ -1252,6 +1268,66 @@ code {
   color: var(--muted);
   font-size: 12px;
   line-height: 1.4;
+}
+.account-hub {
+  display: grid;
+  gap: 34px;
+  margin: -10px 0 46px;
+}
+.account-hub-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: end;
+  gap: 16px;
+  margin-bottom: 13px;
+}
+.account-hub-heading h2 {
+  margin: 3px 0 0;
+  font-size: 20px;
+}
+.account-module-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+.account-module {
+  display: grid;
+  align-content: space-between;
+  gap: 26px;
+  min-height: 132px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  padding: 17px;
+  color: var(--ink);
+  text-decoration: none;
+}
+.account-module:hover:not(.account-module-soon) {
+  border-color: #a8c68b;
+  background: #f5faef;
+}
+.account-module strong {
+  font-size: 15px;
+}
+.account-module span {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.4;
+}
+.account-module-featured {
+  border-color: #9fbb82;
+  background: #edf5e5;
+}
+.account-module-soon {
+  background: #f7f8f5;
+  color: #77817b;
+}
+.account-module-soon span {
+  color: #718461;
+  font-weight: 800;
+}
+.account-module-grid-professional {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
 }
 .smart-pages-dashboard {
   width: min(1340px, calc(100% - 56px));

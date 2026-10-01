@@ -9,31 +9,33 @@ interface Membership {
 }
 const groups = [
   {
-    label: "Visão geral",
+    label: "Espaço pessoal",
     items: [
-      ["/conta", "Visão geral"],
-      ["/untrack/smart-pages", "Smart Pages"],
-      ["/untrack/campaigns", "Campanhas"],
+      { href: "/conta", label: "Meu painel" },
+      { href: "/untrack/smart-pages", label: "Minha página" },
+      { label: "Currículos", status: "Em breve" },
+      { label: "Portfólio", status: "Em breve" },
     ],
   },
   {
-    label: "Criar e distribuir",
+    label: "Trabalho profissional",
     items: [
-      ["/untrack/short-links", "Short links"],
-      ["/untrack/utm", "UTM"],
-      ["/untrack/qr", "QR Codes"],
-      ["/untrack/link-health", "Link Health"],
+      { href: "/untrack/short-links", label: "Links rastreáveis" },
+      { href: "/untrack/utm", label: "Campanhas UTM" },
+      { href: "/untrack/qr", label: "QR Codes" },
+      { href: "/untrack/link-health", label: "Saúde de links" },
+      { href: "/untrack/campaigns", label: "Campanhas" },
     ],
   },
   {
-    label: "Gerenciar",
+    label: "Administração",
     items: [
-      ["/untrack/clients", "Clientes"],
-      ["/untrack/domains", "Domínios"],
-      ["/untrack/members", "Equipe"],
-      ["/untrack/usage", "Plano e cotas"],
-      ["/untrack/audit", "Auditoria"],
-      ["/untrack/api", "API"],
+      { href: "/untrack/clients", label: "Clientes" },
+      { href: "/untrack/domains", label: "Domínios" },
+      { href: "/untrack/members", label: "Equipe" },
+      { href: "/untrack/usage", label: "Plano e cotas" },
+      { href: "/untrack/audit", label: "Auditoria" },
+      { href: "/untrack/api", label: "API" },
     ],
   },
 ];
@@ -196,21 +198,29 @@ export function WorkspaceShell({ children }: { children: ReactNode }) {
           {groups.map((group) => (
             <div key={group.label}>
               <span>{group.label}</span>
-              {group.items.map(([href, label]) => (
-                <Link
-                  key={href}
-                  href={href}
-                  onClick={() => setOpenedAt(null)}
-                  aria-current={
-                    pathname === href ||
-                    (href !== "/conta" && pathname.startsWith(`${href}/`))
-                      ? "page"
-                      : undefined
-                  }
-                >
-                  {label}
-                </Link>
-              ))}
+              {group.items.map((item) =>
+                item.href ? (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    onClick={() => setOpenedAt(null)}
+                    aria-current={
+                      pathname === item.href ||
+                      (item.href !== "/conta" &&
+                        pathname.startsWith(`${item.href}/`))
+                        ? "page"
+                        : undefined
+                    }
+                  >
+                    {item.label}
+                  </Link>
+                ) : (
+                  <span className="product-nav-placeholder" key={item.label} aria-disabled="true">
+                    {item.label}
+                    <small>{item.status}</small>
+                  </span>
+                ),
+              )}
             </div>
           ))}
         </nav>
