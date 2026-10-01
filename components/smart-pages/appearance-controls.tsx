@@ -1,5 +1,45 @@
 "use client";
 import { themes, type SmartPageTheme } from "@/modules/smart-pages/themes";
+import { ImageUpload } from "./image-upload";
+
+const photoLayouts = [
+  ["classic", "Clássico"],
+  ["hero", "Hero"],
+  ["banner", "Banner"],
+  ["cutout", "Recorte"],
+  ["shape", "Forma"],
+] as const;
+
+const titleStyles = [
+  ["classic", "Clássico"],
+  ["editorial", "Editorial"],
+  ["bold", "Impacto"],
+  ["uppercase", "Maiúsculas"],
+] as const;
+
+const wallpaperOptions = [
+  ["fill", "Fill"],
+  ["gradient", "Gradient"],
+  ["blur", "Blur"],
+  ["pattern", "Pattern"],
+  ["image", "Image"],
+  ["video", "Video"],
+] as const;
+
+const gradients = [
+  ["aurora", "Aurora"],
+  ["sunset", "Sol"],
+  ["ocean", "Mar"],
+  ["orchid", "Orquídea"],
+] as const;
+
+const patterns = [
+  ["dots", "Pontos"],
+  ["grid", "Grade"],
+  ["lines", "Linhas"],
+  ["waves", "Ondas"],
+] as const;
+
 const names = {
   avatar: "Foto",
   title: "Nome",
@@ -11,12 +51,14 @@ export function AppearanceControls({
   theme,
   onChange,
   disabled,
+  pageId,
 }: {
   theme: SmartPageTheme;
   onChange: (value: SmartPageTheme) => void;
   disabled: boolean;
+  pageId: string;
 }) {
-  const colors = themes.find((t) => t.id === theme.preset)!.colors;
+  const colors = themes.find((item) => item.id === theme.preset)?.colors ?? themes[0].colors;
   const order = theme.sections ?? [
     "avatar",
     "title",
@@ -33,11 +75,142 @@ export function AppearanceControls({
       <p className="sp-section-intro">
         Veja cada mudança na prévia. Salve quando estiver do seu jeito.
       </p>
-      <div className="sp-control-grid">
+      <section className="sp-design-section" aria-labelledby="sp-header-design">
+        <div className="sp-design-heading">
+          <span>Header</span>
+          <p id="sp-header-design">Organize a sua foto, logo, nome e bio.</p>
+        </div>
+        <div className="sp-visual-field">
+          <span>Layout da foto</span>
+          <div className="sp-visual-options" role="group" aria-label="Layout da foto">
+            {photoLayouts.map(([value, label]) => (
+              <button
+                type="button"
+                key={value}
+                className="sp-visual-choice"
+                aria-pressed={(theme.photoLayout ?? "classic") === value}
+                onClick={() => change({ photoLayout: value })}
+              >
+                <span className="sp-photo-layout-sample" data-layout={value} aria-hidden="true"><i /></span>
+                <span>{label}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+        <div className="sp-logo-controls">
+          <ImageUpload
+            pageId={pageId}
+            currentUrl={theme.logoUrl}
+            disabled={disabled}
+            label="Logo da página"
+            description="Envie uma marca em JPG, PNG ou WebP. Ela aparecerá acima do perfil."
+            onUploaded={(url) => change({ logoUrl: url })}
+          />
+          <label>
+            Logo por URL externa
+            <input
+              type="url"
+              value={theme.logoUrl ?? ""}
+              placeholder="https://exemplo.com/logo.png"
+              onChange={(event) => change({ logoUrl: event.target.value || undefined })}
+            />
+          </label>
+        </div>
+        <div className="sp-control-grid">
+          <label>
+            Fonte do título
+            <select
+              value={theme.font ?? "manrope"}
+              onChange={(event) => change({ font: event.target.value as SmartPageTheme["font"] })}
+            >
+              <option value="manrope">Manrope</option>
+              <option value="georgia">Georgia</option>
+              <option value="courier">Courier New</option>
+            </select>
+          </label>
+          <label>
+            Cor do texto
+            <input type="color" value={theme.textColor ?? colors[1]} onChange={(event) => change({ textColor: event.target.value })} />
+          </label>
+        </div>
+        <div className="sp-visual-field">
+          <span>Estilo do título</span>
+          <div className="sp-title-options" role="group" aria-label="Estilo do título">
+            {titleStyles.map(([value, label]) => (
+              <button
+                type="button"
+                key={value}
+                aria-pressed={(theme.titleStyle ?? "classic") === value}
+                data-title-style={value}
+                onClick={() => change({ titleStyle: value })}
+              >
+                <b>Aa</b><span>{label}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      </section>
+      <section className="sp-design-section" aria-labelledby="sp-wallpaper-design">
+        <div className="sp-design-heading">
+          <span>Wallpaper</span>
+          <p id="sp-wallpaper-design">Crie um fundo próprio ou use mídia da sua marca.</p>
+        </div>
+        <div className="sp-wallpaper-options" role="group" aria-label="Tipo de wallpaper">
+          {wallpaperOptions.map(([value, label]) => (
+            <button
+              type="button"
+              key={value}
+              aria-pressed={(theme.wallpaper ?? "fill") === value}
+              onClick={() => change({ wallpaper: value })}
+            >
+              <span className="sp-wallpaper-sample" data-wallpaper={value} aria-hidden="true"><i /></span>
+              <span>{label}</span>
+            </button>
+          ))}
+        </div>
+        {theme.wallpaper === "gradient" && (
+          <div className="sp-mini-options" role="group" aria-label="Gradiente">
+            {gradients.map(([value, label]) => <button type="button" key={value} aria-pressed={(theme.backgroundGradient ?? "aurora") === value} data-gradient={value} onClick={() => change({ backgroundGradient: value })}>{label}</button>)}
+          </div>
+        )}
+        {theme.wallpaper === "pattern" && (
+          <div className="sp-mini-options" role="group" aria-label="Padrão de fundo">
+            {patterns.map(([value, label]) => <button type="button" key={value} aria-pressed={(theme.backgroundPattern ?? "dots") === value} data-pattern={value} onClick={() => change({ backgroundPattern: value })}>{label}</button>)}
+          </div>
+        )}
+        {["image", "blur"].includes(theme.wallpaper ?? "fill") && (
+          <div className="sp-wallpaper-media">
+            <ImageUpload
+              pageId={pageId}
+              currentUrl={theme.backgroundImageUrl}
+              disabled={disabled}
+              label={theme.wallpaper === "blur" ? "Imagem para o fundo desfocado" : "Imagem de fundo"}
+              description="Use uma imagem da sua biblioteca ou uma URL externa abaixo."
+              onUploaded={(url) => change({ backgroundImageUrl: url })}
+            />
+            <label>
+              Imagem externa
+              <input type="url" value={theme.backgroundImageUrl ?? ""} placeholder="https://exemplo.com/wallpaper.webp" onChange={(event) => change({ backgroundImageUrl: event.target.value || undefined })} />
+            </label>
+          </div>
+        )}
+        {theme.wallpaper === "video" && (
+          <label className="sp-external-media-field">
+            Vídeo externo
+            <input type="url" value={theme.backgroundVideoUrl ?? ""} placeholder="https://exemplo.com/wallpaper.mp4" onChange={(event) => change({ backgroundVideoUrl: event.target.value || undefined })} />
+            <small>Use uma URL direta de vídeo MP4 ou WebM. O vídeo é reproduzido sem áudio e em loop.</small>
+          </label>
+        )}
+      </section>
+      <section className="sp-design-section" aria-labelledby="sp-colors-design">
+        <div className="sp-design-heading">
+          <span>Botões e cores</span>
+          <p id="sp-colors-design">Ajuste contraste, formato e ritmo da página.</p>
+        </div>
+        <div className="sp-control-grid">
         {(
           [
             ["background", "Fundo", colors[0]],
-            ["textColor", "Texto", colors[1]],
             ["buttonColor", "Botões", colors[1]],
           ] as const
         ).map(([key, label, fallback]) => (
@@ -46,7 +219,7 @@ export function AppearanceControls({
             <input
               type="color"
               value={theme[key] ?? fallback}
-              onChange={(e) => change({ [key]: e.target.value })}
+              onChange={(event) => change({ [key]: event.target.value })}
             />
           </label>
         ))}
@@ -54,8 +227,8 @@ export function AppearanceControls({
           Formato
           <select
             value={theme.layout ?? "card"}
-            onChange={(e) =>
-              change({ layout: e.target.value as SmartPageTheme["layout"] })
+            onChange={(event) =>
+              change({ layout: event.target.value as SmartPageTheme["layout"] })
             }
           >
             <option value="card">Cartão</option>
@@ -63,25 +236,12 @@ export function AppearanceControls({
           </select>
         </label>
         <label>
-          Tipografia
-          <select
-            value={theme.font ?? "manrope"}
-            onChange={(e) =>
-              change({ font: e.target.value as SmartPageTheme["font"] })
-            }
-          >
-            <option value="manrope">Manrope</option>
-            <option value="georgia">Georgia</option>
-            <option value="courier">Courier New</option>
-          </select>
-        </label>
-        <label>
           Alinhamento
           <select
             value={theme.alignment ?? "center"}
-            onChange={(e) =>
+            onChange={(event) =>
               change({
-                alignment: e.target.value as SmartPageTheme["alignment"],
+                alignment: event.target.value as SmartPageTheme["alignment"],
               })
             }
           >
@@ -90,27 +250,12 @@ export function AppearanceControls({
           </select>
         </label>
         <label>
-          Foto
-          <select
-            value={theme.avatarShape ?? "circle"}
-            onChange={(e) =>
-              change({
-                avatarShape: e.target.value as SmartPageTheme["avatarShape"],
-              })
-            }
-          >
-            <option value="circle">Circular</option>
-            <option value="rounded">Arredondada</option>
-            <option value="square">Quadrada</option>
-          </select>
-        </label>
-        <label>
           Estilo dos botões
           <select
             value={theme.buttonStyle ?? "solid"}
-            onChange={(e) =>
+            onChange={(event) =>
               change({
-                buttonStyle: e.target.value as SmartPageTheme["buttonStyle"],
+                buttonStyle: event.target.value as SmartPageTheme["buttonStyle"],
               })
             }
           >
@@ -126,7 +271,7 @@ export function AppearanceControls({
             min="0"
             max="28"
             value={theme.buttonRadius ?? 12}
-            onChange={(e) => change({ buttonRadius: Number(e.target.value) })}
+            onChange={(event) => change({ buttonRadius: Number(event.target.value) })}
           />
         </label>
         <label>
@@ -136,7 +281,7 @@ export function AppearanceControls({
             min="48"
             max="144"
             value={theme.avatarSize ?? 88}
-            onChange={(e) => change({ avatarSize: Number(e.target.value) })}
+            onChange={(event) => change({ avatarSize: Number(event.target.value) })}
           />
         </label>
         <label>
@@ -146,7 +291,7 @@ export function AppearanceControls({
             min="24"
             max="48"
             value={theme.titleSize ?? 32}
-            onChange={(e) => change({ titleSize: Number(e.target.value) })}
+            onChange={(event) => change({ titleSize: Number(event.target.value) })}
           />
         </label>
         <label>
@@ -156,10 +301,11 @@ export function AppearanceControls({
             min="8"
             max="32"
             value={theme.spacing ?? 18}
-            onChange={(e) => change({ spacing: Number(e.target.value) })}
+            onChange={(event) => change({ spacing: Number(event.target.value) })}
           />
         </label>
       </div>
+      </section>
       <h4>Ordem e visibilidade</h4>
       <ol className="sp-section-order">
         {order.map((section, index) => (

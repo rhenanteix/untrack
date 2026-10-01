@@ -6,11 +6,15 @@ export function ImageUpload({
   disabled,
   onUploaded,
   currentUrl,
+  label = "Envie sua foto ou logo",
+  description = "JPG, PNG ou WebP · até 2 MB. A imagem será otimizada.",
 }: {
   pageId: string;
   currentUrl?: string | null;
   disabled: boolean;
   onUploaded: (url: string) => void;
+  label?: string;
+  description?: string;
 }) {
   const [busy, setBusy] = useState(false),
     [error, setError] = useState("");
@@ -31,8 +35,8 @@ export function ImageUpload({
   return (
     <div className="sp-upload">
       <label htmlFor={id}>
-        <strong>Envie sua foto ou logo</strong>
-        <span>JPG, PNG ou WebP · até 2 MB. A imagem será otimizada.</span>
+        <strong>{label}</strong>
+        <span>{description}</span>
       </label>
       <input
         id={id}

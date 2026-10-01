@@ -20,6 +20,26 @@ export function PageDesign({
   socials?: ReactNode;
   preview?: boolean;
 }) {
+  const wallpaperImage =
+    (theme.wallpaper === "image" || theme.wallpaper === "blur") &&
+    theme.backgroundImageUrl
+      ? theme.backgroundImageUrl
+      : undefined;
+  const wallpaperVideo =
+    theme.wallpaper === "video" && theme.backgroundVideoUrl
+      ? theme.backgroundVideoUrl
+      : undefined;
+  const logo = theme.logoUrl ? (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      src={theme.logoUrl}
+      alt={`Logo de ${title}`}
+      width={56}
+      height={56}
+      referrerPolicy="no-referrer"
+      className={styles.logo}
+    />
+  ) : null;
   const avatar = avatarUrl ? (
     // eslint-disable-next-line @next/next/no-img-element
     <img
@@ -57,6 +77,11 @@ export function PageDesign({
       data-alignment={theme.alignment}
       data-avatar={theme.avatarShape}
       data-buttons={theme.buttonStyle}
+      data-photo-layout={theme.photoLayout ?? "classic"}
+      data-title-style={theme.titleStyle ?? "classic"}
+      data-wallpaper={theme.wallpaper ?? "fill"}
+      data-gradient={theme.backgroundGradient}
+      data-pattern={theme.backgroundPattern}
       style={
         {
           "--avatar-size": theme.avatarSize === undefined ? undefined : `${theme.avatarSize}px`,
@@ -75,12 +100,37 @@ export function PageDesign({
         } as CSSProperties
       }
     >
+      {wallpaperImage && (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={wallpaperImage}
+          alt=""
+          aria-hidden="true"
+          referrerPolicy="no-referrer"
+          className={styles.wallpaperImage}
+        />
+      )}
+      {wallpaperVideo && (
+        <video
+          className={styles.wallpaperVideo}
+          autoPlay
+          muted
+          loop
+          playsInline
+          aria-hidden="true"
+          src={wallpaperVideo}
+        />
+      )}
+      {(wallpaperImage || wallpaperVideo) && (
+        <div className={styles.wallpaperOverlay} aria-hidden="true" />
+      )}
       <div className={styles.art} aria-hidden="true">
         <i />
         <i />
         <i />
       </div>
       <div className={styles.content}>
+        {logo && <div className={styles.logoWrap}>{logo}</div>}
         {(
           theme.sections ?? [
             "avatar",

@@ -1087,6 +1087,7 @@ export function SmartPagesDashboard({
                       <details className="sp-advanced">
                         <summary>Personalização avançada</summary>{" "}
                         <AppearanceControls
+                          pageId={selected.id}
                           theme={profileDraft.theme ?? selected.theme}
                           disabled={!canEdit || action.busy}
                           onChange={(theme) => {

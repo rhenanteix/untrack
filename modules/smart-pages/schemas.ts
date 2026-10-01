@@ -32,6 +32,22 @@ export const smartPageThemeSchema = z
     alignment: z.enum(["center", "left"]).optional(),
     avatarShape: z.enum(["circle", "rounded", "square"]).optional(),
     buttonStyle: z.enum(["solid", "outline", "soft"]).optional(),
+    photoLayout: z
+      .enum(["classic", "hero", "banner", "cutout", "shape"])
+      .optional(),
+    logoUrl: webUrlSchema.optional(),
+    titleStyle: z
+      .enum(["classic", "editorial", "bold", "uppercase"])
+      .optional(),
+    wallpaper: z
+      .enum(["fill", "gradient", "blur", "pattern", "image", "video"])
+      .optional(),
+    backgroundGradient: z
+      .enum(["aurora", "sunset", "ocean", "orchid"])
+      .optional(),
+    backgroundPattern: z.enum(["dots", "grid", "lines", "waves"]).optional(),
+    backgroundImageUrl: webUrlSchema.optional(),
+    backgroundVideoUrl: webUrlSchema.optional(),
     sections: z
       .array(z.enum(["avatar", "title", "description", "links", "socials"]))
       .length(5)

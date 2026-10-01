@@ -15,6 +15,11 @@ describe("Smart Page customization", () => {
       alignment: "left",
       avatarShape: "square",
       buttonStyle: "outline",
+      photoLayout: "hero",
+      logoUrl: "https://cdn.example/logo.webp",
+      titleStyle: "editorial",
+      wallpaper: "image",
+      backgroundImageUrl: "https://cdn.example/wallpaper.webp",
       sections: ["title", "avatar", "links", "description", "socials"],
       hiddenSections: ["description"],
       buttonRadius: 20,
@@ -35,6 +40,28 @@ describe("Smart Page customization", () => {
     expect(
       smartPageThemeSchema.safeParse({ hiddenSections: ["links"] }).success,
     ).toBe(false);
+    expect(
+      smartPageThemeSchema.safeParse({
+        backgroundImageUrl: "javascript:alert(1)",
+      }).success,
+    ).toBe(false);
+    expect(
+      smartPageThemeSchema.safeParse({ wallpaper: "remote-css" }).success,
+    ).toBe(false);
+  });
+  it("accepts safe external image and video wallpapers", () => {
+    expect(
+      smartPageThemeSchema.parse({
+        wallpaper: "image",
+        backgroundImageUrl: "https://cdn.example/wallpaper.webp",
+      }),
+    ).toMatchObject({ wallpaper: "image" });
+    expect(
+      smartPageThemeSchema.parse({
+        wallpaper: "video",
+        backgroundVideoUrl: "https://cdn.example/wallpaper.mp4",
+      }),
+    ).toMatchObject({ wallpaper: "video" });
   });
   it("requires paid entitlement without enabling charges", () => {
     expect(() => requireSmartPages("free")).toThrow();
