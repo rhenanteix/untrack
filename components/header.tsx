@@ -5,8 +5,8 @@ import { usePathname } from "next/navigation";
 import { useState } from "react";
 
 const links = [
-  { href: "/limpar-link", label: "Arrumar link" },
-  { href: "/gerar-utm", label: "Criar UTM" },
+  { href: "/limpar-link", label: "Limpar link" },
+  { href: "/gerar-utm", label: "UTM" },
   { href: "/gerar-qrcode", label: "QR Code" },
   { href: "/encurtar", label: "Encurtar" },
   { href: "/link-health", label: "Link Health" },
@@ -23,11 +23,11 @@ export function Header() {
   return (
     <header className="site-header">
       <div className="shell header-inner">
-        <Link className="brand" href="/" aria-label="Arrume Meu Link, início">
+        <Link className="brand" href="/" aria-label="Untrack, início">
           <span aria-hidden="true" className="brand-mark">
             ↗
           </span>
-          <span className="brand-name">Arrume Meu Link</span>
+          <span className="brand-name">Untrack</span>
         </Link>
 
         <nav className="desktop-nav" aria-label="Navegação principal">

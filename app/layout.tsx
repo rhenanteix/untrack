@@ -11,25 +11,25 @@ const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
 export const metadata: Metadata = {
   metadataBase: new URL(appUrl),
   title: {
-    default: "Arrume Meu Link — Limpe e organize seus links",
-    template: "%s | Arrume Meu Link",
+    default: "Untrack — Seus links, organizados e rastreáveis",
+    template: "%s | Untrack",
   },
   description:
-    "Limpe URLs, remova rastreadores, crie UTMs e gere QR Codes gratuitamente.",
-  applicationName: "Arrume Meu Link",
+    "Smart Pages, short links, UTMs, QR Codes e saúde de links em uma única plataforma.",
+  applicationName: "Untrack",
   manifest: "/manifest.webmanifest",
   openGraph: {
     type: "website",
     locale: "pt_BR",
-    siteName: "Arrume Meu Link",
-    title: "Arrume Meu Link — Limpe e organize seus links",
+    siteName: "Untrack",
+    title: "Untrack — Seus links, organizados e rastreáveis",
     description:
-      "Limpe URLs, remova rastreadores, crie UTMs e gere QR Codes gratuitamente.",
+      "Smart Pages, short links, UTMs, QR Codes e saúde de links em uma única plataforma.",
   },
   twitter: {
     card: "summary",
-    title: "Arrume Meu Link",
-    description: "Cole seu link. A gente arruma.",
+    title: "Untrack",
+    description: "Organize, rastreie e compartilhe seus links com estilo.",
   },
 };
 
@@ -41,11 +41,11 @@ export const viewport: Viewport = {
 const jsonLd = {
   "@context": "https://schema.org",
   "@type": "WebApplication",
-  name: "Arrume Meu Link",
+  name: "Untrack",
   applicationCategory: "UtilitiesApplication",
   operatingSystem: "Any",
   description:
-    "Ferramenta gratuita para limpar URLs, criar UTMs e gerar QR Codes.",
+    "Plataforma de social linking e gestão de links: Smart Pages, encurtador, UTMs, QR Codes e saúde de links.",
   offers: { "@type": "Offer", price: "0", priceCurrency: "BRL" },
 };
 
