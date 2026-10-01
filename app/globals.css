@@ -2047,3 +2047,164 @@ body:has(.smart-page-public) .site-footer { display: none; }
 .smart-page-public nav { display: flex; flex-wrap: wrap; justify-content: center; gap: 18px; }
 .smart-page-preview { padding: 0; overflow: hidden; border: 6px solid #fff; border-radius: 28px; box-shadow: 0 18px 50px #203b3020, 0 0 0 1px #dce4de; background: #fff; }
 .smart-page-preview > div { min-height: 600px; }
+
+/* Smart Pages: focused editing sections and contextual form feedback. */
+.smart-pages-dashboard [hidden] {
+  display: none !important;
+}
+.sp-editor-sections {
+  display: flex;
+  gap: 6px;
+  padding: 18px 0;
+  border-bottom: 1px solid #e2e8e2;
+  flex-wrap: wrap;
+}
+.sp-editor-sections button {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  min-height: 43px;
+  padding: 8px 12px;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  color: #65766b;
+  background: transparent;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.sp-editor-sections button span {
+  font-size: 10px;
+  opacity: 0.7;
+}
+.sp-editor-sections button[aria-pressed="true"] {
+  background: #edf3ed;
+  border-color: #d4dfd4;
+  color: #24432e;
+}
+.sp-editor-sections button:focus-visible {
+  outline: 3px solid #758e79;
+  outline-offset: 2px;
+}
+.sp-profile-fields {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 22px;
+}
+.sp-section-intro {
+  font-size: 13px;
+  line-height: 1.7;
+  color: #647268;
+  margin: 0 0 2px;
+}
+.smart-page-profile-form input,
+.smart-page-profile-form textarea,
+.smart-page-create input,
+.smart-page-create textarea {
+  width: 100%;
+  box-sizing: border-box;
+  border-radius: 10px;
+  padding: 12px 14px;
+  box-shadow: 0 1px 2px #243d3105;
+  transition:
+    border-color 0.15s,
+    box-shadow 0.15s;
+}
+.smart-page-profile-form input:focus,
+.smart-page-profile-form textarea:focus,
+.smart-page-create input:focus,
+.smart-page-create textarea:focus {
+  outline: 0;
+  border-color: #5a8064;
+  box-shadow: 0 0 0 3px #5a80641a;
+}
+.sp-field-hint {
+  display: block;
+  font-size: 11px;
+  font-weight: 400;
+  line-height: 1.6;
+  color: #69756e;
+}
+.sp-field-error {
+  display: block;
+  color: #a23535;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.6;
+}
+.smart-pages-dashboard [aria-invalid="true"] {
+  border-color: #c05555;
+  background: #fffafa;
+  box-shadow: 0 0 0 2px #c0555510;
+}
+.sp-form-summary {
+  display: grid;
+  gap: 5px;
+  border: 1px solid #efcccc;
+  border-left: 3px solid #bd5555;
+  border-radius: 10px;
+  background: #fff6f4;
+  padding: 15px 18px;
+  color: #863636;
+  font-size: 12px;
+  line-height: 1.5;
+}
+.sp-form-summary strong {
+  font-size: 14px;
+}
+.sp-save-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  border-top: 1px solid #e2e8e2;
+  padding: 18px 0 4px;
+  margin-top: 16px;
+}
+.sp-save-bar small {
+  font-size: 11px;
+  color: #66766c;
+}
+.sp-save-bar .button {
+  flex-shrink: 0;
+  background: #24432e;
+  color: #fff;
+  border-color: #24432e;
+}
+.smart-page-create {
+  background: linear-gradient(150deg, #f3f7f1, #fff);
+  padding: 16px;
+  border: 1px solid #e1e8dc;
+  border-radius: 12px;
+}
+@media (max-width: 600px) {
+  .sp-editor-sections {
+    gap: 3px;
+  }
+  .sp-editor-sections button {
+    padding: 8px 5px;
+    font-size: 11px;
+  }
+  .sp-editor-sections button span {
+    display: none;
+  }
+  .sp-save-bar {
+    align-items: stretch;
+    flex-direction: column;
+  }
+  .sp-save-bar .button {
+    width: 100%;
+  }
+}
+.sp-field {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+.smart-pages-dashboard [aria-invalid="true"]:focus {
+  border-color: #c05555;
+  box-shadow: 0 0 0 3px #c055551a;
+}

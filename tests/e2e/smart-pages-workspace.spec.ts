@@ -52,6 +52,7 @@ test("Smart Pages loads, previews profile changes, saves and publishes", async (
   await expect(
     page.getByRole("button", { name: "Publicar", exact: true }),
   ).toBeDisabled();
+  await page.getByRole("button", { name: "Modelos", exact: true }).click();
   await page
     .getByRole("button", { name: "Usar modelo Atelier", exact: true })
     .click();
@@ -67,6 +68,7 @@ test("Smart Pages loads, previews profile changes, saves and publishes", async (
     .getByRole("button", { name: "Salvar perfil", exact: true })
     .click();
   await expect(page.getByText("Perfil salvo.", { exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Links", exact: true }).click();
   await page
     .locator('form.smart-page-add-block input[name="title"]')
     .fill("Conheça nossos projetos");
@@ -229,4 +231,171 @@ test("viewer can read a shared page but cannot edit it in the UI or API", async 
   );
   expect((await unchanged.json()).title).toBe("Página compartilhada");
   await page.goto("/untrack/smart-pages");
+});
+
+test("field errors explain slug issues; career templates preserve and publish real content", async ({
+  page,
+  context,
+  baseURL,
+}, testInfo) => {
+  await register(context.request, baseURL!);
+  await page.goto("/untrack/smart-pages");
+  await page.getByLabel("Nome ou marca").fill("Ana Silva");
+  const createSlug = page.locator('.smart-page-create input[name="slug"]');
+  await createSlug.fill("ana--silva");
+  await page.getByRole("button", { name: "Criar página", exact: true }).click();
+  await expect(createSlug).toBeFocused();
+  await expect(createSlug).toHaveAttribute("aria-invalid", "true");
+  await expect(createSlug).toHaveAccessibleDescription(/hífens repetidos/);
+  await expect(
+    page.locator('.smart-page-create input[name="title"]'),
+  ).toHaveValue("Ana Silva");
+  const slug = `ana-${randomUUID().slice(0, 8)}`;
+  await createSlug.fill(slug);
+  await page.getByRole("button", { name: "Criar página", exact: true }).click();
+  await expect(
+    page.getByRole("heading", { name: "Ana Silva", exact: true }),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "Modelos", exact: true }).click();
+  await page.getByRole("button", { name: /^Currículos/ }).click();
+  await expect(page.getByRole("button", { name: /Usar modelo/ })).toHaveCount(
+    3,
+  );
+  await page.getByLabel("Buscar modelos").fill("não existe");
+  await expect(page.getByText("Nenhum modelo encontrado")).toBeVisible();
+  await page.getByLabel("Buscar modelos").fill("trajetoria");
+  await expect(page.getByRole("button", { name: /Usar modelo/ })).toHaveCount(
+    1,
+  );
+  await page.getByRole("button", { name: "Usar modelo Trajetória" }).click();
+  await page
+    .getByRole("button", { name: "Salvar perfil", exact: true })
+    .click();
+  await expect(page.getByText("Perfil salvo.", { exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Perfil", exact: true }).click();
+  const profileSlug = page.locator(
+    '.smart-page-profile-form input[name="slug"]',
+  );
+  await profileSlug.fill("ana com espaços");
+  await page.getByRole("button", { name: "Modelos", exact: true }).click();
+  await page
+    .getByRole("button", { name: "Salvar perfil", exact: true })
+    .click();
+  await expect(profileSlug).toBeVisible();
+  await expect(profileSlug).toBeFocused();
+  await page.screenshot({
+    path: testInfo.outputPath("field-error.png"),
+    fullPage: true,
+  });
+  await profileSlug.fill(slug);
+  await page
+    .getByRole("button", { name: "Salvar perfil", exact: true })
+    .click();
+  await expect(page.getByText("Perfil salvo.", { exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Links", exact: true }).click();
+  await page
+    .locator('.smart-page-add-block input[name="title"]')
+    .fill("Meu LinkedIn");
+  await page
+    .locator('.smart-page-add-block input[name="destinationUrl"]')
+    .fill("https://www.linkedin.com/in/example");
+  await page
+    .getByRole("button", { name: "Adicionar link", exact: true })
+    .click();
+  await page.getByRole("button", { name: "Publicar", exact: true }).click();
+  await expect(
+    page.getByText("Página publicada.", { exact: true }),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "Modelos", exact: true }).click();
+  await page.getByLabel("Buscar modelos").fill("");
+  await page.getByRole("button", { name: /^Portfólios/ }).click();
+  await expect(page.getByRole("button", { name: /Usar modelo/ })).toHaveCount(
+    3,
+  );
+  await page.screenshot({
+    path: testInfo.outputPath("portfolio-gallery.png"),
+    fullPage: true,
+  });
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= innerWidth + 1,
+    ),
+  ).toBe(true);
+  const publicPage = await context.newPage();
+  await publicPage.goto(`/page/${slug}`);
+  await expect(publicPage.locator('[data-theme="resume"]')).toBeVisible();
+  await expect(
+    publicPage.getByRole("heading", { name: "Ana Silva" }),
+  ).toBeVisible();
+  await expect(
+    publicPage.getByRole("link", { name: "Meu LinkedIn" }),
+  ).toHaveAttribute("href", "https://www.linkedin.com/in/example");
+  await expect(
+    publicPage.getByText("Ana Martins", { exact: true }),
+  ).toHaveCount(0);
+  await publicPage.screenshot({
+    path: testInfo.outputPath("resume-public.png"),
+    fullPage: true,
+  });
+  await publicPage.close();
+});
+
+test("server conflicts and invalid social URLs point to the correct form field", async ({
+  page,
+  context,
+  browser,
+  baseURL,
+}) => {
+  const other = await browser.newContext();
+  try {
+    await register(other.request, baseURL!);
+    const takenSlug = `taken-${randomUUID().slice(0, 8)}`;
+    const created = await other.request.post(`${baseURL}/api/smart-pages`, {
+      data: { title: "Outra página", slug: takenSlug },
+    });
+    expect(created.status()).toBe(201);
+    await register(context.request, baseURL!);
+    await page.goto("/untrack/smart-pages");
+    await page.getByLabel("Nome ou marca").fill("Perfil profissional");
+    const slug = page.locator('.smart-page-create input[name="slug"]');
+    await slug.fill(takenSlug);
+    await page
+      .getByRole("button", { name: "Criar página", exact: true })
+      .click();
+    await expect(slug).toHaveAttribute("aria-invalid", "true");
+    await expect(slug).toHaveAccessibleDescription(
+      /já pertence a outra página/,
+    );
+    await expect(slug).toBeFocused();
+    await slug.fill(`my-${randomUUID().slice(0, 8)}`);
+    await page
+      .getByRole("button", { name: "Criar página", exact: true })
+      .click();
+    await expect(
+      page.getByRole("heading", { name: "Perfil profissional", exact: true }),
+    ).toBeVisible();
+    await page.getByText("Redes sociais (opcional)", { exact: true }).click();
+    const linkedin = page.locator('input[name="social-linkedin"]');
+    await linkedin.fill("ftp://example.com/profile");
+    await page.getByText("Redes sociais (opcional)", { exact: true }).click();
+    await page.getByRole("button", { name: "Modelos", exact: true }).click();
+    await page
+      .getByRole("button", { name: "Salvar perfil", exact: true })
+      .click();
+    await expect(linkedin).toBeVisible();
+    await expect(linkedin).toBeFocused();
+    await expect(linkedin).toHaveAttribute("aria-invalid", "true");
+    await expect(linkedin).toHaveAccessibleDescription(/HTTP ou HTTPS/);
+    await expect(linkedin).toHaveValue("ftp://example.com/profile");
+    await linkedin.fill("https://www.linkedin.com/in/example");
+    await page
+      .getByRole("button", { name: "Salvar perfil", exact: true })
+      .click();
+    await expect(
+      page.getByText("Perfil salvo.", { exact: true }),
+    ).toBeVisible();
+    await expect(linkedin).toHaveAttribute("aria-invalid", "false");
+  } finally {
+    await other.close();
+  }
 });

@@ -105,13 +105,20 @@ export function useAction() {
   const [busy, setBusy] = useState(false),
     [error, setError] = useState(""),
     [notice, setNotice] = useState("");
+  const [failure, setFailure] = useState<Error | null>(null);
   async function run(action: () => Promise<void>) {
     setBusy(true);
+    setFailure(null);
     setError("");
     setNotice("");
     try {
       await action();
     } catch (error) {
+      setFailure(
+        error instanceof Error
+          ? error
+          : new Error("Não foi possível concluir."),
+      );
       setError(
         error instanceof Error ? error.message : "Não foi possível concluir.",
       );
@@ -119,7 +126,7 @@ export function useAction() {
       setBusy(false);
     }
   }
-  return { busy, error, notice, setNotice, run };
+  return { busy, error, failure, notice, setNotice, run };
 }
 export function ActionStatus({
   busy,

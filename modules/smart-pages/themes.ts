@@ -9,6 +9,18 @@ export const themeIds = [
   "bloom",
   "ocean",
   "cafe",
+  "resume",
+  "executive",
+  "developer",
+  "folio",
+  "gallery",
+  "architect",
+  "rose",
+  "sunset",
+  "fitness",
+  "music",
+  "kitchen",
+  "community",
 ] as const;
 export type ThemePreset = (typeof themeIds)[number];
 export type SmartPageTheme = {
@@ -24,6 +36,7 @@ export const themes: {
   category: string;
   description: string;
   colors: string[];
+  sample?: { name: string; bio: string; links: string[] };
 }[] = [
   {
     id: "minimal",
@@ -84,9 +97,143 @@ export const themes: {
   {
     id: "cafe",
     name: "Café",
-    category: "Negócios",
+    category: "Gastronomia",
     description: "Uma identidade acolhedora, feita para receber.",
     colors: ["#f2e7d7", "#693f2c", "#d3b69a"],
+  },
+  {
+    id: "resume",
+    name: "Trajetória",
+    category: "Currículos",
+    description: "Seu próximo passo começa com uma boa apresentação.",
+    colors: ["#f4f6fa", "#203c61", "#ccd7e5"],
+    sample: {
+      name: "Ana Martins",
+      bio: "Gestão de projetos · Operações\nConectando pessoas, processos e resultados.",
+      links: [
+        "Currículo em PDF",
+        "Experiência no LinkedIn",
+        "Entre em contato",
+      ],
+    },
+  },
+  {
+    id: "executive",
+    name: "Executivo",
+    category: "Currículos",
+    description: "Elegância e clareza para consultores e lideranças.",
+    colors: ["#eeece5", "#263a33", "#b8a87b"],
+    sample: {
+      name: "Rafael Costa",
+      bio: "Consultoria de negócios\nEstratégia com propósito e direção.",
+      links: [
+        "Conheça minha trajetória",
+        "Perfil no LinkedIn",
+        "Agende uma conversa",
+      ],
+    },
+  },
+  {
+    id: "developer",
+    name: "Terminal",
+    category: "Currículos",
+    description: "Uma identidade técnica para quem constrói o futuro.",
+    colors: ["#111d28", "#bde6d5", "#395b68"],
+    sample: {
+      name: "Alex Santos",
+      bio: "Software engineer · Full stack\nTransformando ideias em produtos digitais.",
+      links: [
+        "Projetos no GitHub",
+        "Currículo e experiência",
+        "Vamos conversar",
+      ],
+    },
+  },
+  {
+    id: "folio",
+    name: "Forma & Função",
+    category: "Portfólios",
+    description: "Projetos em primeiro plano, com uma assinatura criativa.",
+    colors: ["#f5f0e8", "#ed592f", "#27251f"],
+    sample: {
+      name: "Marina Lopes",
+      bio: "Design de produto & direção de arte\nIdeias que ganham forma.",
+      links: [
+        "Projetos selecionados",
+        "Meu processo criativo",
+        "Vamos criar juntos",
+      ],
+    },
+  },
+  {
+    id: "gallery",
+    name: "Galeria",
+    category: "Portfólios",
+    description: "Um espaço editorial para fotografia e artes visuais.",
+    colors: ["#222323", "#eeeae2", "#aeafa6"],
+    sample: {
+      name: "Lucas Oliveira",
+      bio: "Fotografia & histórias visuais\nUm novo olhar para o cotidiano.",
+      links: ["Ensaios e coleções", "Portfólio completo", "Reserve uma sessão"],
+    },
+  },
+  {
+    id: "architect",
+    name: "Perspectiva",
+    category: "Portfólios",
+    description: "Linhas precisas para arquitetura, interiores e design.",
+    colors: ["#ece9e2", "#51473f", "#b8ada0"],
+    sample: {
+      name: "Estúdio Norte",
+      bio: "Arquitetura & interiores\nEspaços para viver com intenção.",
+      links: [
+        "Projetos residenciais",
+        "Conheça o estúdio",
+        "Conte sobre seu projeto",
+      ],
+    },
+  },
+  {
+    id: "rose",
+    name: "Rosé",
+    category: "Beleza",
+    description: "Delicadeza e sofisticação em cada detalhe.",
+    colors: ["#f5e7e6", "#713e4b", "#d5acb4"],
+  },
+  {
+    id: "sunset",
+    name: "Sol",
+    category: "Criadores",
+    description: "Cores solares para uma presença cheia de vida.",
+    colors: ["#ffdfba", "#782e2b", "#f7a983"],
+  },
+  {
+    id: "fitness",
+    name: "Movimento",
+    category: "Esporte",
+    description: "Energia e contraste para sua rotina e comunidade.",
+    colors: ["#e8ff75", "#222b24", "#ffffff"],
+  },
+  {
+    id: "music",
+    name: "Frequência",
+    category: "Música",
+    description: "Um palco digital para lançamentos e conexões.",
+    colors: ["#25152c", "#fbc2e7", "#9d78c4"],
+  },
+  {
+    id: "kitchen",
+    name: "À Mesa",
+    category: "Gastronomia",
+    description: "Uma apresentação com sabor de encontro.",
+    colors: ["#fff5df", "#9a382e", "#e8c18e"],
+  },
+  {
+    id: "community",
+    name: "Conexão",
+    category: "Educação",
+    description: "Conhecimento e conversas que aproximam.",
+    colors: ["#e7ecfa", "#344b87", "#bac8ee"],
   },
 ];
 export function readableInk(hex: string) {

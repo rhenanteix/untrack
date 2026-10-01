@@ -111,9 +111,9 @@ Para pontuação técnica configurável, razões por check e interface visual, u
 
 ### Modelos de Smart Pages
 
-O editor oferece nove modelos (Studio, Aura, Forma, After Hours, Atelier,
-Amplifica, Botânica, Maré e Café), filtrados por categoria. Escolha o modelo
-em **Identidade visual** e use **Salvar perfil** para persistir a seleção.
+O editor oferece 21 modelos, com busca e filtros por categoria. Use as etapas
+**Perfil**, **Modelos**, **Links** e **Resultados**. Escolha o modelo na etapa
+**Modelos** e use **Salvar perfil** para persistir a seleção.
 Em páginas publicadas, salvar atualiza a apresentação imediatamente.
 Os exemplos da galeria são demonstrativos; selecionar um modelo preserva
 textos, avatar, links e redes sociais da página.
@@ -127,3 +127,16 @@ apenas `theme` preserva a descrição. A prévia não registra analytics.
 
 Os modelos usam o campo JSON `SmartPage.theme` existente: nenhuma migration,
 variável de ambiente ou serviço externo adicional é necessário.
+
+Os modelos de **Currículos** (Trajetória, Executivo e Terminal) e **Portfólios**
+(Forma & Função, Galeria e Perspectiva) têm composições e exemplos específicos.
+Use a descrição para seu resumo profissional e os links para LinkedIn, GitHub,
+projetos e um currículo em PDF já hospedado. Os dados demonstrativos da galeria
+não são copiados para a página publicada. Não há integração automática com
+LinkedIn nem upload de currículo nesta etapa.
+
+A validação destaca o campo com `aria-invalid`, associa a explicação usando
+`aria-describedby` e leva o foco até ele. Erros em uma etapa oculta reabrem o
+perfil, e erros de redes sociais expandem a seção correspondente. A validação
+de endereço usa o mesmo schema do servidor; colisões retornadas pela API são
+exibidas no campo de endereço. Os dados digitados permanecem no formulário.

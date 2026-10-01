@@ -38,7 +38,11 @@ function slugConflict(error: unknown): never {
     error instanceof Prisma.PrismaClientKnownRequestError &&
     error.code === "P2002"
   ) {
-    throw new ApiError(409, "SLUG_EXISTS", "Este slug já está em uso.");
+    throw new ApiError(
+      409,
+      "SLUG_EXISTS",
+      "Este endereço já está em uso. Escolha outro para sua página.",
+    );
   }
   throw error;
 }

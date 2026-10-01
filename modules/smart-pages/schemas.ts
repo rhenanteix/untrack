@@ -8,13 +8,16 @@ export const smartPageSlugSchema = z
   .string()
   .trim()
   .toLowerCase()
-  .min(3)
-  .max(60)
+  .min(3, "Use pelo menos 3 caracteres no endereço.")
+  .max(60, "Use no máximo 60 caracteres no endereço.")
   .regex(
     /^[a-z0-9]+(?:-[a-z0-9]+)*$/,
-    "Use letras minúsculas, números e hífens.",
+    "Use letras de a a z, números e hífens entre palavras. Espaços, acentos, símbolos e hífens repetidos não são aceitos. Exemplo: ana-silva.",
   )
-  .refine((value) => !reservedSlugs.has(value), "Slug reservado.");
+  .refine(
+    (value) => !reservedSlugs.has(value),
+    "Este endereço é reservado pelo sistema. Escolha outro, como ana-silva.",
+  );
 
 export const smartPageStatusSchema = z.enum(["draft", "published"]);
 

@@ -347,3 +347,340 @@
     transform: none;
   }
 }
+
+/* Career layouts keep actual profile content central, without invented credentials. */
+.resume {
+  --bg: #f4f6fa;
+  --ink: #203c61;
+  --button: #fff;
+  --button-ink: #203c61;
+  --radius: 8px;
+}
+.resume .content,
+.executive .content,
+.developer .content {
+  padding-top: 48px;
+}
+.resume .profile,
+.executive .profile,
+.developer .profile {
+  align-items: flex-start;
+  text-align: left;
+}
+.resume .profile {
+  border-bottom: 2px solid #203c6125;
+  padding-bottom: 28px;
+}
+.resume .avatar {
+  border-radius: 18px;
+  background: #ccd7e5;
+  color: #203c61;
+}
+.resume .title {
+  font-size: 34px;
+  letter-spacing: -1.2px;
+}
+.resume .links > a,
+.resume .links > span {
+  justify-content: flex-start;
+  text-align: left;
+  border: 1px solid #203c6120;
+  box-shadow: 0 3px 12px #203c6105;
+}
+.resume .links > a:first-child,
+.resume .links > span:first-child {
+  background: var(--ink);
+  color: var(--bg);
+}
+.executive {
+  --bg: #eeece5;
+  --ink: #263a33;
+  --button: transparent;
+  --button-ink: #263a33;
+  --radius: 0px;
+}
+.executive .art {
+  width: 12px;
+  background: #b8a87b;
+}
+.executive .title {
+  font:
+    400 40px Georgia,
+    serif;
+}
+.executive .avatar {
+  background: #b8a87b;
+  border: 0;
+  color: #263a33;
+  border-radius: 0;
+}
+.executive .links > a,
+.executive .links > span {
+  border-bottom: 1px solid #263a3330;
+  justify-content: flex-start;
+  padding-left: 0;
+}
+.developer {
+  --bg: #111d28;
+  --ink: #bde6d5;
+  --button: #1a2d3c;
+  --button-ink: #bde6d5;
+  --radius: 5px;
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+}
+.developer .art {
+  background-image: radial-gradient(#bde6d515 1px, transparent 1px);
+  background-size: 20px 20px;
+}
+.developer .avatar {
+  border-radius: 8px;
+  border: 1px solid #395b68;
+  background: #1a2d3c;
+  color: #bde6d5;
+  font-family: inherit;
+  font-style: normal;
+}
+.developer .links > a,
+.developer .links > span {
+  border: 1px solid #395b68;
+  justify-content: flex-start;
+}
+.developer .title {
+  font-size: 30px;
+  letter-spacing: -1px;
+}
+.folio {
+  --bg: #f5f0e8;
+  --ink: #27251f;
+  --button: #ed592f;
+  --button-ink: #fff;
+  --radius: 2px;
+}
+.folio .profile {
+  align-items: flex-start;
+  text-align: left;
+}
+.folio .title {
+  font-size: 44px;
+  letter-spacing: -2px;
+  max-width: 320px;
+}
+.folio .avatar {
+  background: #ed592f;
+  color: #fff;
+  border-radius: 0;
+  border: none;
+  width: 60px;
+  height: 60px;
+  font-size: 32px;
+}
+.folio .links > a,
+.folio .links > span {
+  min-height: 100px;
+  align-items: flex-end;
+  justify-content: flex-start;
+  text-align: left;
+  background: transparent;
+  color: var(--ink);
+  border: 1px solid #27251f45;
+}
+.folio .links > a:first-child,
+.folio .links > span:first-child {
+  background: var(--button);
+  color: var(--button-ink);
+  min-height: 140px;
+  border: 0;
+}
+.gallery {
+  --bg: #222323;
+  --ink: #eeeae2;
+  --button: #303131;
+  --button-ink: #eeeae2;
+  --radius: 0px;
+}
+.gallery .title {
+  font:
+    400 38px Georgia,
+    serif;
+}
+.gallery .avatar {
+  border-radius: 50% 50% 0 0;
+  background: #aeafa6;
+  color: #222323;
+  height: 110px;
+}
+.gallery .links > a,
+.gallery .links > span {
+  min-height: 85px;
+  border: 1px solid #aeafa633;
+  justify-content: flex-start;
+}
+.gallery .links > a:first-child,
+.gallery .links > span:first-child {
+  background: linear-gradient(125deg, #4a514d, #303131);
+  min-height: 125px;
+}
+.architect {
+  --bg: #ece9e2;
+  --ink: #51473f;
+  --button: transparent;
+  --button-ink: #51473f;
+  --radius: 0px;
+}
+.architect .art {
+  height: 165px;
+  background: linear-gradient(
+    130deg,
+    transparent 40%,
+    #b8ada0 40% 60%,
+    #d3cbc0 60% 80%,
+    transparent 80%
+  );
+}
+.architect .content {
+  padding-top: 100px;
+}
+.architect .profile {
+  align-items: flex-start;
+  text-align: left;
+}
+.architect .avatar {
+  border-radius: 0;
+  background: #51473f;
+  font-style: normal;
+}
+.architect .title {
+  font-weight: 400;
+  font-size: 36px;
+}
+.architect .links > a,
+.architect .links > span {
+  border-top: 1px solid #51473f55;
+  justify-content: flex-start;
+  padding-left: 0;
+}
+.rose {
+  --bg: #f5e7e6;
+  --ink: #713e4b;
+  --button: #713e4b;
+  --radius: 28px;
+}
+.rose .title {
+  font:
+    italic 40px Georgia,
+    serif;
+}
+.rose .art {
+  background: radial-gradient(ellipse at 110% 0%, #d5acb480, transparent 65%);
+}
+.rose .avatar {
+  background: #d5acb4;
+  color: #713e4b;
+}
+.sunset {
+  --bg: #ffdfba;
+  --ink: #782e2b;
+  --button: #fff4e5;
+  --button-ink: #782e2b;
+  --radius: 18px;
+}
+.sunset .art {
+  background:
+    radial-gradient(circle at 90% 5%, #f7a983 0 80px, transparent 81px),
+    linear-gradient(150deg, transparent 30%, #f7a98380);
+}
+.sunset .title {
+  font:
+    700 38px Georgia,
+    serif;
+}
+.fitness {
+  --bg: #e8ff75;
+  --ink: #222b24;
+  --button: #222b24;
+  --button-ink: #e8ff75;
+  --radius: 4px;
+}
+.fitness .title {
+  font-size: 40px;
+  font-weight: 900;
+  letter-spacing: -2px;
+  text-transform: uppercase;
+  font-style: italic;
+}
+.fitness .avatar {
+  border-radius: 12px;
+  transform: rotate(5deg);
+}
+.fitness .links > a,
+.fitness .links > span {
+  text-transform: uppercase;
+  font-size: 12px;
+  letter-spacing: 1px;
+}
+.music {
+  --bg: #25152c;
+  --ink: #fbc2e7;
+  --button: #fbc2e7;
+  --button-ink: #25152c;
+  --radius: 24px;
+}
+.music .art {
+  background: repeating-radial-gradient(
+    circle at 50% 120px,
+    transparent 0 30px,
+    #9d78c415 32px 33px,
+    transparent 35px 45px
+  );
+}
+.music .avatar {
+  background: #9d78c4;
+  color: #25152c;
+}
+.music .title {
+  font-size: 40px;
+  letter-spacing: -2px;
+}
+.kitchen {
+  --bg: #fff5df;
+  --ink: #9a382e;
+  --button: #9a382e;
+  --radius: 8px;
+}
+.kitchen .title {
+  font:
+    700 38px Georgia,
+    serif;
+}
+.kitchen .art {
+  border: 12px solid transparent;
+  border-image: repeating-linear-gradient(
+      45deg,
+      #e8c18e 0 10px,
+      #fff5df 10px 20px
+    )
+    12;
+}
+.kitchen .avatar {
+  border: 1px solid #9a382e;
+  outline: 4px solid #fff5df;
+}
+.community {
+  --bg: #e7ecfa;
+  --ink: #344b87;
+  --button: #fff;
+  --button-ink: #344b87;
+  --radius: 16px;
+}
+.community .art {
+  background: radial-gradient(ellipse at 0 0, #bac8ee, transparent 65%);
+}
+.community .avatar {
+  border-radius: 24px;
+  background: #344b87;
+  color: #e7ecfa;
+}
+.community .links > a,
+.community .links > span {
+  box-shadow: 0 4px 0 #bac8ee;
+}
