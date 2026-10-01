@@ -18,6 +18,13 @@ export const ANALYTICS_EVENTS = [
   "utm_generated",
   "url_check_requested",
   "url_check_completed",
+  "smart_page_created",
+  "smart_page_updated",
+  "smart_page_published",
+  "smart_page_view",
+  "smart_block_created",
+  "smart_block_view",
+  "smart_block_clicked",
 ] as const;
 
 export type AnalyticsEventName = (typeof ANALYTICS_EVENTS)[number];

@@ -2,18 +2,36 @@ generator client {
   provider = "prisma-client-js"
 }
 
+
+enum SmartPageStatus {
+  draft
+  published
+}
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
 model AnalyticsEvent {
-  id         String   @id @default(cuid())
-  name       String
-  occurredAt DateTime @default(now())
-  metadata   Json
+  id               String          @id @default(cuid())
+  name             String
+  occurredAt       DateTime        @default(now())
+  metadata         Json
+  workspaceId      String?
+  smartPageId      String?
+  smartPageBlockId String?
+  day              DateTime?       @db.Date
+  visitorHash      String?         @db.VarChar(64)
+  referrer         String?         @db.VarChar(253)
+  device           String?         @db.VarChar(20)
+  workspace        Workspace?      @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  smartPage        SmartPage?      @relation(fields: [smartPageId], references: [id], onDelete: Cascade)
+  smartPageBlock   SmartPageBlock? @relation(fields: [smartPageBlockId], references: [id], onDelete: Cascade)
 
   @@index([name, occurredAt])
+  @@index([smartPageId, day])
+  @@index([smartPageBlockId, day])
+  @@index([smartPageId, visitorHash])
 }
 
 model User {
@@ -78,6 +96,45 @@ model Verification {
   @@index([identifier])
 }
 
+model SmartPage {
+  id          String          @id @default(cuid())
+  workspaceId String
+  slug        String          @unique @db.VarChar(60)
+  title       String          @db.VarChar(120)
+  description String          @default("") @db.VarChar(500)
+  avatarUrl   String?         @db.VarChar(4096)
+  status      SmartPageStatus @default(draft)
+  publishedAt DateTime?
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+  workspace   Workspace       @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  blocks      SmartPageBlock[]
+  analyticsEvents AnalyticsEvent[]
+
+  @@index([workspaceId, createdAt])
+  @@index([status, publishedAt])
+}
+
+model SmartPageBlock {
+  id               String     @id @default(cuid())
+  smartPageId      String
+  type             String     @db.VarChar(40)
+  position         Int
+  settings         Json
+  visible          Boolean    @default(true)
+  analyticsEnabled Boolean    @default(true)
+  linkId           String?
+  createdAt        DateTime   @default(now())
+  updatedAt        DateTime   @updatedAt
+  smartPage        SmartPage  @relation(fields: [smartPageId], references: [id], onDelete: Cascade)
+  link             ShortLink? @relation(fields: [linkId], references: [id], onDelete: SetNull)
+  analyticsEvents  AnalyticsEvent[]
+
+  @@unique([smartPageId, position])
+  @@index([smartPageId, position])
+  @@index([linkId])
+}
+
 model RateLimit {
   id          String @id
   key         String @unique
@@ -108,6 +165,7 @@ model ShortLink {
   userId         String
   user           User        @relation(fields: [userId], references: [id], onDelete: Cascade)
   clicks         LinkClick[]
+  smartPageBlocks SmartPageBlock[]
 
   @@unique([domainKey, slug])
   @@unique([id, workspaceId])
@@ -184,6 +242,8 @@ model Workspace {
   monitorChecks CampaignMonitorCheck[]
   incidents CampaignIncident[]
   deliveries NotificationDelivery[]
+  smartPages SmartPage[]
+  analyticsEvents AnalyticsEvent[]
 }
 
 model WorkspaceMember {
