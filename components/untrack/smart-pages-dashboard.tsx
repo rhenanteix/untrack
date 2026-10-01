@@ -1,6 +1,8 @@
 "use client";
+import { useRouter, useSearchParams } from "next/navigation";
 
 import { useEffect, useRef, useState, type FormEvent } from "react";
+import { BlockDestinationFields } from "@/components/smart-pages/block-destination-fields";
 import { AppearanceControls } from "@/components/smart-pages/appearance-controls";
 import { ImageUpload } from "@/components/smart-pages/image-upload";
 import { SmartForm, SmartField } from "@/components/smart-pages/smart-form";
@@ -73,6 +75,9 @@ interface SmartPageDetail extends SmartPageSummary {
 }
 
 interface ManagedLink {
+  domainKey: string;
+  isActive: boolean;
+  expiresAt: string | null;
   id: string;
   title: string;
   slug: string;
@@ -155,6 +160,18 @@ export function SmartPagesDashboard({
   readOnlyReason?: string;
   publicOrigin?: string;
 }) {
+  const router = useRouter(),
+    params = useSearchParams();
+  const editId = params.get("edit");
+  const [selectionLoading, setSelectionLoading] = useState(false),
+    [selectionError, setSelectionError] = useState("");
+  const [libraryLoading, setLibraryLoading] = useState(false),
+    [libraryError, setLibraryError] = useState("");
+  const [metricsDays, setMetricsDays] = useState(30),
+    [metricsLoading, setMetricsLoading] = useState(false),
+    [metricsError, setMetricsError] = useState(""),
+    [metricsUpdated, setMetricsUpdated] = useState<string | null>(null),
+    [metricsRevision, setMetricsRevision] = useState(0);
   const [pages, setPages] = useState(initial.items);
   const [selected, setSelected] = useState<SmartPageDetail | null>(null);
   const [editorTab, setEditorTab] = useState<"editor" | "preview">("editor");
@@ -168,11 +185,13 @@ export function SmartPagesDashboard({
   );
   const [activeForm, setActiveForm] = useState("");
   const [editorSection, setEditorSection] = useState("profile");
-  const [search, setSearch] = useState("");
-  const [appliedSearch, setAppliedSearch] = useState("");
+  const [search, setSearch] = useState(params.get("search") ?? "");
+  const [appliedSearch, setAppliedSearch] = useState(
+    params.get("search") ?? "",
+  );
   const [listPage, setListPage] = useState(initial.page);
   const [hasMore, setHasMore] = useState(initial.hasMore);
-  const [showCreate, setShowCreate] = useState(initial.items.length === 0);
+  const [showCreate, setShowCreate] = useState(params.get("create") === "1");
   const [profileDraft, setProfileDraft] = useState<Partial<SmartPageSummary>>(
     {},
   );
@@ -189,16 +208,113 @@ export function SmartPagesDashboard({
     window.addEventListener("beforeunload", warn);
     return () => window.removeEventListener("beforeunload", warn);
   }, [hasUnsaved]);
+  useEffect(() => {
+    if (!editId) {
+      // Clear the detail when browser navigation returns to the library.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setSelected(null);
+      return;
+    }
+    const controller = new AbortController();
+    setSelectionLoading(true);
+    setSelectionError("");
+    apiRequest<SmartPageDetail>(
+      `/api/smart-pages/${encodeURIComponent(editId)}`,
+      { signal: controller.signal },
+    )
+      .then((page) => {
+        if (controller.signal.aborted) return;
+        setSelected({
+          ...page,
+          theme: page.theme ?? { preset: "minimal" },
+          socialLinks: page.socialLinks ?? [],
+        });
+        setProfileDraft({});
+        setDirty(false);
+        setDirtyBlocks([]);
+        setBlockDrafts({});
+        setNewBlockDraft(null);
+        setEditorSection("profile");
+        setEditorTab("editor");
+        setShowCreate(false);
+      })
+      .catch((error) => {
+        if (!controller.signal.aborted) setSelectionError(error.message);
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setSelectionLoading(false);
+      });
+    return () => controller.abort();
+  }, [editId]);
+  useEffect(() => {
+    if (editorSection !== "analytics" || !selected?.id) return;
+    const controller = new AbortController();
+    // A new period starts a separate, cancellable metrics request.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setMetricsLoading(true);
+    setMetricsError("");
+    setMetrics(null);
+    apiRequest<SmartPageMetrics>(
+      `/api/smart-pages/${selected.id}/analytics?days=${metricsDays}`,
+      { signal: controller.signal },
+    )
+      .then((data) => {
+        if (controller.signal.aborted) return;
+        setMetrics(data);
+        setMetricsUpdated(new Date().toLocaleTimeString("pt-BR"));
+      })
+      .catch((error) => {
+        if (!controller.signal.aborted) setMetricsError(error.message);
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setMetricsLoading(false);
+      });
+    return () => controller.abort();
+  }, [selected?.id, editorSection, metricsDays, metricsRevision]);
+  function openEditor(id: string) {
+    const query = new URLSearchParams(params);
+    query.set("edit", id);
+    query.delete("create");
+    router.push(`/untrack/smart-pages?${query}`, { scroll: false });
+  }
+  function backToLibrary() {
+    if (
+      hasUnsaved &&
+      !window.confirm(
+        "Descartar as alterações não salvas e voltar à biblioteca?",
+      )
+    )
+      return;
+    const query = new URLSearchParams(params);
+    query.delete("edit");
+    setSelected(null);
+    setDirty(false);
+    setDirtyBlocks([]);
+    setNewBlockDraft(null);
+    router.push(`/untrack/smart-pages?${query}`, { scroll: false });
+  }
   async function loadPages(page: number, query = appliedSearch) {
-    await action.run(async () => {
-      const data = await apiRequest<typeof initial>(
+    setLibraryLoading(true);
+    setLibraryError("");
+    try {
+      const result = await apiRequest<typeof initial>(
         `/api/smart-pages?page=${page}&search=${encodeURIComponent(query)}`,
       );
-      setPages(data.items);
-      setListPage(data.page);
-      setHasMore(data.hasMore);
+      setPages(result.items);
+      setListPage(result.page);
+      setHasMore(result.hasMore);
       setAppliedSearch(query);
-    });
+      const next = new URLSearchParams(params);
+      next.set("page", String(page));
+      next.set("search", query);
+      router.replace(`/untrack/smart-pages?${next}`, { scroll: false });
+    } catch (error) {
+      setLibraryError(
+        error instanceof Error ? error.message : "Falha ao carregar páginas.",
+      );
+    } finally {
+      setLibraryLoading(false);
+    }
   }
   function profileChanged(event: FormEvent<HTMLFormElement>) {
     if (
@@ -226,34 +342,10 @@ export function SmartPagesDashboard({
   }
 
   async function selectPage(id: string) {
-    if (
-      action.busy ||
-      (hasUnsaved &&
-        !window.confirm(
-          "Há alterações não salvas. Deseja descartá-las e trocar de página?",
-        ))
-    )
+    if (hasUnsaved && !window.confirm("Descartar alterações não salvas?"))
       return;
-    await action.run(async () => {
-      const page = await apiRequest<SmartPageDetail>(`/api/smart-pages/${id}`);
-      setSelected({
-        ...page,
-        theme: page.theme ?? { preset: "minimal" },
-        socialLinks: page.socialLinks ?? [],
-      });
-      setProfileDraft({});
-      setEditorSection("profile");
-      setDirty(false);
-      setDirtyBlocks([]);
-      setBlockDrafts({});
-      setNewBlockDraft(null);
-      setShowCreate(false);
-      requestAnimationFrame(() => editorRef.current?.focus());
-      setMetrics(null);
-      setEditorTab("editor");
-    });
+    openEditor(id);
   }
-
   async function createPage(event: FormEvent<HTMLFormElement>) {
     setActiveForm("create");
     event.preventDefault();
@@ -277,7 +369,9 @@ export function SmartPagesDashboard({
         }),
       });
       setPages((current) => [page, ...current]);
-      setSelected({ ...page, blocks: [] });
+      // Render the editor only after its detail request finishes. This avoids
+      // a late response resetting fields the user has already started editing.
+      openEditor(page.id);
       setMetrics(null);
       setProfileDraft({});
       setEditorSection("profile");
@@ -476,27 +570,25 @@ export function SmartPagesDashboard({
     });
   }
 
-  async function loadMetrics() {
-    if (!selected) return;
-    await action.run(async () => {
-      const result = await apiRequest<SmartPageMetrics>(
-        `/api/smart-pages/${selected.id}/analytics?days=30`,
-      );
-      setMetrics(result);
-    });
-  }
-
   return (
-    <section className="smart-pages-dashboard">
+    <section
+      className={`smart-pages-dashboard ${editId ? "is-editing" : "is-library"}`}
+    >
       <div className="dashboard-heading">
         <div>
           <span className="eyebrow">Untrack</span>
           <h1>Smart Pages</h1>
           <p className="muted">
-            Crie sua presença pública, organize seus links e acompanhe o que funciona.
+            Crie sua presença pública, organize seus links e acompanhe o que
+            funciona.
           </p>
         </div>
-        {canEdit && (
+        {editId && (
+          <button className="button button-secondary" onClick={backToLibrary}>
+            ← Biblioteca de páginas
+          </button>
+        )}
+        {canEdit && !editId && (
           <button
             className="button"
             disabled={action.busy}
@@ -511,7 +603,11 @@ export function SmartPagesDashboard({
         {!canEdit && <p className="smart-page-readonly">{readOnlyReason}</p>}
       </div>
       <div className="smart-pages-grid">
-        <aside className="smart-pages-sidebar" aria-label="Suas Smart Pages">
+        <aside
+          hidden={!!editId}
+          className="smart-pages-sidebar"
+          aria-label="Suas Smart Pages"
+        >
           {canEdit && showCreate && (
             <SmartForm
               className="smart-page-create"
@@ -569,27 +665,40 @@ export function SmartPagesDashboard({
                 Buscar
               </button>
             </form>
-            {pages.map((page) => (
-              <button
-                key={page.id}
-                type="button"
-                className={
-                  selected?.id === page.id
-                    ? "smart-page-list-item active"
-                    : "smart-page-list-item"
-                }
-                disabled={action.busy}
-                aria-pressed={selected?.id === page.id}
-                onClick={() => void selectPage(page.id)}
-              >
-                <strong>{page.title}</strong>
-                <span>
-                  /{page.slug} ·{" "}
-                  {page.status === "published" ? "Publicada" : "Rascunho"}
-                </span>
-              </button>
-            ))}
-            {!pages.length ? (
+            {libraryLoading && <p role="status">Carregando páginas…</p>}
+            {libraryError && (
+              <div role="alert">
+                <p>{libraryError}</p>
+                <button
+                  className="button button-secondary"
+                  onClick={() => void loadPages(listPage)}
+                >
+                  Tentar novamente
+                </button>
+              </div>
+            )}
+            {!libraryError &&
+              pages.map((page) => (
+                <button
+                  key={page.id}
+                  type="button"
+                  className={
+                    selected?.id === page.id
+                      ? "smart-page-list-item active"
+                      : "smart-page-list-item"
+                  }
+                  disabled={action.busy}
+                  aria-pressed={selected?.id === page.id}
+                  onClick={() => void selectPage(page.id)}
+                >
+                  <strong>{page.title}</strong>
+                  <span>
+                    /{page.slug} ·{" "}
+                    {page.status === "published" ? "Publicada" : "Rascunho"}
+                  </span>
+                </button>
+              ))}
+            {!libraryError && !libraryLoading && !pages.length ? (
               <p className="muted">
                 {appliedSearch
                   ? "Nenhuma página encontrada. Tente outro nome ou endereço."
@@ -618,21 +727,38 @@ export function SmartPagesDashboard({
           </div>
         </aside>
 
-        <div className="smart-page-workbench" aria-busy={action.busy}>
+        <div hidden={!editId} className="smart-page-workbench">
+          {selectionLoading && <p role="status">Carregando editor…</p>}
+          {selectionError && (
+            <div role="alert">
+              <p>{selectionError}</p>
+              <button
+                className="button button-secondary"
+                onClick={() => window.location.reload()}
+              >
+                Tentar novamente
+              </button>
+            </div>
+          )}
           <div
             className="smart-page-mobile-tabs"
-            aria-label="Editor da Smart Page"
+            role="tablist"
+            aria-label="Visualização do editor"
           >
             <button
               type="button"
-              aria-pressed={editorTab === "editor"}
+              role="tab"
+              aria-selected={editorTab === "editor"}
+              aria-controls="smart-page-editor-panel"
               onClick={() => setEditorTab("editor")}
             >
-              Editor
+              Editar
             </button>
             <button
               type="button"
-              aria-pressed={editorTab === "preview"}
+              role="tab"
+              aria-selected={editorTab === "preview"}
+              aria-controls="smart-page-preview-panel"
               onClick={() => setEditorTab("preview")}
             >
               Prévia
@@ -657,6 +783,7 @@ export function SmartPagesDashboard({
           ) : (
             <>
               <div
+                id="smart-page-editor-panel"
                 key={selected.id}
                 className={
                   editorTab === "preview"
@@ -726,7 +853,33 @@ export function SmartPagesDashboard({
 
                 <nav
                   className="sp-editor-sections"
+                  role="tablist"
                   aria-label="Etapas do editor"
+                  onKeyDown={(event) => {
+                    const tabs = Array.from(
+                      event.currentTarget.querySelectorAll<HTMLButtonElement>(
+                        '[role="tab"]',
+                      ),
+                    );
+                    const index = tabs.indexOf(
+                      document.activeElement as HTMLButtonElement,
+                    );
+                    const target =
+                      event.key === "ArrowRight"
+                        ? tabs[(index + 1) % tabs.length]
+                        : event.key === "ArrowLeft"
+                          ? tabs[(index - 1 + tabs.length) % tabs.length]
+                          : event.key === "Home"
+                            ? tabs[0]
+                            : event.key === "End"
+                              ? tabs.at(-1)
+                              : null;
+                    if (target) {
+                      event.preventDefault();
+                      target.click();
+                      target.focus();
+                    }
+                  }}
                 >
                   {[
                     ["profile", "01", "Perfil"],
@@ -737,7 +890,11 @@ export function SmartPagesDashboard({
                     <button
                       type="button"
                       key={id}
-                      aria-pressed={editorSection === id}
+                      role="tab"
+                      id={`sp-tab-${id}`}
+                      aria-selected={editorSection === id}
+                      tabIndex={editorSection === id ? 0 : -1}
+                      aria-controls={`sp-panel-${id}`}
                       onClick={() => setEditorSection(id)}
                     >
                       <span aria-hidden="true">{number}</span>
@@ -749,10 +906,28 @@ export function SmartPagesDashboard({
                   hidden={!["profile", "appearance"].includes(editorSection)}
                   failure={activeForm === "profile" ? action.failure : null}
                   reveal={() => setEditorSection("profile")}
+                  id="smart-page-profile-form"
                   className="smart-page-profile-form"
                   onSubmit={saveProfile}
                   onChange={profileChanged}
                 >
+                  <div className="sp-save-bar">
+                    <small>
+                      {action.busy
+                        ? "Salvando…"
+                        : action.error
+                          ? "Falha ao salvar. Seus dados foram mantidos."
+                          : hasUnsaved
+                            ? "Alterações pendentes"
+                            : "✓ Salvo"}
+                    </small>
+                    <button
+                      className="button button-secondary"
+                      disabled={action.busy || !canEdit}
+                    >
+                      Salvar perfil
+                    </button>
+                  </div>{" "}
                   <fieldset
                     className="smart-page-form-fields"
                     disabled={!canEdit || action.busy}
@@ -763,6 +938,9 @@ export function SmartPagesDashboard({
                         : "Sua apresentação"}
                     </legend>
                     <div
+                      id="sp-panel-profile"
+                      role="tabpanel"
+                      aria-labelledby="sp-tab-profile"
                       className="sp-profile-fields"
                       hidden={editorSection !== "profile"}
                     >
@@ -891,16 +1069,12 @@ export function SmartPagesDashboard({
                         </ol>
                       </details>
                     </div>
-                    <div hidden={editorSection !== "appearance"}>
-                      <AppearanceControls
-                        theme={profileDraft.theme ?? selected.theme}
-                        disabled={!canEdit || action.busy}
-                        onChange={(theme) => {
-                          setProfileDraft((current) => ({ ...current, theme }));
-                          setDirty(true);
-                          action.setNotice("");
-                        }}
-                      />
+                    <div
+                      id="sp-panel-appearance"
+                      role="tabpanel"
+                      aria-labelledby="sp-tab-appearance"
+                      hidden={editorSection !== "appearance"}
+                    >
                       <ThemeGallery
                         value={profileDraft.theme ?? selected.theme}
                         disabled={!canEdit || action.busy}
@@ -910,27 +1084,31 @@ export function SmartPagesDashboard({
                           setDirty(true);
                         }}
                       />
-                    </div>
-                    <div className="sp-save-bar">
-                      <small>
-                        {hasUnsaved
-                          ? "Você tem alterações não salvas"
-                          : "Tudo salvo. Continue editando quando quiser."}
-                      </small>
-                      <button
-                        className="button button-secondary"
-                        disabled={action.busy}
-                      >
-                        Salvar perfil
-                      </button>
+                      <details className="sp-advanced">
+                        <summary>Personalização avançada</summary>{" "}
+                        <AppearanceControls
+                          theme={profileDraft.theme ?? selected.theme}
+                          disabled={!canEdit || action.busy}
+                          onChange={(theme) => {
+                            setProfileDraft((current) => ({
+                              ...current,
+                              theme,
+                            }));
+                            setDirty(true);
+                            action.setNotice("");
+                          }}
+                        />
+                      </details>{" "}
                     </div>
                   </fieldset>
                 </SmartForm>
 
                 <section
+                  id="sp-panel-links"
+                  role="tabpanel"
+                  aria-labelledby="sp-tab-links"
                   hidden={editorSection !== "links"}
                   className="smart-page-block-editor"
-                  aria-labelledby="smart-page-content-heading"
                 >
                   <h3 id="smart-page-content-heading">
                     Seus links, na ordem certa
@@ -961,8 +1139,12 @@ export function SmartPagesDashboard({
                                 position: selected.blocks.length,
                                 visible: true,
                                 analyticsEnabled: false,
-                                linkId: null,
-                                link: null,
+                                linkId:
+                                  String(data.get("linkId") || "") || null,
+                                link:
+                                  managedLinks.find(
+                                    (link) => link.id === data.get("linkId"),
+                                  ) ?? null,
                                 settings: {
                                   title: title || "Novo link",
                                   destinationUrl,
@@ -983,25 +1165,7 @@ export function SmartPagesDashboard({
                           placeholder="Meu portfólio"
                         />
                       </SmartField>
-                      <SmartField>
-                        URL externa
-                        <input
-                          type="url"
-                          name="destinationUrl"
-                          placeholder="https://exemplo.com"
-                        />
-                      </SmartField>
-                      <SmartField>
-                        Link gerenciado
-                        <select name="linkId" defaultValue="">
-                          <option value="">Nenhum</option>
-                          {managedLinks.map((link) => (
-                            <option key={link.id} value={link.id}>
-                              {link.title || link.slug}
-                            </option>
-                          ))}
-                        </select>
-                      </SmartField>
+                      <BlockDestinationFields links={managedLinks} />
                       <SmartField className="smart-page-check">
                         <input
                           type="checkbox"
@@ -1019,157 +1183,187 @@ export function SmartPagesDashboard({
                         <li
                           key={`${block.id}:${block.settings.title}:${block.visible}:${block.linkId}`}
                         >
-                          <SmartForm
-                            failure={
-                              activeForm === block.id ? action.failure : null
-                            }
-                            onChange={(event) => {
-                              const data = new FormData(event.currentTarget);
-                              setBlockDrafts((current) => ({
-                                ...current,
-                                [block.id]: {
-                                  ...block,
-                                  visible: data.get("visible") === "on",
-                                  settings: {
-                                    ...block.settings,
-                                    title: String(data.get("title") ?? ""),
-                                    destinationUrl: String(
-                                      data.get("destinationUrl") ?? "",
-                                    ),
+                          <details className="sp-link-card">
+                            <summary>
+                              <strong>
+                                {blockDrafts[block.id]?.settings.title ??
+                                  block.settings.title}
+                              </strong>
+                              <span>
+                                {block.visible ? "Visível" : "Oculto"} · Link{" "}
+                                {index + 1}
+                              </span>
+                            </summary>
+                            <SmartForm
+                              failure={
+                                activeForm === block.id ? action.failure : null
+                              }
+                              onChange={(event) => {
+                                const data = new FormData(event.currentTarget);
+                                setBlockDrafts((current) => ({
+                                  ...current,
+                                  [block.id]: {
+                                    ...block,
+                                    linkId:
+                                      String(data.get("linkId") || "") || null,
+                                    link:
+                                      managedLinks.find(
+                                        (link) =>
+                                          link.id === data.get("linkId"),
+                                      ) ?? null,
+                                    visible: data.get("visible") === "on",
+                                    settings: {
+                                      ...block.settings,
+                                      title: String(data.get("title") ?? ""),
+                                      destinationUrl: String(
+                                        data.get("destinationUrl") ?? "",
+                                      ),
+                                    },
                                   },
-                                },
-                              }));
-                              setDirtyBlocks((ids) =>
-                                ids.includes(block.id)
-                                  ? ids
-                                  : [...ids, block.id],
-                              );
-                            }}
-                            onSubmit={(event) => saveBlock(event, block)}
-                          >
-                            <SmartField>
-                              Título
-                              <input
-                                required
-                                name="title"
-                                maxLength={120}
-                                defaultValue={block.settings.title}
+                                }));
+                                setDirtyBlocks((ids) =>
+                                  ids.includes(block.id)
+                                    ? ids
+                                    : [...ids, block.id],
+                                );
+                              }}
+                              onSubmit={(event) => saveBlock(event, block)}
+                            >
+                              <SmartField>
+                                Título
+                                <input
+                                  required
+                                  name="title"
+                                  maxLength={120}
+                                  defaultValue={block.settings.title}
+                                />
+                              </SmartField>
+                              <BlockDestinationFields
+                                links={managedLinks}
+                                initialUrl={block.settings.destinationUrl}
+                                initialLinkId={block.linkId}
                               />
-                            </SmartField>
-                            <SmartField>
-                              URL externa
-                              <input
-                                type="url"
-                                name="destinationUrl"
-                                defaultValue={
-                                  block.settings.destinationUrl ?? ""
-                                }
-                              />
-                            </SmartField>
-                            <SmartField>
-                              Link gerenciado
-                              <select
-                                name="linkId"
-                                defaultValue={block.linkId ?? ""}
-                              >
-                                <option value="">Nenhum</option>
-                                {managedLinks.map((link) => (
-                                  <option key={link.id} value={link.id}>
-                                    {link.title || link.slug}
-                                  </option>
-                                ))}
-                              </select>
-                            </SmartField>
-                            <div className="smart-page-block-options">
-                              <SmartField className="smart-page-check">
-                                <input
-                                  type="checkbox"
-                                  name="visible"
-                                  defaultChecked={block.visible}
-                                />{" "}
-                                Visível
-                              </SmartField>
-                              <SmartField className="smart-page-check">
-                                <input
-                                  type="checkbox"
-                                  name="analyticsEnabled"
-                                  defaultChecked={block.analyticsEnabled}
-                                />{" "}
-                                Medir cliques
-                              </SmartField>
-                              <SmartField className="smart-page-check">
-                                <input
-                                  type="checkbox"
-                                  name="openInNewTab"
-                                  defaultChecked={block.settings.openInNewTab}
-                                />{" "}
-                                Nova aba
-                              </SmartField>
-                            </div>
-                            <div className="action-row">
-                              <button
-                                className="button button-secondary"
-                                disabled={action.busy}
-                              >
-                                Salvar
-                              </button>
-                              <button
-                                type="button"
-                                className="button button-quiet"
-                                disabled={action.busy || index === 0}
-                                onClick={() => void moveBlock(block.id, -1)}
-                              >
-                                Mover acima
-                              </button>
-                              <button
-                                type="button"
-                                className="button button-quiet"
-                                disabled={
-                                  action.busy ||
-                                  index === selected.blocks.length - 1
-                                }
-                                onClick={() => void moveBlock(block.id, 1)}
-                              >
-                                Mover abaixo
-                              </button>
-                              <button
-                                type="button"
-                                className="button button-quiet danger-text"
-                                disabled={action.busy}
-                                onClick={() => void deleteBlock(block.id)}
-                              >
-                                Excluir
-                              </button>
-                            </div>
-                          </SmartForm>
+                              <div className="smart-page-block-options">
+                                <SmartField className="smart-page-check">
+                                  <input
+                                    type="checkbox"
+                                    name="visible"
+                                    defaultChecked={block.visible}
+                                  />{" "}
+                                  Visível
+                                </SmartField>
+                                <SmartField className="smart-page-check">
+                                  <input
+                                    type="checkbox"
+                                    name="analyticsEnabled"
+                                    defaultChecked={block.analyticsEnabled}
+                                  />{" "}
+                                  Medir cliques
+                                </SmartField>
+                                <SmartField className="smart-page-check">
+                                  <input
+                                    type="checkbox"
+                                    name="openInNewTab"
+                                    defaultChecked={block.settings.openInNewTab}
+                                  />{" "}
+                                  Nova aba
+                                </SmartField>
+                              </div>
+                              <div className="action-row">
+                                <button
+                                  className="button button-secondary"
+                                  disabled={action.busy}
+                                >
+                                  Salvar
+                                </button>
+                                <button
+                                  type="button"
+                                  className="button button-quiet"
+                                  disabled={action.busy || index === 0}
+                                  onClick={() => void moveBlock(block.id, -1)}
+                                >
+                                  Mover acima
+                                </button>
+                                <button
+                                  type="button"
+                                  className="button button-quiet"
+                                  disabled={
+                                    action.busy ||
+                                    index === selected.blocks.length - 1
+                                  }
+                                  onClick={() => void moveBlock(block.id, 1)}
+                                >
+                                  Mover abaixo
+                                </button>
+                                <button
+                                  type="button"
+                                  className="button button-quiet danger-text"
+                                  disabled={action.busy}
+                                  onClick={() => void deleteBlock(block.id)}
+                                >
+                                  Excluir
+                                </button>
+                              </div>
+                            </SmartForm>
+                          </details>
                         </li>
                       ))}
                     </ol>
                   </fieldset>
                 </section>
                 <section
+                  id="sp-panel-analytics"
+                  role="tabpanel"
+                  aria-labelledby="sp-tab-analytics"
                   hidden={editorSection !== "analytics"}
                   className="smart-page-metrics"
-                  aria-labelledby="smart-page-analytics-heading"
                 >
                   <div className="smart-page-metrics-heading">
                     <div>
-                      <h3 id="smart-page-analytics-heading">Analytics</h3>
-                      <p>Últimos 30 dias</p>
+                      <h3 id="smart-page-analytics-heading">Resultados</h3>
+                      <label>
+                        Período
+                        <select
+                          value={metricsDays}
+                          onChange={(e) =>
+                            setMetricsDays(Number(e.target.value))
+                          }
+                        >
+                          <option value={7}>Últimos 7 dias</option>
+                          <option value={30}>Últimos 30 dias</option>
+                          <option value={90}>Últimos 90 dias</option>
+                        </select>
+                      </label>
                     </div>
                     <button
                       type="button"
                       className="button button-secondary"
-                      disabled={action.busy}
-                      onClick={() => void loadMetrics()}
+                      disabled={metricsLoading}
+                      onClick={() => setMetricsRevision((v) => v + 1)}
                     >
                       Atualizar métricas
                     </button>
                   </div>
-                  {!metrics ? (
-                    <p className="muted">
-                      Carregue as métricas para ver o desempenho da página.
-                    </p>
+                  <p className="sp-field-hint">
+                    {metricsUpdated
+                      ? `Última atualização: ${metricsUpdated}. `
+                      : ""}
+                    CTR é a razão entre cliques e visualizações. Visitantes
+                    únicos usam um identificador do navegador por sessão; não
+                    representam pessoas identificadas. Amostras pequenas não
+                    indicam tendência.
+                  </p>
+                  {metricsLoading ? (
+                    <p role="status">Carregando resultados…</p>
+                  ) : metricsError ? (
+                    <div role="alert">
+                      <p>{metricsError}</p>
+                      <button onClick={() => setMetricsRevision((v) => v + 1)}>
+                        Tentar novamente
+                      </button>
+                    </div>
+                  ) : !metrics ? (
+                    <p>Aguardando dados.</p>
                   ) : (
                     <>
                       <div className="stats-grid smart-page-stats">
@@ -1183,7 +1377,7 @@ export function SmartPagesDashboard({
                         </div>
                         <div>
                           <strong>{metrics.clicks}</strong>
-                          <span>Clicks</span>
+                          <span>Cliques</span>
                         </div>
                         <div>
                           <strong>{metrics.ctr}%</strong>
@@ -1192,7 +1386,7 @@ export function SmartPagesDashboard({
                       </div>
                       <div className="smart-page-metric-lists">
                         <div>
-                          <h4>Links com mais clicks</h4>
+                          <h4>Links com mais cliques</h4>
                           <ul>
                             {metrics.topLinks.map((link) => (
                               <li key={link.blockId}>
@@ -1201,7 +1395,7 @@ export function SmartPagesDashboard({
                               </li>
                             ))}
                             {!metrics.topLinks.length ? (
-                              <li>Sem clicks ainda.</li>
+                              <li>Sem cliques ainda.</li>
                             ) : null}
                           </ul>
                         </div>
@@ -1239,6 +1433,7 @@ export function SmartPagesDashboard({
                 </section>
               </div>
               <div
+                id="smart-page-preview-panel"
                 className={
                   editorTab === "editor"
                     ? "smart-page-preview-panel mobile-hidden"

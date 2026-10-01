@@ -109,15 +109,29 @@ export function SmartForm({
     const name = Object.keys(fields)[0];
     if (!name) return;
     revealRef.current?.();
-    requestAnimationFrame(() => {
+    // Revealing a tab and releasing a disabled fieldset can commit after this
+    // effect. Wait for the field to be visible and enabled before focusing it.
+    let attempts = 0;
+    const focusWhenReady = () => {
       const input = ref.current?.elements.namedItem(name);
-      if (input instanceof HTMLElement) {
-        const details = input.closest("details");
-        if (details) details.open = true;
-        input.focus();
-        input.scrollIntoView({ block: "center", behavior: "instant" });
+      if (!(input instanceof HTMLElement)) return;
+      for (
+        let details = input.closest("details");
+        details;
+        details = details.parentElement?.closest("details") ?? null
+      )
+        details.open = true;
+      if (
+        (!input.getClientRects().length || input.matches(":disabled")) &&
+        attempts++ < 12
+      ) {
+        requestAnimationFrame(focusWhenReady);
+        return;
       }
-    });
+      input.focus({ preventScroll: true });
+      input.scrollIntoView({ block: "center", behavior: "instant" });
+    };
+    requestAnimationFrame(focusWhenReady);
   }
   useEffect(() => {
     if (!ref.current) return;

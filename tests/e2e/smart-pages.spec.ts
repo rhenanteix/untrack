@@ -28,6 +28,7 @@ test("cria, publica, abre e mede uma Smart Page", async ({
   await register(page, baseURL!);
   const slug = `pagina-${randomUUID().slice(0, 8)}`;
   await page.goto("/untrack/smart-pages");
+  await page.getByRole("button", { name: /Nova página/ }).click();
   await page.getByLabel("Nome ou marca").fill("Consultoria Aurora");
   await page.locator('.smart-page-create input[name="slug"]').fill(slug);
   await page.getByLabel("Descrição curta").fill("Estratégia e crescimento.");
@@ -36,9 +37,11 @@ test("cria, publica, abre e mede uma Smart Page", async ({
     page.getByRole("heading", { name: "Consultoria Aurora" }),
   ).toBeVisible();
 
-  await page.getByRole("button", { name: "Links", exact: true }).click();
+  await page.getByRole("tab", { name: "Links", exact: true }).click();
   await page.getByLabel("Título").fill("Conheça meu trabalho");
-  await page.getByLabel("URL externa").fill("https://example.com/portfolio");
+  await page
+    .locator('input[name="destinationUrl"]')
+    .fill("https://example.com/portfolio");
   await page.getByRole("button", { name: "Adicionar link" }).click();
   await expect(
     page.locator('.smart-page-block-list input[name="title"]'),

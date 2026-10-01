@@ -1,3 +1,4 @@
+import { AssetLibrary } from "@/components/untrack/asset-library";
 import { UtmBuilder } from "@/components/utm-builder";
 import { QrGenerator } from "@/components/qr-generator";
 import { Shortener } from "@/components/shortener";
@@ -14,6 +15,7 @@ export default async function ModulePage({
   params: Promise<{ module: string }>;
 }) {
   const { module } = await params;
+  if (module === "short-links") return <AssetLibrary kind="links" />;
   if (module === "link-health") return <LinkHealthPage />;
   if (["utm", "qr", "short-links"].includes(module))
     return (
@@ -61,4 +63,26 @@ export default async function ModulePage({
       )}
     </section>
   );
+}
+
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ module: string }>;
+}) {
+  const { module } = await params;
+  const names: Record<string, string> = {
+    clients: "Clientes",
+    domains: "Domínios",
+    members: "Equipe",
+    usage: "Plano e cotas",
+    audit: "Auditoria",
+    api: "API",
+    folders: "Pastas",
+    utm: "Construtor UTM",
+    qr: "QR Codes",
+    "short-links": "Links",
+    "link-health": "Qualidade",
+  };
+  return { title: names[module] ?? "Workspace" };
 }

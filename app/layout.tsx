@@ -1,9 +1,11 @@
+import { AuthenticatedFrame } from "@/components/untrack/authenticated-frame";
 import type { Metadata, Viewport } from "next";
 import { Manrope } from "next/font/google";
 import { Footer } from "@/components/footer";
 import { Header } from "@/components/header";
 import { PageViewTracker } from "@/lib/client/page-view-tracker";
 import "./globals.css";
+import "./workspace.css";
 
 const manrope = Manrope({ subsets: ["latin"], variable: "--font-manrope" });
 const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
@@ -61,7 +63,9 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
           Pular para o conteúdo
         </a>
         <Header />
-        <main id="conteudo">{children}</main>
+        <main id="conteudo">
+          <AuthenticatedFrame>{children}</AuthenticatedFrame>
+        </main>
         <Footer />
         <PageViewTracker />
         <script

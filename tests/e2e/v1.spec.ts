@@ -7,9 +7,9 @@ test("UTM Builder preserva o destino e permite abrir a campanha", async ({
   await page
     .getByLabel("URL de destino")
     .fill("https://example.com/oferta?id=7#detalhes");
-  await page.getByLabel("Campaign Source").fill("newsletter");
-  await page.getByLabel("Campaign Medium").fill("email");
-  await page.getByLabel("Campaign Name").fill("lançamento");
+  await page.getByLabel("Origem (utm_source)").fill("newsletter");
+  await page.getByLabel("Meio (utm_medium)").fill("email");
+  await page.getByLabel("Campanha (utm_campaign)").fill("lançamento");
   await page.getByRole("button", { name: "Criar URL com UTM" }).click();
   await expect(
     page.getByRole("heading", { name: "Sua campanha está pronta." }),
@@ -35,9 +35,9 @@ test("UTM Builder trata falha de rede e permite tentar novamente", async ({
 }) => {
   await page.goto("/gerar-utm");
   await page.getByLabel("URL de destino").fill("https://example.com/");
-  await page.getByLabel("Campaign Source").fill("news");
-  await page.getByLabel("Campaign Medium").fill("email");
-  await page.getByLabel("Campaign Name").fill("v1");
+  await page.getByLabel("Origem (utm_source)").fill("news");
+  await page.getByLabel("Meio (utm_medium)").fill("email");
+  await page.getByLabel("Campanha (utm_campaign)").fill("v1");
   await page.route("**/api/utm/generate", (route) => route.abort());
   await page.getByRole("button", { name: "Criar URL com UTM" }).click();
   await expect(page.getByRole("main").getByRole("alert")).toContainText(

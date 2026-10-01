@@ -37,6 +37,7 @@ test("Smart Pages loads, previews profile changes, saves and publishes", async (
   await expect(
     page.getByText("Não foi possível carregar o workspace.", { exact: true }),
   ).toHaveCount(0);
+  await page.getByRole("button", { name: /Nova página/ }).click();
   await page.getByLabel("Nome ou marca").fill("Aurora Studio");
   await page
     .locator('form.smart-page-create input[name="slug"]')
@@ -57,29 +58,25 @@ test("Smart Pages loads, previews profile changes, saves and publishes", async (
   await expect(
     page.getByRole("button", { name: "Publicar", exact: true }),
   ).toBeDisabled();
-  await page.getByRole("button", { name: "Modelos", exact: true }).click();
+  await page.getByRole("tab", { name: "Aparência", exact: true }).click();
   await page
     .getByRole("button", { name: "Usar modelo Atelier", exact: true })
     .click();
-  if (
-    await page.getByRole("button", { name: "Prévia", exact: true }).isVisible()
-  )
-    await page.getByRole("button", { name: "Prévia", exact: true }).click();
+  if (await page.getByRole("tab", { name: "Prévia", exact: true }).isVisible())
+    await page.getByRole("tab", { name: "Prévia", exact: true }).click();
   await expect(page.locator(".smart-page-preview strong")).toHaveText(
     "Aurora Design",
   );
   await expect(
     page.locator('.smart-page-preview [data-theme="editorial"]'),
   ).toBeVisible();
-  if (
-    await page.getByRole("button", { name: "Editor", exact: true }).isVisible()
-  )
-    await page.getByRole("button", { name: "Editor", exact: true }).click();
+  if (await page.getByRole("tab", { name: "Editar", exact: true }).isVisible())
+    await page.getByRole("tab", { name: "Editar", exact: true }).click();
   await page
     .getByRole("button", { name: "Salvar perfil", exact: true })
     .click();
   await expect(page.getByText("Perfil salvo.", { exact: true })).toBeVisible();
-  await page.getByRole("button", { name: "Links", exact: true }).click();
+  await page.getByRole("tab", { name: "Links", exact: true }).click();
   await page
     .locator('form.smart-page-add-block input[name="title"]')
     .fill("Conheça nossos projetos");
@@ -116,6 +113,7 @@ test("Smart Pages loads, previews profile changes, saves and publishes", async (
     fullPage: true,
   });
   await published.close();
+  await page.getByRole("button", { name: /Biblioteca de páginas/ }).click();
   const listing = page.waitForResponse((response) =>
     response.url().includes("/api/smart-pages?page=1&search="),
   );
@@ -251,6 +249,7 @@ test("field errors explain slug issues; career templates preserve and publish re
 }, testInfo) => {
   await register(context.request, baseURL!);
   await page.goto("/untrack/smart-pages");
+  await page.getByRole("button", { name: /Nova página/ }).click();
   await page.getByLabel("Nome ou marca").fill("Ana Silva");
   const createSlug = page.locator('.smart-page-create input[name="slug"]');
   await createSlug.fill("ana--silva");
@@ -267,7 +266,7 @@ test("field errors explain slug issues; career templates preserve and publish re
   await expect(
     page.getByRole("heading", { name: "Ana Silva", exact: true }),
   ).toBeVisible();
-  await page.getByRole("button", { name: "Modelos", exact: true }).click();
+  await page.getByRole("tab", { name: "Aparência", exact: true }).click();
   await page.getByRole("button", { name: /^Currículos/ }).click();
   await expect(page.getByRole("button", { name: /Usar modelo/ })).toHaveCount(
     3,
@@ -283,12 +282,12 @@ test("field errors explain slug issues; career templates preserve and publish re
     .getByRole("button", { name: "Salvar perfil", exact: true })
     .click();
   await expect(page.getByText("Perfil salvo.", { exact: true })).toBeVisible();
-  await page.getByRole("button", { name: "Perfil", exact: true }).click();
+  await page.getByRole("tab", { name: "Perfil", exact: true }).click();
   const profileSlug = page.locator(
     '.smart-page-profile-form input[name="slug"]',
   );
   await profileSlug.fill("ana com espaços");
-  await page.getByRole("button", { name: "Modelos", exact: true }).click();
+  await page.getByRole("tab", { name: "Aparência", exact: true }).click();
   await page
     .getByRole("button", { name: "Salvar perfil", exact: true })
     .click();
@@ -303,7 +302,7 @@ test("field errors explain slug issues; career templates preserve and publish re
     .getByRole("button", { name: "Salvar perfil", exact: true })
     .click();
   await expect(page.getByText("Perfil salvo.", { exact: true })).toBeVisible();
-  await page.getByRole("button", { name: "Links", exact: true }).click();
+  await page.getByRole("tab", { name: "Links", exact: true }).click();
   await page
     .locator('.smart-page-add-block input[name="title"]')
     .fill("Meu LinkedIn");
@@ -317,7 +316,7 @@ test("field errors explain slug issues; career templates preserve and publish re
   await expect(
     page.getByText("Página publicada.", { exact: true }),
   ).toBeVisible();
-  await page.getByRole("button", { name: "Modelos", exact: true }).click();
+  await page.getByRole("tab", { name: "Aparência", exact: true }).click();
   await page.getByLabel("Buscar modelos").fill("");
   await page.getByRole("button", { name: /^Portfólios/ }).click();
   await expect(page.getByRole("button", { name: /Usar modelo/ })).toHaveCount(
@@ -367,6 +366,7 @@ test("server conflicts and invalid social URLs point to the correct form field",
     expect(created.status()).toBe(201);
     await register(context.request, baseURL!);
     await page.goto("/untrack/smart-pages");
+    await page.getByRole("button", { name: /Nova página/ }).click();
     await page.getByLabel("Nome ou marca").fill("Perfil profissional");
     const slug = page.locator('.smart-page-create input[name="slug"]');
     await slug.fill(takenSlug);
@@ -389,7 +389,7 @@ test("server conflicts and invalid social URLs point to the correct form field",
     const linkedin = page.locator('input[name="social-linkedin"]');
     await linkedin.fill("ftp://example.com/profile");
     await page.getByText("Redes sociais (opcional)", { exact: true }).click();
-    await page.getByRole("button", { name: "Modelos", exact: true }).click();
+    await page.getByRole("tab", { name: "Aparência", exact: true }).click();
     await page
       .getByRole("button", { name: "Salvar perfil", exact: true })
       .click();
@@ -442,13 +442,11 @@ test("live card customization, upload isolation, reorder and downgrade", async (
   })
     .png()
     .toBuffer();
-  await page
-    .locator('input[type="file"]')
-    .setInputFiles({
-      name: "avatar.png",
-      mimeType: "image/png",
-      buffer: image,
-    });
+  await page.locator('input[type="file"]').setInputFiles({
+    name: "avatar.png",
+    mimeType: "image/png",
+    buffer: image,
+  });
   await expect(
     page.locator('.smart-page-profile-form input[name="avatarUrl"]'),
   ).toHaveValue(/api\/smart-page-images/);
@@ -457,13 +455,18 @@ test("live card customization, upload isolation, reorder and downgrade", async (
     .inputValue();
   const visitor = await browser.newContext();
   expect((await visitor.request.get(avatarUrl)).status()).toBe(404);
-  await page.getByRole("button", { name: "Modelos", exact: true }).click();
-  await page.getByLabel("Alinhamento", { exact: true }).selectOption("left");
-  await page.getByLabel("Tipografia", { exact: true }).selectOption("serif");
+  await page.getByRole("tab", { name: "Aparência", exact: true }).click();
+  await page.getByText("Personalização avançada", { exact: true }).click();
+  await page
+    .getByRole("combobox", { name: "Alinhamento", exact: true })
+    .selectOption("left");
+  await page
+    .getByRole("combobox", { name: "Tipografia", exact: true })
+    .selectOption("serif");
   await page.getByRole("button", { name: "Subir Nome", exact: true }).click();
   await expect(
     page.locator('.smart-page-preview [data-alignment="left"]'),
-  ).toBeVisible();
+  ).toHaveCount(1);
   await expect(
     page.locator(".smart-page-preview [data-section]").first(),
   ).toHaveAttribute("data-section", "title");
@@ -471,7 +474,8 @@ test("live card customization, upload isolation, reorder and downgrade", async (
     .getByRole("button", { name: "Salvar perfil", exact: true })
     .click();
   await expect(page.getByText("Perfil salvo.", { exact: true })).toBeVisible();
-  await page.getByRole("button", { name: "Links", exact: true }).click();
+  await page.getByRole("tab", { name: "Links", exact: true }).click();
+  await page.locator(".sp-link-card summary").first().click();
   await page
     .locator('.smart-page-block-list input[name="title"]')
     .fill("Projeto em tempo real");
@@ -489,7 +493,7 @@ test("live card customization, upload isolation, reorder and downgrade", async (
   expect((await visitor.request.get(avatarUrl)).headers()["content-type"]).toBe(
     "image/webp",
   );
-  await page.getByRole("button", { name: "Modelos", exact: true }).click();
+  await page.getByRole("tab", { name: "Aparência", exact: true }).click();
   await page.screenshot({
     path: testInfo.outputPath("live-card-editor.png"),
     fullPage: true,

@@ -16,10 +16,16 @@ export const metadata: Metadata = {
 
 export default async function LinkPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ returnTo?: string }>;
 }) {
   const { id } = await params;
+  const query = await searchParams;
+  const back = query.returnTo?.startsWith("/untrack/short-links?")
+    ? query.returnTo
+    : "/untrack/short-links";
   const session = await sessionFromHeaders(await headers());
   if (!session)
     redirect(`/entrar?next=${encodeURIComponent(`/conta/links/${id}`)}`);
@@ -32,8 +38,8 @@ export default async function LinkPage({
   const metrics = await linkMetrics(id);
   return (
     <section className="shell page-section">
-      <Link href="/conta" className="back-link">
-        ← Voltar para minha conta
+      <Link href={back} className="back-link">
+        ← Voltar à biblioteca de links
       </Link>
       <div className="page-heading">
         <span className="eyebrow">

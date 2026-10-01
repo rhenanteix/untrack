@@ -7,11 +7,11 @@ import { CopyButton } from "@/components/copy-button";
 import { analytics } from "@/lib/client/analytics";
 
 const fields = [
-  ["source", "Campaign Source", "google"],
-  ["medium", "Campaign Medium", "cpc"],
-  ["campaign", "Campaign Name", "black-friday"],
-  ["term", "Campaign Term", "tênis masculino"],
-  ["content", "Campaign Content", "banner-principal"],
+  ["source", "Origem (utm_source)", "google"],
+  ["medium", "Meio (utm_medium)", "cpc"],
+  ["campaign", "Campanha (utm_campaign)", "black-friday"],
+  ["term", "Termo (utm_term)", "tênis masculino"],
+  ["content", "Conteúdo (utm_content)", "banner-principal"],
 ] as const;
 
 export function UtmBuilder() {
@@ -70,7 +70,7 @@ export function UtmBuilder() {
             onChange={(e) => setValues({ ...values, url: e.target.value })}
           />
         </label>
-        {fields.map(([name, label, placeholder]) => (
+        {fields.slice(0, 3).map(([name, label, placeholder]) => (
           <label key={name}>
             <span>
               {label}
@@ -88,6 +88,35 @@ export function UtmBuilder() {
             />
           </label>
         ))}
+        <details className="full-field utm-advanced">
+          <summary>Parâmetros opcionais</summary>
+          <p className="muted">
+            Identifique palavras-chave e variações de conteúdo quando precisar
+            comparar anúncios.
+          </p>
+          <div className="form-grid">
+            {fields.slice(3).map(([name, label, placeholder]) => (
+              <label key={name}>
+                <span>
+                  {label}
+                  {(["source", "medium", "campaign"] as string[]).includes(name)
+                    ? " *"
+                    : ""}
+                </span>
+                <input
+                  required={(
+                    ["source", "medium", "campaign"] as string[]
+                  ).includes(name)}
+                  placeholder={placeholder}
+                  value={values[name]}
+                  onChange={(e) =>
+                    setValues({ ...values, [name]: e.target.value })
+                  }
+                />
+              </label>
+            ))}
+          </div>
+        </details>
         <button className="button full-field" type="submit" disabled={loading}>
           {loading ? "Criando..." : "Criar URL com UTM"}
         </button>

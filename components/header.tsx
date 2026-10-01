@@ -19,7 +19,7 @@ export function Header() {
   const [openedAt, setOpenedAt] = useState<string | null>(null);
   const open = openedAt === pathname;
 
-  if(pathname.startsWith("/untrack") || pathname.startsWith("/page/")) return null;
+  if(pathname.startsWith("/conta") || pathname.startsWith("/untrack") || pathname.startsWith("/page/")) return null;
   return (
     <header className="site-header">
       <div className="shell header-inner">
