@@ -19,6 +19,7 @@ type Project = {
   description: string;
   icon: string;
   color: string;
+  goal: string | null;
   status: "active" | "archived";
   updatedAt: string;
   archivedAt: string | null;
@@ -43,6 +44,7 @@ export function ProjectsDashboard() {
   const [query, setQuery] = useState({ search: "", status: "active", page: 1 });
   const [draftSearch, setDraftSearch] = useState("");
   const [result, setResult] = useState<ProjectList | null>(null);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [error, setError] = useState("");
 
   useEffect(() => {
@@ -81,6 +83,7 @@ export function ProjectsDashboard() {
           description: data.get("description"),
           icon: data.get("icon"),
           color: data.get("color"),
+          goal: data.get("goal") || undefined,
         }),
       });
       createDialog.current?.close();
@@ -105,6 +108,21 @@ export function ProjectsDashboard() {
       });
       await refresh();
       action.setNotice(archive ? "Projeto arquivado." : "Projeto restaurado.");
+    });
+  }
+
+  async function changeSelected(actionName: "archive" | "restore") {
+    if (!selectedIds.length) return;
+    const label = actionName === "archive" ? "arquivar" : "restaurar";
+    if (!window.confirm(`${label[0].toUpperCase()}${label.slice(1)} ${selectedIds.length} projeto(s)?`)) return;
+    await action.run(async () => {
+      await apiRequest("/api/projects/bulk", {
+        method: "POST",
+        body: JSON.stringify({ action: actionName, ids: selectedIds }),
+      });
+      setSelectedIds([]);
+      await refresh();
+      action.setNotice(`${selectedIds.length} projeto(s) atualizado(s).`);
     });
   }
 
@@ -169,6 +187,15 @@ export function ProjectsDashboard() {
 
       <ActionStatus {...action} />
 
+      {canWrite && selectedIds.length > 0 && (
+        <div className="projects-bulk-actions" role="status">
+          <span>{selectedIds.length} selecionado(s)</span>
+          <button className="button button-secondary" disabled={action.busy} onClick={() => void changeSelected("archive")}>Arquivar</button>
+          <button className="button button-secondary" disabled={action.busy} onClick={() => void changeSelected("restore")}>Restaurar</button>
+          <button className="workspace-inline-link" type="button" disabled={action.busy} onClick={() => setSelectedIds([])}>Limpar</button>
+        </div>
+      )}
+
       {error ? (
         <section className="workspace-panel projects-empty" role="alert">
           <h2>Não foi possível carregar seus projetos</h2>
@@ -186,6 +213,7 @@ export function ProjectsDashboard() {
           {result.items.map((project) => (
             <article className="project-card" key={project.id}>
               <div className="project-card-heading">
+                {canWrite && <label className="project-select"><input type="checkbox" checked={selectedIds.includes(project.id)} onChange={(event) => setSelectedIds((current) => event.target.checked ? [...current, project.id] : current.filter((id) => id !== project.id))} aria-label={`Selecionar ${project.name}`} /></label>}
                 <span
                   className="project-icon"
                   style={{ backgroundColor: project.color }}
@@ -319,6 +347,18 @@ export function ProjectsDashboard() {
           <label>
             Descrição opcional
             <textarea name="description" maxLength={500} rows={3} />
+          </label>
+          <label>
+            Meta do projeto
+            <select name="goal" defaultValue="">
+              <option value="">Sem template</option>
+              <option value="campaign">Campanha</option>
+              <option value="content">Conteúdo</option>
+              <option value="sales">Vendas</option>
+              <option value="personal-brand">Marca pessoal</option>
+              <option value="website">Website</option>
+              <option value="client">Cliente</option>
+            </select>
           </label>
           <div className="project-appearance-fields">
             <label>

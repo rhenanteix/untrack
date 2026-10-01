@@ -10,6 +10,7 @@ import {
 } from "@/modules/workspaces/context";
 import {
   createProjectSchema,
+  bulkProjectActionSchema,
   projectSlug,
   type ProjectListQuery,
   updateProjectSchema,
@@ -192,5 +193,30 @@ export async function restoreProject(actor: Actor, id: string) {
     });
     await audit(tx, actor, "project.restored", id);
     return restored;
+  });
+}
+
+export async function changeProjectsStatusBulk(actor: Actor, raw: unknown) {
+  const input = bulkProjectActionSchema.parse(raw);
+  const ids = [...new Set(input.ids)];
+  return workspaceTransaction(actor, "write", async (tx) => {
+    const projects = await tx.project.findMany({
+      where: { id: { in: ids }, workspaceId: actor.workspaceId },
+      select: { id: true },
+    });
+    if (projects.length !== ids.length)
+      throw new ApiError(404, "PROJECT_NOT_FOUND", "Um dos projetos não pertence a este workspace.");
+    const archive = input.action === "archive";
+    await tx.project.updateMany({
+      where: { id: { in: ids }, workspaceId: actor.workspaceId },
+      data: {
+        status: archive ? "archived" : "active",
+        archivedAt: archive ? new Date() : null,
+      },
+    });
+    await audit(tx, actor, archive ? "project.bulkArchived" : "project.bulkRestored", actor.workspaceId, {
+      projectIds: ids,
+    });
+    return { count: ids.length, action: input.action };
   });
 }

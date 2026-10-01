@@ -21,6 +21,26 @@ enum ProjectResourceType {
   qrAsset
 }
 
+enum WorkspaceResourceType {
+  project
+  shortLink
+  smartPage
+  campaign
+  utmLink
+  qrAsset
+}
+
+enum CollectionKind {
+  manual
+  smart
+}
+
+enum ProjectMemberRole {
+  owner
+  editor
+  viewer
+}
+
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
@@ -64,6 +84,9 @@ model User {
   memberships   WorkspaceMember[]
   campaignsResponsible Campaign[]
   campaignApprovals CampaignApproval[]
+  projectMemberships ProjectMember[]
+  favorites Favorite[]
+  recentResources RecentResource[]
 }
 
 model Session {
@@ -263,6 +286,10 @@ model Workspace {
   smartPages SmartPage[]
   analyticsEvents AnalyticsEvent[]
   projects Project[]
+  tags Tag[]
+  collections Collection[]
+  favorites Favorite[]
+  recentResources RecentResource[]
 }
 
 model Project {
@@ -273,12 +300,15 @@ model Project {
   description String        @default("") @db.VarChar(500)
   icon        String        @default("folder") @db.VarChar(40)
   color       String        @default("#285239") @db.VarChar(16)
+  goal        String?       @db.VarChar(40)
   status      ProjectStatus @default(active)
   createdAt   DateTime      @default(now())
   updatedAt   DateTime      @updatedAt
   archivedAt  DateTime?
   workspace   Workspace     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   resources   ProjectResource[]
+  members     ProjectMember[]
+  collections Collection[]
 
   @@unique([workspaceId, slug])
   @@unique([id, workspaceId])
@@ -297,6 +327,108 @@ model ProjectResource {
   @@unique([projectId, resourceType, resourceId])
   @@index([projectId, createdAt])
   @@index([workspaceId, resourceType, resourceId])
+}
+
+model ProjectMember {
+  projectId  String
+  userId     String
+  role       ProjectMemberRole @default(viewer)
+  createdAt  DateTime          @default(now())
+  project    Project           @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  user       User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([projectId, userId])
+  @@index([userId])
+}
+
+model Tag {
+  id          String   @id @default(cuid())
+  workspaceId String
+  name        String   @db.VarChar(80)
+  slug        String   @db.VarChar(100)
+  color       String   @default("#285239") @db.VarChar(16)
+  archivedAt  DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  resources   ResourceTag[]
+
+  @@unique([workspaceId, slug])
+  @@unique([id, workspaceId])
+  @@index([workspaceId, archivedAt, name])
+}
+
+model ResourceTag {
+  workspaceId  String
+  tagId        String
+  resourceType WorkspaceResourceType
+  resourceId   String
+  createdAt    DateTime              @default(now())
+  tag          Tag                   @relation(fields: [tagId, workspaceId], references: [id, workspaceId], onDelete: Cascade)
+
+  @@id([tagId, resourceType, resourceId])
+  @@index([workspaceId, resourceType, resourceId])
+}
+
+model Favorite {
+  workspaceId  String
+  userId       String
+  resourceType WorkspaceResourceType
+  resourceId   String
+  createdAt    DateTime              @default(now())
+  workspace    Workspace             @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  user         User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([workspaceId, userId, resourceType, resourceId])
+  @@index([workspaceId, userId, createdAt])
+}
+
+model RecentResource {
+  workspaceId  String
+  userId       String
+  resourceType WorkspaceResourceType
+  resourceId   String
+  viewedAt     DateTime              @updatedAt
+  workspace    Workspace             @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  user         User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([workspaceId, userId, resourceType, resourceId])
+  @@index([workspaceId, userId, viewedAt])
+}
+
+model Collection {
+  id          String         @id @default(cuid())
+  workspaceId String
+  projectId   String?
+  name        String         @db.VarChar(120)
+  description String         @default("") @db.VarChar(500)
+  kind        CollectionKind @default(manual)
+  rules       Json           @default("[]")
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+  workspace   Workspace      @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  project     Project?       @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  resources   CollectionResource[]
+
+  @@unique([id, workspaceId])
+  @@unique([workspaceId, projectId, name])
+  @@index([workspaceId, projectId, updatedAt])
+}
+
+model CollectionResource {
+  id           String                @id @default(cuid())
+  workspaceId  String
+  collectionId String
+  resourceType WorkspaceResourceType
+  resourceId   String
+  position     Int
+  createdAt    DateTime              @default(now())
+  collection   Collection            @relation(fields: [collectionId, workspaceId], references: [id, workspaceId], onDelete: Cascade)
+
+  @@unique([collectionId, resourceType, resourceId])
+  @@unique([collectionId, position])
+  @@index([workspaceId, resourceType, resourceId])
+  @@index([collectionId, position])
 }
 
 model WorkspaceMember {

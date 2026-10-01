@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  bulkProjectActionSchema,
   createProjectSchema,
   projectListQuerySchema,
   projectSlug,
@@ -40,5 +41,17 @@ describe("project schemas", () => {
     });
     expect(projectStatusSchema.parse("archived")).toBe("archived");
     expect(() => projectStatusSchema.parse("deleted")).toThrow();
+  });
+
+  it("validates bounded, explicit bulk lifecycle actions", () => {
+    expect(
+      bulkProjectActionSchema.parse({ action: "archive", ids: ["project-1"] }),
+    ).toMatchObject({ action: "archive", ids: ["project-1"] });
+    expect(() =>
+      bulkProjectActionSchema.parse({ action: "delete", ids: ["project-1"] }),
+    ).toThrow();
+    expect(() =>
+      bulkProjectActionSchema.parse({ action: "archive", ids: [] }),
+    ).toThrow();
   });
 });

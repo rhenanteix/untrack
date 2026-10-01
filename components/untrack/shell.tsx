@@ -11,6 +11,7 @@ import {
   type ReactNode,
 } from "react";
 import { apiRequest, useAction, ActionStatus } from "./shared";
+import { WorkspaceCommandPalette } from "./workspace-command-palette";
 interface Membership {
   role: string;
   workspace: { id: string; name: string; plan: string };
@@ -31,6 +32,9 @@ const groups = [
     items: [
       { href: "/conta", label: "Visão geral" },
       { href: "/untrack/projects", label: "Projetos" },
+      { href: "/untrack/collections", label: "Collections" },
+      { href: "/untrack/favorites", label: "Favoritos" },
+      { href: "/untrack/tags", label: "Tags" },
       { href: "/untrack/clients", label: "Clientes" },
       { href: "/untrack/campaigns", label: "Campanhas" },
     ],
@@ -357,6 +361,7 @@ export function WorkspaceShell({ children }: { children: ReactNode }) {
             <span className="workspace-role">
               {current ? roleNames[current.role] : ""}
             </span>
+            <WorkspaceCommandPalette />
           </div>
           {loading ? (
             <div className="product-empty" role="status">

@@ -6,6 +6,7 @@ import { actorFor } from "@/modules/workspaces/context";
 import { getPrisma } from "@/lib/prisma";
 import { WorkspaceLoadError } from "@/components/untrack/load-error";
 import { workspaceLoadError } from "@/modules/workspaces/load-error";
+import { WorkspaceIntelligence } from "@/components/untrack/workspace-intelligence";
 export const metadata = {
   title: "Visão geral",
   robots: { index: false, follow: false },
@@ -161,6 +162,7 @@ export default async function AccountPage() {
           )}
         </div>
       </header>
+      <WorkspaceIntelligence />
       <section className="workspace-snapshot" aria-labelledby="workspace-snapshot-heading">
         <div className="workspace-section-intro">
           <span className="eyebrow">Panorama</span>

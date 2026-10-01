@@ -47,7 +47,7 @@ test("projects can be created, archived and restored without crossing workspaces
   await page.getByRole("button", { name: "Arquivar" }).click();
   await expect(page.getByRole("button", { name: "Restaurar" })).toBeVisible();
 
-  await page.getByRole("link", { name: "Projetos", exact: true }).click();
+  await page.getByRole("link", { name: "← Projetos", exact: true }).click();
   await page.getByLabel("Mostrar", { exact: true }).selectOption("archived");
   await expect(projectLink).toBeVisible();
   page.once("dialog", (dialog) => dialog.accept());

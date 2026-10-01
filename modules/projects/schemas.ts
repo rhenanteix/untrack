@@ -10,6 +10,9 @@ export const createProjectSchema = z
     description: z.string().trim().max(500).optional().default(""),
     icon: z.string().trim().min(1).max(40).optional().default("folder"),
     color: colorSchema.optional().default("#285239"),
+    goal: z
+      .enum(["campaign", "content", "sales", "personal-brand", "website", "client"])
+      .optional(),
   })
   .strict();
 
@@ -20,6 +23,13 @@ export const projectListQuerySchema = z
     search: z.string().trim().max(120).default(""),
     status: z.enum(["active", "archived", "all"]).default("active"),
     page: z.coerce.number().int().min(1).max(10000).default(1),
+  })
+  .strict();
+
+export const bulkProjectActionSchema = z
+  .object({
+    action: z.enum(["archive", "restore"]),
+    ids: z.array(z.string().min(1).max(200)).min(1).max(100),
   })
   .strict();
 
