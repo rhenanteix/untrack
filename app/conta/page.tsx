@@ -19,7 +19,7 @@ export default async function AccountPage() {
   const session = await sessionFromHeaders(await headers());
   if (!session) redirect("/entrar?next=/conta");
   const actor = await actorFor(session.user.id, await headers());
-  const [links, history] = await Promise.all([
+  const [links, history, totalLinks, activeLinks, clicks, publishedPages] = await Promise.all([
     getPrisma().shortLink.findMany({
       where: { workspaceId: actor.workspaceId },
       orderBy: [{ createdAt: "desc" }, { id: "desc" }],
@@ -30,6 +30,16 @@ export default async function AccountPage() {
       where: { workspaceId: actor.workspaceId },
       orderBy: [{ createdAt: "desc" }, { id: "desc" }],
       take: PAGE_SIZE + 1,
+    }),
+    getPrisma().shortLink.count({ where: { workspaceId: actor.workspaceId } }),
+    getPrisma().shortLink.count({
+      where: { workspaceId: actor.workspaceId, isActive: true },
+    }),
+    getPrisma().linkClick.count({
+      where: { link: { workspaceId: actor.workspaceId } },
+    }),
+    getPrisma().smartPage.count({
+      where: { workspaceId: actor.workspaceId, status: "published" },
     }),
   ]);
   return (
@@ -84,6 +94,12 @@ export default async function AccountPage() {
         </section>
       </div>
       <AccountDashboard
+        profile={{
+          name: session.user.name,
+          email: session.user.email,
+          image: session.user.image ?? null,
+        }}
+        insights={{ totalLinks, activeLinks, clicks, publishedPages }}
         initialLinks={{
           items: links.slice(0, PAGE_SIZE).map(serializeLink),
           page: 1,

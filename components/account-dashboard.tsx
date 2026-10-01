@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useState, type FormEvent } from "react";
 import Link from "next/link";
 import { CopyButton } from "@/components/copy-button";
 import { apiRequest } from "@/lib/client/api";
@@ -11,9 +11,18 @@ import type {
 } from "@/modules/short-links/types";
 
 export function AccountDashboard({
+  profile: initialProfile,
+  insights,
   initialLinks,
   initialHistory,
 }: {
+  profile: { name: string; email: string; image: string | null };
+  insights: {
+    totalLinks: number;
+    activeLinks: number;
+    clicks: number;
+    publishedPages: number;
+  };
   initialLinks: PageResult<ShortLinkView>;
   initialHistory: PageResult<HistoryView>;
 }) {
@@ -23,6 +32,8 @@ export function AccountDashboard({
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
+  const [profile, setProfile] = useState(initialProfile);
+  const [editingProfile, setEditingProfile] = useState(false);
 
   async function action(work: () => Promise<void>) {
     setBusy(true);
@@ -95,6 +106,23 @@ export function AccountDashboard({
     });
   }
 
+  async function saveProfile(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const data = new FormData(event.currentTarget);
+    await action(async () => {
+      const updated = await apiRequest<typeof profile>("/api/account/profile", {
+        method: "PATCH",
+        body: JSON.stringify({
+          name: data.get("name"),
+          image: data.get("image") || null,
+        }),
+      });
+      setProfile(updated);
+      setEditingProfile(false);
+      setNotice("Perfil atualizado.");
+    });
+  }
+
   return (
     <div className="dashboard-stack" aria-busy={busy}>
       {error && (
@@ -107,6 +135,62 @@ export function AccountDashboard({
           {notice}
         </p>
       )}
+      <section className="account-overview" aria-labelledby="account-overview-heading">
+        <div className="account-profile-summary">
+          <span className="account-profile-mark" aria-hidden="true">
+            {profile.name.slice(0, 1).toUpperCase()}
+          </span>
+          <div>
+            <span className="eyebrow">Visão geral</span>
+            <h2 id="account-overview-heading">Seu espaço está pronto, {profile.name}.</h2>
+            <p>{profile.email}</p>
+          </div>
+        </div>
+        <button
+          className="button button-secondary"
+          type="button"
+          aria-expanded={editingProfile}
+          onClick={() => setEditingProfile((current) => !current)}
+        >
+          Editar perfil
+        </button>
+      </section>
+      {editingProfile && (
+        <section className="account-profile-editor" aria-labelledby="profile-editor-heading">
+          <div>
+            <span className="eyebrow">Conta</span>
+            <h2 id="profile-editor-heading">Dados do seu perfil</h2>
+          </div>
+          <form onSubmit={saveProfile}>
+            <label>
+              Nome
+              <input required name="name" maxLength={120} defaultValue={profile.name} />
+            </label>
+            <label>
+              Foto de perfil (URL)
+              <input type="url" name="image" defaultValue={profile.image ?? ""} placeholder="https://" />
+            </label>
+            <div className="action-row">
+              <button className="button" disabled={busy}>Salvar perfil</button>
+              <button className="button button-quiet" type="button" onClick={() => setEditingProfile(false)}>Cancelar</button>
+            </div>
+          </form>
+        </section>
+      )}
+      <section className="account-insights" aria-labelledby="account-insights-heading">
+        <div className="account-insights-heading">
+          <div>
+            <span className="eyebrow">Insights do workspace</span>
+            <h2 id="account-insights-heading">O que está acontecendo</h2>
+          </div>
+          <p>Dados acumulados dos recursos ativos neste workspace.</p>
+        </div>
+        <dl className="account-insight-grid">
+          <div><dt>Cliques registrados</dt><dd>{insights.clicks}</dd></div>
+          <div><dt>Links ativos</dt><dd>{insights.activeLinks}</dd><small>de {insights.totalLinks} links</small></div>
+          <div><dt>Páginas públicas</dt><dd>{insights.publishedPages}</dd></div>
+        </dl>
+      </section>
       <section className="dashboard-section" aria-labelledby="meus-links">
         <div className="dashboard-heading">
           <div>
