@@ -28,7 +28,7 @@ export const smartPageThemeSchema = z
     titleSize: z.number().int().min(24).max(48).optional(),
     spacing: z.number().int().min(8).max(32).optional(),
     layout: z.enum(["card", "full"]).optional(),
-    font: z.enum(["sans", "serif", "mono"]).optional(),
+    font: z.enum(["sans", "serif", "mono", "manrope", "georgia", "courier"]).optional(),
     alignment: z.enum(["center", "left"]).optional(),
     avatarShape: z.enum(["circle", "rounded", "square"]).optional(),
     buttonStyle: z.enum(["solid", "outline", "soft"]).optional(),

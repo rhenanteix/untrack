@@ -695,6 +695,9 @@
 .canvas[data-font="sans"] .title {font-family:Arial,Helvetica,sans-serif}
 .canvas[data-font="serif"] .title {font-family:Georgia,serif}
 .canvas[data-font="mono"] .title {font-family:ui-monospace,monospace}
+.canvas[data-font="manrope"] .title {font-family:var(--font-manrope), Arial, sans-serif}
+.canvas[data-font="georgia"] .title {font-family:Georgia, "Times New Roman", serif}
+.canvas[data-font="courier"] .title {font-family:"Courier New", Courier, monospace}
 .canvas[data-alignment="left"] {text-align:left}
 .canvas[data-alignment="left"] .section[data-section="avatar"],.canvas[data-alignment="left"] .socials {justify-content:flex-start}
 .canvas[data-alignment="center"] {text-align:center}

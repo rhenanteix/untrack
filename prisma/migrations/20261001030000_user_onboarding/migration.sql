@@ -1,0 +1,1 @@
+ALTER TABLE "User" ADD COLUMN "onboarding" JSONB NOT NULL DEFAULT '{}';

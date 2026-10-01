@@ -16,6 +16,7 @@ import {
   smartPageInputSchema,
   smartPageUpdateSchema,
   linkBlockSettingsSchema,
+  socialLinksSchema,
   type SmartPageBlockInput,
 } from "./schemas";
 
@@ -32,6 +33,13 @@ const publicBlockInclude = {
 
 function json(value: unknown): Prisma.InputJsonValue {
   return JSON.parse(JSON.stringify(value)) as Prisma.InputJsonValue;
+}
+
+function onboardingSocialLinks(value: unknown) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return [];
+  return socialLinksSchema.safeParse(
+    (value as Record<string, unknown>).socialLinks,
+  ).data ?? [];
 }
 
 function slugConflict(error: unknown): never {
@@ -106,6 +114,14 @@ export async function getSmartPage(actor: Actor, id: string) {
 
 export async function createSmartPage(actor: Actor, raw: unknown) {
   const input = smartPageInputSchema.parse(raw);
+  const user = await getPrisma().user.findUnique({
+    where: { id: actor.userId },
+    select: { onboarding: true },
+  });
+  const socialLinks =
+    input.socialLinks.length > 0
+      ? input.socialLinks
+      : onboardingSocialLinks(user?.onboarding);
   try {
     const page = await workspaceTransaction(
       actor,
@@ -114,7 +130,7 @@ export async function createSmartPage(actor: Actor, raw: unknown) {
         requireSmartPages(plan);
         await reserveQuota(tx, actor.workspaceId, plan, "smartPages");
         const page = await tx.smartPage.create({
-          data: { ...input, workspaceId: actor.workspaceId },
+          data: { ...input, socialLinks, workspaceId: actor.workspaceId },
         });
         await audit(tx, actor, "smartPage.created", page.id, {
           slug: page.slug,

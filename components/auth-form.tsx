@@ -46,7 +46,7 @@ export function AuthForm({
                 : "E-mail ou senha incorretos.",
         );
       }
-      router.replace(returnTo);
+      router.replace(register ? `/onboarding?next=${encodeURIComponent(returnTo)}` : returnTo);
       router.refresh();
     } catch (cause) {
       setError(

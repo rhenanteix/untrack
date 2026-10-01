@@ -33,7 +33,7 @@ export type SmartPageTheme = {
   titleSize?: number;
   spacing?: number;
   layout?: "card" | "full";
-  font?: "sans" | "serif" | "mono";
+  font?: "sans" | "serif" | "mono" | "manrope" | "georgia" | "courier";
   alignment?: "center" | "left";
   avatarShape?: "circle" | "rounded" | "square";
   buttonStyle?: "solid" | "outline" | "soft";

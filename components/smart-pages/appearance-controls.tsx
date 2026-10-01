@@ -65,14 +65,14 @@ export function AppearanceControls({
         <label>
           Tipografia
           <select
-            value={theme.font ?? "sans"}
+            value={theme.font ?? "manrope"}
             onChange={(e) =>
               change({ font: e.target.value as SmartPageTheme["font"] })
             }
           >
-            <option value="sans">Moderna</option>
-            <option value="serif">Editorial</option>
-            <option value="mono">Tecnologia</option>
+            <option value="manrope">Manrope</option>
+            <option value="georgia">Georgia</option>
+            <option value="courier">Courier New</option>
           </select>
         </label>
         <label>

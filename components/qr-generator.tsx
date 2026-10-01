@@ -13,6 +13,11 @@ export function QrGenerator() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [generatedUrl, setGeneratedUrl] = useState("");
+  const [foreground, setForeground] = useState("#172A3A");
+  const [background, setBackground] = useState("#FFFFFF");
+  const [frame, setFrame] = useState<"none" | "rounded" | "scan">("none");
+  const [frameText, setFrameText] = useState("ESCANEIE");
+  const [errorCorrectionLevel, setErrorCorrectionLevel] = useState<"L" | "M" | "Q" | "H">("M");
   const canShare = typeof navigator !== "undefined" && "share" in navigator;
 
   async function submit(event: FormEvent) {
@@ -25,7 +30,14 @@ export function QrGenerator() {
       const response = await fetch("/api/qr/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ url: submittedUrl }),
+        body: JSON.stringify({
+          url: submittedUrl,
+          foreground,
+          background,
+          frame,
+          frameText,
+          errorCorrectionLevel,
+        }),
       });
       const data: { dataUrl?: string; error?: string } = await response.json();
       if (!response.ok || !data.dataUrl) {
@@ -76,6 +88,40 @@ export function QrGenerator() {
             {loading ? "Gerando..." : "Gerar QR Code"}
           </button>
         </div>
+        <fieldset className="qr-style-controls">
+          <legend>Estilo do QR Code</legend>
+          <label>
+            Cor do código
+            <input type="color" value={foreground} onChange={(event) => setForeground(event.target.value)} />
+          </label>
+          <label>
+            Cor de fundo
+            <input type="color" value={background} onChange={(event) => setBackground(event.target.value)} />
+          </label>
+          <label>
+            Frame
+            <select value={frame} onChange={(event) => setFrame(event.target.value as typeof frame)}>
+              <option value="none">Sem frame</option>
+              <option value="rounded">Borda arredondada</option>
+              <option value="scan">Chamada para ação</option>
+            </select>
+          </label>
+          {frame === "scan" && (
+            <label>
+              Texto do frame
+              <input maxLength={40} value={frameText} onChange={(event) => setFrameText(event.target.value)} />
+            </label>
+          )}
+          <label>
+            Correção de erro
+            <select value={errorCorrectionLevel} onChange={(event) => setErrorCorrectionLevel(event.target.value as typeof errorCorrectionLevel)}>
+              <option value="L">Baixa</option>
+              <option value="M">Média</option>
+              <option value="Q">Alta</option>
+              <option value="H">Máxima</option>
+            </select>
+          </label>
+        </fieldset>
         <GuestAccessNotice error={error} />
         {error && (
           <p className="form-error" role="alert">
@@ -116,6 +162,7 @@ export function QrGenerator() {
           {/* A data URL comes from our own QR API and never contains user HTML. */}
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
+            className="qr-result-image"
             src={dataUrl}
             alt={`QR Code para ${generatedUrl}`}
             width="280"

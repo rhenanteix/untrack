@@ -71,6 +71,27 @@ select {
 .auth-switch a {
   font-weight: 750;
 }
+.onboarding { width: min(760px, calc(100% - 32px)); margin: 64px auto; padding: clamp(28px, 6vw, 56px); border: 1px solid var(--line); border-radius: 14px; background: var(--surface); box-shadow: var(--shadow); }
+.onboarding-progress { height: 6px; margin-bottom: 42px; border-radius: 99px; background: #e4e8e0; overflow: hidden; }
+.onboarding-progress span { display: block; height: 100%; border-radius: inherit; background: #d122dc; transition: width 180ms ease; }
+.onboarding h1 { max-width: 620px; margin: 8px 0; font-size: clamp(30px, 5vw, 48px); line-height: 1.12; }
+.onboarding > p { max-width: 590px; margin: 0; color: var(--muted); }
+.onboarding-goals { display: grid; gap: 12px; margin: 32px 0; }
+.onboarding-goals button { display: grid; gap: 4px; width: 100%; border: 1px solid var(--line); border-radius: 10px; background: #fff; padding: 18px; color: var(--ink); cursor: pointer; text-align: left; }
+.onboarding-goals button[aria-pressed="true"] { border-color: #b42ac0; background: #fff5fe; box-shadow: 0 0 0 3px #d122dc1c; }
+.onboarding-goals strong { font-size: 17px; }
+.onboarding-goals span { color: var(--muted); font-size: 14px; }
+.onboarding-continue { min-width: 220px; background: #7d1df2; border-color: #7d1df2; color: #fff; }
+.onboarding-back { margin-bottom: 26px; border: 0; background: transparent; color: var(--muted); cursor: pointer; font-weight: 750; }
+.onboarding-network-picker { display: flex; flex-wrap: wrap; gap: 10px; margin: 30px 0 18px; }
+.onboarding-network-picker button { border: 1px solid var(--line); border-radius: 999px; background: #fff; padding: 10px 14px; color: var(--ink); cursor: pointer; font-weight: 700; }
+.onboarding-network-picker button[aria-pressed="true"] { border-color: #7d1df2; background: #f4edff; color: #5620a5; }
+.onboarding-network-fields { display: grid; gap: 12px; margin: 18px 0 28px; }
+.onboarding-network-fields label { display: grid; gap: 6px; font-size: 13px; font-weight: 750; }
+.onboarding-network-fields label > div { display: flex; align-items: center; border: 1px solid var(--line); border-radius: 8px; background: #fff; padding-left: 12px; }
+.onboarding-network-fields span { color: var(--muted); font-size: 13px; white-space: nowrap; }
+.onboarding-network-fields input { width: 100%; min-width: 0; border: 0; background: transparent; padding: 12px; outline: 0; }
+@media (max-width: 600px) { .onboarding { margin: 24px auto; } .onboarding-continue { width: 100%; } }
 .dashboard-stack,
 .dashboard-section,
 .metrics-section {
@@ -236,6 +257,38 @@ select {
   border-bottom: 1px solid var(--line);
   padding: 8px;
 }
+.qr-style-controls {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+  margin: 20px 0 0;
+  border: 0;
+  border-top: 1px solid var(--line);
+  padding: 18px 0 0;
+}
+.qr-style-controls legend {
+  padding: 0 5px;
+  color: var(--ink);
+  font-size: 14px;
+  font-weight: 750;
+}
+.qr-style-controls label {
+  display: grid;
+  gap: 7px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+.qr-style-controls input,
+.qr-style-controls select {
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  padding: 9px;
+}
+.qr-style-controls input[type="color"] { min-height: 42px; padding: 4px; }
+.qr-result-image { max-width: min(100%, 320px); height: auto; image-rendering: pixelated; }
 .shared-link-card {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
