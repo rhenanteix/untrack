@@ -51,6 +51,7 @@ const groups = [
     label: "Distribuir e acompanhar",
     collapsible: false,
     items: [
+      { href: "/untrack/whatsapp", label: "WhatsApp" },
       { href: "/untrack/utm", label: "Construtor UTM" },
       { href: "/untrack/qr", label: "QR Codes" },
       { href: "/untrack/link-health", label: "Qualidade" },

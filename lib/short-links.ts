@@ -22,7 +22,11 @@ export function serializeLink(
   };
 }
 
-export async function publicLink(slug: string, hostname = appUrl().hostname, distribution = "digital") {
+export async function publicLink(
+  slug: string,
+  hostname = appUrl().hostname,
+  distribution: "digital" | "qr" | "whatsapp" = "digital",
+) {
   if (!/^[A-Za-z0-9_-]{3,64}$/.test(slug)) return null;
   let domainKey = "platform";
   if (hostname !== appUrl().hostname) {

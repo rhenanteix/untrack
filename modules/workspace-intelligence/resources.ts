@@ -110,6 +110,21 @@ export async function workspaceResource(
           }
         : null;
     }
+    case "whatsappLink": {
+      const resource = await db.whatsappLink.findFirst({
+        where: { id: resourceId, workspaceId },
+      });
+      return resource
+        ? {
+            id: resource.id,
+            resourceType,
+            name: resource.name,
+            description: resource.phoneNumber,
+            href: `/untrack/whatsapp?edit=${resource.id}`,
+            updatedAt: resource.updatedAt,
+          }
+        : null;
+    }
   }
 }
 
@@ -139,7 +154,7 @@ export async function resourceOptions(
   workspaceId: string,
   limit = 50,
 ) {
-  const [links, pages, campaigns, utms, qrs] = await Promise.all([
+  const [links, pages, campaigns, utms, qrs, whatsappLinks] = await Promise.all([
     db.shortLink.findMany({
       where: { workspaceId, distribution: "digital" },
       orderBy: { updatedAt: "desc" },
@@ -163,6 +178,11 @@ export async function resourceOptions(
     db.qrAsset.findMany({
       where: { workspaceId },
       orderBy: { createdAt: "desc" },
+      take: limit,
+    }),
+    db.whatsappLink.findMany({
+      where: { workspaceId },
+      orderBy: { updatedAt: "desc" },
       take: limit,
     }),
   ]);
@@ -206,6 +226,14 @@ export async function resourceOptions(
       description: item.destinationUrl,
       href: "/untrack/qr",
       updatedAt: item.createdAt,
+    })),
+    ...whatsappLinks.map((item) => ({
+      id: item.id,
+      resourceType: "whatsappLink" as const,
+      name: item.name,
+      description: item.phoneNumber,
+      href: `/untrack/whatsapp?edit=${item.id}`,
+      updatedAt: item.updatedAt,
     })),
   ].sort((left, right) => right.updatedAt.getTime() - left.updatedAt.getTime());
 }

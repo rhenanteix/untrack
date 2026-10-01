@@ -7,6 +7,7 @@ export const workspaceResourceTypeSchema = z.enum([
   "campaign",
   "utmLink",
   "qrAsset",
+  "whatsappLink",
 ]);
 
 export const projectResourceTypeSchema = workspaceResourceTypeSchema.exclude([

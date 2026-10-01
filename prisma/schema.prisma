@@ -19,6 +19,7 @@ enum ProjectResourceType {
   campaign
   utmLink
   qrAsset
+  whatsappLink
 }
 
 enum WorkspaceResourceType {
@@ -28,6 +29,13 @@ enum WorkspaceResourceType {
   campaign
   utmLink
   qrAsset
+  whatsappLink
+}
+
+enum WhatsappLinkStatus {
+  DRAFT
+  ACTIVE
+  ARCHIVED
 }
 
 enum CollectionKind {
@@ -207,6 +215,7 @@ model ShortLink {
   user           User        @relation(fields: [userId], references: [id], onDelete: Cascade)
   clicks         LinkClick[]
   smartPageBlocks SmartPageBlock[]
+  whatsappLink   WhatsappLink? @relation("WhatsappSmartLink")
 
   @@unique([domainKey, slug])
   @@unique([id, workspaceId])
@@ -290,6 +299,7 @@ model Workspace {
   collections Collection[]
   favorites Favorite[]
   recentResources RecentResource[]
+  whatsappLinks WhatsappLink[]
 }
 
 model Project {
@@ -501,6 +511,7 @@ model Campaign {
   monitoringChecks CampaignMonitorCheck[]
   incidents CampaignIncident[]
   approvals CampaignApproval[]
+  whatsappLinks WhatsappLink[]
   @@unique([id, workspaceId])
   @@index([workspaceId, createdAt])
   @@index([workspaceId, status])
@@ -536,6 +547,28 @@ model CampaignChannel {
   incidents CampaignIncident[]
   @@unique([id, workspaceId])
   @@index([workspaceId, campaignId])
+  @@index([campaignId])
+}
+
+model WhatsappLink {
+  id             String             @id @default(cuid())
+  workspaceId    String
+  name           String             @db.VarChar(120)
+  phoneNumber    String             @db.VarChar(15)
+  message        String             @default("") @db.VarChar(4096)
+  campaignId     String?
+  smartLinkId    String?            @unique
+  status         WhatsappLinkStatus @default(ACTIVE)
+  trackingConfig Json               @default("{\"enabled\":true}")
+  metadata       Json               @default("{}")
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
+  workspace      Workspace          @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  campaign       Campaign?          @relation(fields: [campaignId], references: [id], onDelete: SetNull)
+  smartLink      ShortLink?         @relation("WhatsappSmartLink", fields: [smartLinkId], references: [id], onDelete: SetNull)
+
+  @@index([workspaceId, status, updatedAt])
+  @@index([workspaceId, phoneNumber, campaignId])
   @@index([campaignId])
 }
 

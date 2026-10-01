@@ -5,6 +5,7 @@ import { getPrisma } from "@/lib/prisma";
 import { appUrl } from "@/lib/app-url";
 import { clickMetadata } from "@/modules/short-links/click-metadata";
 import { publicLink } from "@/lib/short-links";
+import { track } from "@/lib/analytics";
 import { cachedDestination } from "./cache";
 
 export async function drainClickOutbox() {
@@ -17,7 +18,7 @@ export async function drainClickOutbox() {
     return events.length;
   }, { timeout: 15000 });
 }
-export async function redirectResponse(request: Request, slug: string, distribution: "digital" | "qr", countClick: boolean) {
+export async function redirectResponse(request: Request, slug: string, distribution: "digital" | "qr" | "whatsapp", countClick: boolean, unavailableMessage = "Link não encontrado, expirado ou desativado.") {
   if (!/^[A-Za-z0-9_-]{3,64}$/.test(slug)) return new Response("Link não encontrado.", { status: 404 });
   const hostname = new URL(request.url).hostname.toLowerCase();
   const domainKey = hostname === appUrl().hostname ? "platform" : hostname;
@@ -44,7 +45,15 @@ export async function redirectResponse(request: Request, slug: string, distribut
       link = await publicLink(slug, hostname, distribution);
     }
   } else link = await publicLink(slug, hostname, distribution);
-  if (!link) return new Response("Link não encontrado, expirado ou desativado.", { status: 404, headers: { "Cache-Control": "no-store" } });
+  if (!link) return new Response(unavailableMessage, { status: 404, headers: { "Cache-Control": "no-store" } });
+  if (distribution === "whatsapp" && countClick)
+    after(async () => {
+      await Promise.all([
+        track("whatsapp_link_view", { linkId: link.id }),
+        track("whatsapp_link_click", { linkId: link.id }),
+        track("whatsapp_redirect", { linkId: link.id }),
+      ]);
+    });
   // Explicit query policy: all incoming query parameters are ignored, including UTMs.
   const destination = await cachedDestination(link);
   return new Response(null, { status: 302, headers: { Location: destination, "Cache-Control": "no-store, max-age=0", "CDN-Cache-Control": "no-store", "X-Robots-Tag": "noindex, nofollow", "Referrer-Policy": "no-referrer" } });
