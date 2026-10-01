@@ -1,3 +1,4 @@
+import { requireSmartPages } from "@/modules/billing/plans";
 import { Prisma } from "@prisma/client";
 import { ApiError } from "@/lib/api-response";
 import { track } from "@/lib/analytics";
@@ -110,6 +111,7 @@ export async function createSmartPage(actor: Actor, raw: unknown) {
       actor,
       "write",
       async (tx, plan) => {
+        requireSmartPages(plan);
         await reserveQuota(tx, actor.workspaceId, plan, "smartPages");
         const page = await tx.smartPage.create({
           data: { ...input, workspaceId: actor.workspaceId },
@@ -130,29 +132,34 @@ export async function createSmartPage(actor: Actor, raw: unknown) {
 export async function updateSmartPage(actor: Actor, id: string, raw: unknown) {
   const input = smartPageUpdateSchema.parse(raw);
   try {
-    const page = await workspaceTransaction(actor, "write", async (tx) => {
-      const existing = await tx.smartPage.findFirst({
-        where: { id, workspaceId: actor.workspaceId },
-      });
-      if (!existing) {
-        throw new ApiError(
-          404,
-          "SMART_PAGE_NOT_FOUND",
-          "Smart Page não encontrada.",
-        );
-      }
-      const page = await tx.smartPage.update({ where: { id }, data: input });
-      await audit(tx, actor, "smartPage.updated", id, {
-        before: {
-          slug: existing.slug,
-          title: existing.title,
-          description: existing.description,
-          avatarUrl: existing.avatarUrl,
-        },
-        after: input,
-      });
-      return page;
-    });
+    const page = await workspaceTransaction(
+      actor,
+      "write",
+      async (tx, plan) => {
+        requireSmartPages(plan);
+        const existing = await tx.smartPage.findFirst({
+          where: { id, workspaceId: actor.workspaceId },
+        });
+        if (!existing) {
+          throw new ApiError(
+            404,
+            "SMART_PAGE_NOT_FOUND",
+            "Smart Page não encontrada.",
+          );
+        }
+        const page = await tx.smartPage.update({ where: { id }, data: input });
+        await audit(tx, actor, "smartPage.updated", id, {
+          before: {
+            slug: existing.slug,
+            title: existing.title,
+            description: existing.description,
+            avatarUrl: existing.avatarUrl,
+          },
+          after: input,
+        });
+        return page;
+      },
+    );
     await track("smart_page_updated", { workspaceId: actor.workspaceId });
     return page;
   } catch (error) {
@@ -183,7 +190,8 @@ export async function setSmartPagePublished(
   id: string,
   published: boolean,
 ) {
-  const page = await workspaceTransaction(actor, "write", async (tx) => {
+  const page = await workspaceTransaction(actor, "write", async (tx, plan) => {
+    if (published) requireSmartPages(plan);
     const page = await tx.smartPage.findFirst({
       where: { id, workspaceId: actor.workspaceId },
     });
@@ -243,7 +251,8 @@ export async function addSmartPageBlock(
   raw: unknown,
 ) {
   const input = smartPageBlockInputSchema.parse(raw);
-  const block = await workspaceTransaction(actor, "write", async (tx) => {
+  const block = await workspaceTransaction(actor, "write", async (tx, plan) => {
+    requireSmartPages(plan);
     const page = await tx.smartPage.findFirst({
       where: { id: pageId, workspaceId: actor.workspaceId },
     });
@@ -287,7 +296,8 @@ export async function updateSmartPageBlock(
   raw: unknown,
 ) {
   const input = smartPageBlockInputSchema.parse(raw);
-  return workspaceTransaction(actor, "write", async (tx) => {
+  return workspaceTransaction(actor, "write", async (tx, plan) => {
+    requireSmartPages(plan);
     const block = await tx.smartPageBlock.findFirst({
       where: {
         id: blockId,
@@ -348,7 +358,8 @@ export async function reorderSmartPageBlocks(
   pageId: string,
   blockIds: string[],
 ) {
-  return workspaceTransaction(actor, "write", async (tx) => {
+  return workspaceTransaction(actor, "write", async (tx, plan) => {
+    requireSmartPages(plan);
     const blocks = await tx.smartPageBlock.findMany({
       where: {
         smartPageId: pageId,

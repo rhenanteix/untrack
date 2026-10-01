@@ -1,3 +1,5 @@
+import Link from "next/link";
+import { smartPagesPrice } from "@/modules/billing/plans";
 import type { Metadata } from "next";
 import { LinkCleaner } from "@/components/link-cleaner";
 import { SeoContent } from "@/components/seo-content";
@@ -20,6 +22,7 @@ export default function Home() {
         </p>
         <LinkCleaner />
       </section>
+      <section className="sp-premium-banner"><span className="eyebrow">Smart Pages Premium</span><h2>Um cartão digital para tudo o que você faz.</h2><p>Reúna seu portfólio, redes sociais e contatos em uma página com sua identidade. Personalize com prévia ao vivo.</p><strong>{smartPagesPrice}</strong><p>Preço previsto · cobrança ainda não disponível.</p><Link className="button" href="/untrack/smart-pages">Conhecer no meu perfil</Link></section>
       <SeoContent />
     </>
   );

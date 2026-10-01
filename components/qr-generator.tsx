@@ -1,4 +1,5 @@
 "use client";
+import { GuestAccessNotice } from "@/components/guest-access-notice";
 
 import { FormEvent, useState } from "react";
 import { useSearchParams } from "next/navigation";
@@ -75,6 +76,7 @@ export function QrGenerator() {
             {loading ? "Gerando..." : "Gerar QR Code"}
           </button>
         </div>
+        <GuestAccessNotice error={error} />
         {error && (
           <p className="form-error" role="alert">
             {error}

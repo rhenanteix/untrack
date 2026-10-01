@@ -1,3 +1,7 @@
+import { UtmBuilder } from "@/components/utm-builder";
+import { QrGenerator } from "@/components/qr-generator";
+import { Shortener } from "@/components/shortener";
+import LinkHealthPage from "@/app/link-health/page";
 import { notFound } from "next/navigation";
 import {
   ApiPanel,
@@ -10,6 +14,30 @@ export default async function ModulePage({
   params: Promise<{ module: string }>;
 }) {
   const { module } = await params;
+  if (module === "link-health") return <LinkHealthPage />;
+  if (["utm", "qr", "short-links"].includes(module))
+    return (
+      <section className="shell page-section">
+        <div className="page-heading">
+          <span className="eyebrow">Criar e distribuir</span>
+          <h1>
+            {module === "utm"
+              ? "Crie suas UTMs"
+              : module === "qr"
+                ? "Seu QR Code"
+                : "Crie um short link"}
+          </h1>
+          <p>Crie e distribua seus links dentro do seu perfil.</p>
+        </div>
+        {module === "utm" ? (
+          <UtmBuilder />
+        ) : module === "qr" ? (
+          <QrGenerator />
+        ) : (
+          <Shortener initialUrl="" />
+        )}
+      </section>
+    );
   if (
     ![
       "clients",

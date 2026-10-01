@@ -140,3 +140,56 @@ A validação destaca o campo com `aria-invalid`, associa a explicação usando
 perfil, e erros de redes sociais expandem a seção correspondente. A validação
 de endereço usa o mesmo schema do servidor; colisões retornadas pela API são
 exibidas no campo de endereço. Os dados digitados permanecem no formulário.
+
+### Cartão, uploads e premium
+
+O cartão é o formato padrão. Em **Modelos → Ajuste cada detalhe**, altere cores,
+fontes, alinhamento, foto, estilo e cantos dos botões, tamanhos e espaçamento.
+Reordene foto, nome, apresentação, links e redes; a ordem dos links individuais
+e das redes também é editável. A prévia permanece ao lado no desktop e aparece
+compacta acima do editor em telas menores. Alterações só são publicadas ao salvar.
+
+**Foto:** envie JPG, PNG ou WebP de até 2 MB e 16 megapixels. O servidor decodifica,
+remove metadados, redimensiona e reencoda em WebP; SVG e animações são rejeitados.
+Os arquivos são persistidos em `SmartPageImage` (PostgreSQL), até 10 por página,
+com controle transacional de cota. A biblioteca permite reutilizar ou excluir
+imagens não utilizadas. Uma imagem de rascunho exige associação ao workspace;
+apenas a foto atualmente associada a uma página publicada é acessível sem login.
+Despublicar revoga esse acesso. O limite mantém o armazenamento no banco pequeno;
+um armazenamento de objetos poderá substituir essa camada conforme a escala.
+
+Migration nova: `20261001010000_smart_page_images_guest_usage`.
+Execute `npm run prisma:generate` e `npm run prisma:deploy` antes de subir o app.
+Ela cria `SmartPageImage` e `AnonymousUse`, sem alterar nem remover páginas.
+
+O produto Smart Pages Premium está configurado em `modules/billing/plans.ts`
+com preço previsto de **R$ 45,90**. A periodicidade ainda não foi confirmada.
+Não há checkout, assinatura ou débito ativo. Workspaces `pro` e `business`
+possuem acesso; o plano `free` não cria nem edita Smart Pages. Não existe endpoint
+público para promover o plano: até a integração de pagamentos, uma concessão de
+acesso precisa ser feita pela administração no banco, no workspace correto.
+Páginas existentes continuam publicadas após downgrade, e a API permite excluir
+ou despublicar; editar ou publicar novamente exige premium. Membros viewer
+continuam sem permissão de alteração independentemente do plano.
+
+### Um uso gratuito sem login
+
+Limpeza (incluindo o alias `/api/links/clean`), UTM, QR, análise e health compartilham
+um único uso bem-sucedido para visitantes. Depois disso, as APIs respondem 401
+`LOGIN_REQUIRED` e os formulários oferecem entrada/cadastro. Falhas de validação
+ou processamento devolvem a reserva. Uma sessão autenticada válida passa a usar
+as cotas normais da conta, sem receber automaticamente acesso premium.
+
+A unicidade no PostgreSQL impede dois resultados simultâneos. A identidade usa
+um cookie HttpOnly e HMAC do IP fornecido pelo proxy; URLs e IPs em texto puro
+não são armazenados nessa tabela. O bloqueio de rede evita reiniciar a cota
+apagando cookies, mas pessoas na mesma rede podem compartilhar o limite. Sem
+identificação por login não é possível garantir um único uso por pessoa em
+redes/dispositivos diferentes. O proxy de produção precisa sobrescrever
+`x-vercel-forwarded-for`/`x-real-ip`, como já exigido por autenticação/rate limit.
+Sem IP confiável, o acesso anônimo falha fechado em produção. O banco é agora
+necessário também para o uso gratuito. `BETTER_AUTH_SECRET` precisa continuar
+estável; nenhuma variável ou serviço novo foi adicionado.
+
+A distribuição autenticada está em `/untrack/utm`, `/untrack/qr`,
+`/untrack/short-links` e `/untrack/link-health`, dentro da navegação do perfil.

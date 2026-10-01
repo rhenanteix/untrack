@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useRef, useState, type FormEvent } from "react";
+import { AppearanceControls } from "@/components/smart-pages/appearance-controls";
+import { ImageUpload } from "@/components/smart-pages/image-upload";
 import { SmartForm, SmartField } from "@/components/smart-pages/smart-form";
 import { CopyButton } from "@/components/copy-button";
 import { ActionStatus, apiRequest, useAction } from "./shared";
@@ -88,6 +90,22 @@ interface SmartPageMetrics {
   devices: { name: string; views: number }[];
 }
 
+function collectSocialLinks(
+  data: FormData,
+  order: { network: SocialNetwork; url: string }[],
+) {
+  const networks = [
+    ...new Set([
+      ...order.map((s) => s.network),
+      ...socialNetworks.map((s) => s.value),
+    ]),
+  ];
+  return networks.flatMap((network) => {
+    const url = String(data.get(`social-${network}`) ?? "").trim();
+    return url ? [{ network, url }] : [];
+  });
+}
+
 function publicUrl(slug: string) {
   return `/page/${encodeURIComponent(slug)}`;
 }
@@ -126,11 +144,15 @@ export function SmartPagesDashboard({
   initial,
   managedLinks,
   canEdit = true,
+  canUnpublish = canEdit,
+  readOnlyReason = "Você tem acesso de leitura. Peça a um editor ou administrador para alterar páginas.",
   publicOrigin = "",
 }: {
   initial: { items: SmartPageSummary[]; page: number; hasMore: boolean };
   managedLinks: ManagedLink[];
   canEdit?: boolean;
+  canUnpublish?: boolean;
+  readOnlyReason?: string;
   publicOrigin?: string;
 }) {
   const [pages, setPages] = useState(initial.items);
@@ -138,6 +160,12 @@ export function SmartPagesDashboard({
   const [editorTab, setEditorTab] = useState<"editor" | "preview">("editor");
   const [metrics, setMetrics] = useState<SmartPageMetrics | null>(null);
   const action = useAction();
+  const [blockDrafts, setBlockDrafts] = useState<
+    Record<string, SmartPageBlock>
+  >({});
+  const [newBlockDraft, setNewBlockDraft] = useState<SmartPageBlock | null>(
+    null,
+  );
   const [activeForm, setActiveForm] = useState("");
   const [editorSection, setEditorSection] = useState("profile");
   const [search, setSearch] = useState("");
@@ -151,7 +179,7 @@ export function SmartPagesDashboard({
   const [dirty, setDirty] = useState(false);
   const [dirtyBlocks, setDirtyBlocks] = useState<string[]>([]);
   const editorRef = useRef<HTMLHeadingElement>(null);
-  const hasUnsaved = dirty || dirtyBlocks.length > 0;
+  const hasUnsaved = dirty || dirtyBlocks.length > 0 || newBlockDraft !== null;
   useEffect(() => {
     if (!hasUnsaved) return;
     const warn = (event: BeforeUnloadEvent) => {
@@ -190,10 +218,10 @@ export function SmartPagesDashboard({
       description: String(data.get("description") ?? ""),
       avatarUrl: String(data.get("avatarUrl") ?? "") || null,
       theme: profileDraft.theme ?? selected?.theme ?? { preset: "minimal" },
-      socialLinks: socialNetworks.flatMap(({ value }) => {
-        const url = String(data.get(`social-${value}`) ?? "").trim();
-        return url ? [{ network: value, url }] : [];
-      }),
+      socialLinks: collectSocialLinks(
+        data,
+        profileDraft.socialLinks ?? selected?.socialLinks ?? [],
+      ),
     });
   }
 
@@ -217,6 +245,8 @@ export function SmartPagesDashboard({
       setEditorSection("profile");
       setDirty(false);
       setDirtyBlocks([]);
+      setBlockDrafts({});
+      setNewBlockDraft(null);
       setShowCreate(false);
       requestAnimationFrame(() => editorRef.current?.focus());
       setMetrics(null);
@@ -253,6 +283,8 @@ export function SmartPagesDashboard({
       setEditorSection("profile");
       setDirty(false);
       setDirtyBlocks([]);
+      setBlockDrafts({});
+      setNewBlockDraft(null);
       setShowCreate(false);
       action.setNotice(
         "Rascunho criado. Adicione seus links e publique quando estiver pronto.",
@@ -267,10 +299,10 @@ export function SmartPagesDashboard({
     if (!selected) return;
     const form = event.currentTarget;
     const data = new FormData(form);
-    const socialLinks = socialNetworks.flatMap(({ value }) => {
-      const url = String(data.get(`social-${value}`) ?? "").trim();
-      return url ? [{ network: value, url }] : [];
-    });
+    const socialLinks = collectSocialLinks(
+      data,
+      profileDraft.socialLinks ?? selected.socialLinks,
+    );
     await action.run(async () => {
       const page = await apiRequest<SmartPageDetail>(
         `/api/smart-pages/${selected.id}`,
@@ -324,6 +356,7 @@ export function SmartPagesDashboard({
         current ? { ...current, blocks: [...current.blocks, block] } : current,
       );
       form.reset();
+      setNewBlockDraft(null);
       action.setNotice("Link adicionado.");
     });
   }
@@ -365,6 +398,11 @@ export function SmartPagesDashboard({
           : current,
       );
       setDirtyBlocks((ids) => ids.filter((id) => id !== block.id));
+      setBlockDrafts((current) => {
+        const next = { ...current };
+        delete next[block.id];
+        return next;
+      });
       action.setNotice("Link atualizado.");
     });
   }
@@ -409,7 +447,8 @@ export function SmartPagesDashboard({
   }
 
   async function setPublished(published: boolean) {
-    if (!selected || !canEdit || hasUnsaved) return;
+    if (!selected || !(published ? canEdit : canUnpublish) || hasUnsaved)
+      return;
     if (
       !published &&
       !window.confirm(
@@ -469,12 +508,7 @@ export function SmartPagesDashboard({
       </div>
       <div className="smart-page-feedback">
         <ActionStatus {...action} />
-        {!canEdit && (
-          <p className="smart-page-readonly">
-            Você tem acesso de leitura. Peça a um editor ou administrador para
-            alterar páginas.
-          </p>
-        )}
+        {!canEdit && <p className="smart-page-readonly">{readOnlyReason}</p>}
       </div>
       <div className="smart-pages-grid">
         <aside className="smart-pages-sidebar" aria-label="Suas Smart Pages">
@@ -672,7 +706,13 @@ export function SmartPagesDashboard({
                     )}
                     <button
                       className="button"
-                      disabled={action.busy || !canEdit || hasUnsaved}
+                      disabled={
+                        action.busy ||
+                        !(selected.status === "published"
+                          ? canUnpublish
+                          : canEdit) ||
+                        hasUnsaved
+                      }
                       onClick={() =>
                         void setPublished(selected.status !== "published")
                       }
@@ -748,12 +788,39 @@ export function SmartPagesDashboard({
                           defaultValue={selected.description}
                         />
                       </SmartField>
+                      <ImageUpload
+                        currentUrl={
+                          profileDraft.avatarUrl === undefined
+                            ? selected.avatarUrl
+                            : profileDraft.avatarUrl
+                        }
+                        pageId={selected.id}
+                        disabled={!canEdit || action.busy}
+                        onUploaded={(url) => {
+                          setProfileDraft((current) => ({
+                            ...current,
+                            avatarUrl: url,
+                          }));
+                          setDirty(true);
+                          action.setNotice("");
+                        }}
+                      />
                       <SmartField hint="Use o endereço https:// de uma imagem. Escolha uma foto nítida ou o logo da sua marca.">
                         Foto de perfil (URL)
                         <input
                           type="url"
                           name="avatarUrl"
-                          defaultValue={selected.avatarUrl ?? ""}
+                          value={
+                            profileDraft.avatarUrl === undefined
+                              ? (selected.avatarUrl ?? "")
+                              : (profileDraft.avatarUrl ?? "")
+                          }
+                          onChange={(event) =>
+                            setProfileDraft((current) => ({
+                              ...current,
+                              avatarUrl: event.target.value,
+                            }))
+                          }
                         />
                       </SmartField>
                       <SmartField hint="Use de 3 a 60 caracteres, sem espaços ou acentos. Exemplo: ana-silva. Alterar este endereço muda o link público.">
@@ -788,9 +855,52 @@ export function SmartPagesDashboard({
                             </SmartField>
                           ))}
                         </fieldset>
+                        <ol className="sp-section-order">
+                          {(
+                            profileDraft.socialLinks ?? selected.socialLinks
+                          ).map((social, index, array) => (
+                            <li key={social.network}>
+                              <strong>{social.network}</strong>
+                              {([-1, 1] as const).map((direction) => (
+                                <button
+                                  type="button"
+                                  key={direction}
+                                  aria-label={`${direction === -1 ? "Subir" : "Descer"} rede ${social.network}`}
+                                  disabled={
+                                    index + direction < 0 ||
+                                    index + direction >= array.length
+                                  }
+                                  onClick={() => {
+                                    const next = [...array];
+                                    [next[index], next[index + direction]] = [
+                                      next[index + direction],
+                                      next[index],
+                                    ];
+                                    setProfileDraft((current) => ({
+                                      ...current,
+                                      socialLinks: next,
+                                    }));
+                                    setDirty(true);
+                                  }}
+                                >
+                                  {direction === -1 ? "↑" : "↓"}
+                                </button>
+                              ))}
+                            </li>
+                          ))}
+                        </ol>
                       </details>
                     </div>
                     <div hidden={editorSection !== "appearance"}>
+                      <AppearanceControls
+                        theme={profileDraft.theme ?? selected.theme}
+                        disabled={!canEdit || action.busy}
+                        onChange={(theme) => {
+                          setProfileDraft((current) => ({ ...current, theme }));
+                          setDirty(true);
+                          action.setNotice("");
+                        }}
+                      />
                       <ThemeGallery
                         value={profileDraft.theme ?? selected.theme}
                         disabled={!canEdit || action.busy}
@@ -837,6 +947,31 @@ export function SmartPagesDashboard({
                     <SmartForm
                       className="smart-page-add-block"
                       onSubmit={addBlock}
+                      onChange={(event) => {
+                        const data = new FormData(event.currentTarget);
+                        const title = String(data.get("title") ?? "");
+                        const destinationUrl = String(
+                          data.get("destinationUrl") ?? "",
+                        );
+                        setNewBlockDraft(
+                          title || destinationUrl
+                            ? {
+                                id: "preview-new",
+                                type: "link",
+                                position: selected.blocks.length,
+                                visible: true,
+                                analyticsEnabled: false,
+                                linkId: null,
+                                link: null,
+                                settings: {
+                                  title: title || "Novo link",
+                                  destinationUrl,
+                                  openInNewTab: true,
+                                },
+                              }
+                            : null,
+                        );
+                      }}
                       failure={activeForm === "add" ? action.failure : null}
                     >
                       <SmartField>
@@ -888,13 +1023,28 @@ export function SmartPagesDashboard({
                             failure={
                               activeForm === block.id ? action.failure : null
                             }
-                            onChange={() =>
+                            onChange={(event) => {
+                              const data = new FormData(event.currentTarget);
+                              setBlockDrafts((current) => ({
+                                ...current,
+                                [block.id]: {
+                                  ...block,
+                                  visible: data.get("visible") === "on",
+                                  settings: {
+                                    ...block.settings,
+                                    title: String(data.get("title") ?? ""),
+                                    destinationUrl: String(
+                                      data.get("destinationUrl") ?? "",
+                                    ),
+                                  },
+                                },
+                              }));
                               setDirtyBlocks((ids) =>
                                 ids.includes(block.id)
                                   ? ids
                                   : [...ids, block.id],
-                              )
-                            }
+                              );
+                            }}
                             onSubmit={(event) => saveBlock(event, block)}
                           >
                             <SmartField>
@@ -1095,13 +1245,24 @@ export function SmartPagesDashboard({
                     : "smart-page-preview-panel"
                 }
               >
-                <h2>Prévia</h2>
+                <h2>Seu cartão ao vivo</h2>
                 <p className="muted">
                   {dirty
-                    ? "Prévia das alterações do perfil. Salve para atualizar sua página."
+                    ? "As alterações aparecem aqui enquanto você edita. Salve para publicar o resultado."
                     : "Confira a aparência antes de compartilhar."}
                 </p>
-                <SmartPagePreview page={{ ...selected, ...profileDraft }} />
+                <SmartPagePreview
+                  page={{
+                    ...selected,
+                    ...profileDraft,
+                    blocks: [
+                      ...selected.blocks.map(
+                        (block) => blockDrafts[block.id] ?? block,
+                      ),
+                      ...(newBlockDraft ? [newBlockDraft] : []),
+                    ],
+                  }}
+                />
               </div>
             </>
           )}

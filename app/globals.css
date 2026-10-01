@@ -2208,3 +2208,22 @@ body:has(.smart-page-public) .site-footer { display: none; }
   border-color: #c05555;
   box-shadow: 0 0 0 3px #c055551a;
 }
+/* Card editor: preview remains visible beside the controls on desktop. */
+.smart-page-public {display:grid;place-items:center;min-height:100svh;padding:40px 20px;background:radial-gradient(ellipse at top,#edf0e8,#f6f7f4)}
+.smart-page-public>div[data-layout="card"] {min-height:620px}
+.smart-page-public:has([data-layout="full"]) {padding:0}
+.smart-page-public>div[data-layout="full"] {min-height:100svh}
+.sp-appearance-controls {border:1px solid #dfe7df;background:#f7faf6;border-radius:16px;padding:20px;margin-bottom:28px;min-width:0}
+.sp-appearance-controls legend {font-size:16px;font-weight:700}
+.sp-control-grid {display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;margin-top:18px}
+.sp-control-grid label {display:grid;gap:8px;font-size:12px}.sp-control-grid input[type="color"]{width:100%;height:40px;padding:4px}.sp-control-grid select{width:100%;min-width:0;padding:10px;border:1px solid #ccd8cc;border-radius:8px;background:white;color:#243d31}
+.sp-section-order {padding:0;list-style:none;display:grid;gap:8px}.sp-section-order li{display:flex;align-items:center;gap:8px;padding:12px;background:white;border:1px solid #e1e8dd;border-radius:10px;font-size:12px}.sp-section-order strong{margin-right:auto}.sp-section-order label{display:flex!important;align-items:center;gap:5px;font-size:11px!important}.sp-section-order button{padding:6px 10px;background:#f4f7f1;border:1px solid #d7e2d3;border-radius:6px;cursor:pointer}.sp-section-order button:disabled{opacity:.35;cursor:default}
+.sp-upload {display:grid;gap:12px;padding:22px;border:1px dashed #9eb39b;border-radius:14px;background:#f7faf4;font-size:12px;color:#425440}.sp-upload label{gap:6px}.sp-upload label span{font-size:11px;font-weight:400}.sp-upload input{max-width:100%;font-size:12px}
+@media(min-width:1101px){.smart-pages-grid{grid-template-columns:minmax(180px,220px) minmax(0,1fr);gap:18px}.smart-page-workbench{grid-template-columns:minmax(0,1fr) 290px}.smart-page-workbench>.mobile-hidden{display:block}.smart-page-mobile-tabs{display:none}.smart-page-preview-panel{position:sticky;top:88px;align-self:start;max-height:calc(100svh - 110px);overflow:auto;padding:18px 10px;border-left:1px solid #e0e6dd;border-top:0}.smart-page-preview{width:100%;margin-top:18px}.smart-page-editor{padding:22px!important}}
+@media(max-width:1100px){.smart-page-workbench{display:flex;flex-direction:column}.smart-page-mobile-tabs{order:-2}.smart-page-preview-panel{order:-1}.smart-page-workbench>.smart-page-preview-panel.mobile-hidden{display:block;max-height:240px;overflow:auto}.smart-page-workbench>.smart-page-preview-panel.mobile-hidden .smart-page-preview{width:220px;zoom:.75}.smart-page-workbench>.smart-page-preview-panel.mobile-hidden h2{font-size:13px}.smart-page-workbench>.smart-page-preview-panel.mobile-hidden>.muted{display:none}}
+@media(max-width:500px){.sp-control-grid{grid-template-columns:1fr 1fr}.sp-section-order li{flex-wrap:wrap}.smart-page-public{padding:20px 12px}}
+.sp-premium-banner {margin:30px auto;padding:32px;width:min(900px,calc(100% - 40px));border:1px solid #d2dfcc;border-radius:24px;background:linear-gradient(135deg,#f0f6df,#fff);color:#263b2a}
+.sp-premium-banner h1{font-size:32px;letter-spacing:-1px}.sp-premium-banner>strong{display:block;font-size:38px;margin:20px 0}.sp-premium-banner p{font-size:14px;line-height:1.6;max-width:650px}
+body:has(.product-shell) .site-footer{display:none}
+.sp-guest-notice{grid-column:1/-1;padding:20px;border:1px solid #d9e5ca;border-radius:14px;background:#f4f8ec;color:#29452b}.sp-guest-notice p,.sp-guest-note{font-size:12px;line-height:1.7}.sp-guest-note{grid-column:1/-1;color:#63715f}
+.sp-image-library{display:flex;flex-wrap:wrap;gap:12px;list-style:none;padding:0}.sp-image-library li{display:grid;gap:5px}.sp-image-library button{padding:4px;border:1px solid #d3ddce;border-radius:8px;background:white;cursor:pointer;font-size:11px}.sp-image-library img{object-fit:cover;border-radius:5px}.sp-image-library button:disabled{opacity:.45}

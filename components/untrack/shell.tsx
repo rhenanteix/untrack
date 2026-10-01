@@ -19,10 +19,10 @@ const groups = [
   {
     label: "Criar e distribuir",
     items: [
-      ["/encurtar", "Short links"],
-      ["/gerar-utm", "UTM"],
-      ["/gerar-qrcode", "QR Codes"],
-      ["/link-health", "Link Health"],
+      ["/untrack/short-links", "Short links"],
+      ["/untrack/utm", "UTM"],
+      ["/untrack/qr", "QR Codes"],
+      ["/untrack/link-health", "Link Health"],
     ],
   },
   {

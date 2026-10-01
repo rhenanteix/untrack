@@ -1,3 +1,4 @@
+import { grantTestPremium } from "../helpers/premium";
 import { randomUUID } from "node:crypto";
 import { expect, test } from "@playwright/test";
 
@@ -14,6 +15,8 @@ async function register(
   await page.getByLabel("Senha", { exact: true }).fill(password);
   await page.getByRole("button", { name: "Criar minha conta" }).click();
   await expect(page).toHaveURL(`${baseURL}/conta`);
+  const workspace = await (await page.request.get("/api/workspaces")).json();
+  await grantTestPremium(workspace.activeId);
 }
 
 test("cria, publica, abre e mede uma Smart Page", async ({
@@ -26,17 +29,20 @@ test("cria, publica, abre e mede uma Smart Page", async ({
   const slug = `pagina-${randomUUID().slice(0, 8)}`;
   await page.goto("/untrack/smart-pages");
   await page.getByLabel("Nome ou marca").fill("Consultoria Aurora");
-  await page.getByLabel("Slug").first().fill(slug);
+  await page.locator('.smart-page-create input[name="slug"]').fill(slug);
   await page.getByLabel("Descrição curta").fill("Estratégia e crescimento.");
   await page.getByRole("button", { name: "Criar página" }).click();
   await expect(
     page.getByRole("heading", { name: "Consultoria Aurora" }),
   ).toBeVisible();
 
+  await page.getByRole("button", { name: "Links", exact: true }).click();
   await page.getByLabel("Título").fill("Conheça meu trabalho");
   await page.getByLabel("URL externa").fill("https://example.com/portfolio");
   await page.getByRole("button", { name: "Adicionar link" }).click();
-  await expect(page.getByText("Link 1")).toBeVisible();
+  await expect(
+    page.locator('.smart-page-block-list input[name="title"]'),
+  ).toHaveValue("Conheça meu trabalho");
   await page.getByRole("button", { name: "Publicar" }).click();
   await expect(page.getByText("Página publicada.")).toBeVisible();
 

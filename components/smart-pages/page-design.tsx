@@ -20,12 +20,48 @@ export function PageDesign({
   socials?: ReactNode;
   preview?: boolean;
 }) {
+  const avatar = avatarUrl ? (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      src={avatarUrl}
+      alt=""
+      width={88}
+      height={88}
+      referrerPolicy="no-referrer"
+      className={styles.avatar}
+    />
+  ) : (
+    <span className={styles.avatar} aria-hidden="true">
+      {title.slice(0, 1).toUpperCase()}
+    </span>
+  );
+  const sections: Record<string, ReactNode> = {
+    avatar,
+    title: preview ? (
+      <strong className={styles.title}>{title}</strong>
+    ) : (
+      <h1 className={styles.title}>{title}</h1>
+    ),
+    description: description ? (
+      <p className={styles.bio}>{description}</p>
+    ) : null,
+    links: <div className={styles.links}>{children}</div>,
+    socials: socials ? <div className={styles.socials}>{socials}</div> : null,
+  };
   return (
     <div
       className={`${styles.canvas} ${styles[theme.preset]}`}
       data-theme={theme.preset}
+      data-layout={theme.layout ?? "card"}
+      data-font={theme.font}
+      data-alignment={theme.alignment}
+      data-avatar={theme.avatarShape}
+      data-buttons={theme.buttonStyle}
       style={
         {
+          "--avatar-size": theme.avatarSize === undefined ? undefined : `${theme.avatarSize}px`,
+          "--title-size": theme.titleSize === undefined ? undefined : `${theme.titleSize}px`,
+          "--spacing": theme.spacing === undefined ? undefined : `${theme.spacing}px`,
           "--bg": theme.background,
           "--ink": theme.textColor,
           "--button": theme.buttonColor,
@@ -45,31 +81,32 @@ export function PageDesign({
         <i />
       </div>
       <div className={styles.content}>
-        <header className={styles.profile}>
-          {avatarUrl ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={avatarUrl}
-              alt=""
-              width={88}
-              height={88}
-              referrerPolicy="no-referrer"
-              className={styles.avatar}
-            />
-          ) : (
-            <span className={styles.avatar} aria-hidden="true">
-              {title.slice(0, 1).toUpperCase()}
-            </span>
+        {(
+          theme.sections ?? [
+            "avatar",
+            "title",
+            "description",
+            "links",
+            "socials",
+          ]
+        )
+          .filter(
+            (section) =>
+              !theme.hiddenSections?.includes(
+                section as "avatar" | "description" | "socials",
+              ),
+          )
+          .map((section) =>
+            sections[section] ? (
+              <div
+                key={section}
+                className={styles.section}
+                data-section={section}
+              >
+                {sections[section]}
+              </div>
+            ) : null,
           )}
-          {preview ? (
-            <strong className={styles.title}>{title}</strong>
-          ) : (
-            <h1 className={styles.title}>{title}</h1>
-          )}
-          {description && <p>{description}</p>}
-        </header>
-        <div className={styles.links}>{children}</div>
-        {socials && <div className={styles.socials}>{socials}</div>}
         <div className={styles.signature}>
           feito com <b>untrack</b>
           <span aria-hidden="true"> ↗</span>

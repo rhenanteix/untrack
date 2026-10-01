@@ -123,3 +123,5 @@ describe("coleta de analytics", () => {
     },
   );
 });
+
+vi.mock("@/lib/anonymous-use", () => ({ withAnonymousUse: (_request: Request, action: () => Promise<Response>) => action() }));

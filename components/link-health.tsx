@@ -1,4 +1,5 @@
 "use client";
+import { GuestAccessNotice } from "@/components/guest-access-notice";
 
 import { useState, type FormEvent } from "react";
 import { apiRequest } from "@/lib/client/api";
@@ -189,6 +190,7 @@ export function LinkHealth() {
         <button className="button" type="submit" disabled={loading}>
           {loading ? "Executando checks..." : "Avaliar health do link"}
         </button>
+        <GuestAccessNotice error={error} />
         {error && (
           <p className="form-error" role="alert">
             {error}

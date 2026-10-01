@@ -1,3 +1,4 @@
+import { withAnonymousUse } from "@/lib/anonymous-use";
 import { after, NextResponse } from "next/server";
 import { errorResponse, readJson } from "@/lib/api-response";
 import { track } from "@/lib/analytics";
@@ -6,7 +7,7 @@ import { utmInputSchema } from "@/modules/utm/utm.schemas";
 import { generateUtmUrl } from "@/modules/utm/utm.service";
 import { saveCloudHistory } from "@/lib/cloud-history";
 
-export async function POST(request: Request) {
+async function handlePost(request: Request) {
   try {
     const rateHeaders = await enforceRateLimit(request, "utm");
     const input = utmInputSchema.parse(await readJson(request));
@@ -23,3 +24,5 @@ export async function POST(request: Request) {
     return errorResponse(error);
   }
 }
+
+export async function POST(request: Request) { return withAnonymousUse(request, () => handlePost(request)); }

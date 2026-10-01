@@ -63,7 +63,7 @@ describe("smart page schemas", () => {
 
 describe("smart page entitlements", () => {
   it("keeps Smart Page limits centralized by plan", () => {
-    expect(PLAN_LIMITS.free.smartPages).toBe(1);
+    expect(PLAN_LIMITS.free.smartPages).toBe(0);
     expect(PLAN_LIMITS.pro.smartPages).toBe(10);
     expect(PLAN_LIMITS.business.smartPages).toBe(100);
   });

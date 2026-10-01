@@ -1,3 +1,4 @@
+import { withAnonymousUse } from "@/lib/anonymous-use";
 import { after, NextResponse } from "next/server";
 import { errorResponse, readJson } from "@/lib/api-response";
 import { track } from "@/lib/analytics";
@@ -8,7 +9,7 @@ import { saveCloudHistory } from "@/lib/cloud-history";
 
 export const runtime = "nodejs";
 
-export async function POST(request: Request) {
+async function handlePost(request: Request) {
   try {
     const rateHeaders = await enforceRateLimit(request, "qr");
     const input = qrInputSchema.parse(await readJson(request));
@@ -45,3 +46,5 @@ export async function POST(request: Request) {
     return errorResponse(error);
   }
 }
+
+export async function POST(request: Request) { return withAnonymousUse(request, () => handlePost(request)); }

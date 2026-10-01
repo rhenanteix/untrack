@@ -1,3 +1,4 @@
+import { withAnonymousUse } from "@/lib/anonymous-use";
 import { after, NextResponse } from "next/server";
 import { errorResponse, readJson } from "@/lib/api-response";
 import { track } from "@/lib/analytics";
@@ -6,7 +7,7 @@ import { analyzeUrl } from "@/modules/links/clean-url";
 import { analyzeInputSchema } from "@/modules/links/schemas";
 import { saveCloudHistory } from "@/lib/cloud-history";
 
-export async function POST(request: Request) {
+async function handlePost(request: Request) {
   try {
     const rateHeaders = await enforceRateLimit(request, "links-analyze");
     const input = analyzeInputSchema.parse(await readJson(request));
@@ -31,3 +32,5 @@ export async function POST(request: Request) {
     return errorResponse(error);
   }
 }
+
+export async function POST(request: Request) { return withAnonymousUse(request, () => handlePost(request)); }

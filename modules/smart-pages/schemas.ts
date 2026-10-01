@@ -24,6 +24,30 @@ export const smartPageStatusSchema = z.enum(["draft", "published"]);
 export const smartPageThemeSchema = z
   .object({
     preset: z.enum(themeIds).default("minimal"),
+    avatarSize: z.number().int().min(48).max(144).optional(),
+    titleSize: z.number().int().min(24).max(48).optional(),
+    spacing: z.number().int().min(8).max(32).optional(),
+    layout: z.enum(["card", "full"]).optional(),
+    font: z.enum(["sans", "serif", "mono"]).optional(),
+    alignment: z.enum(["center", "left"]).optional(),
+    avatarShape: z.enum(["circle", "rounded", "square"]).optional(),
+    buttonStyle: z.enum(["solid", "outline", "soft"]).optional(),
+    sections: z
+      .array(z.enum(["avatar", "title", "description", "links", "socials"]))
+      .length(5)
+      .refine(
+        (items) => new Set(items).size === 5,
+        "Cada seção deve aparecer uma única vez.",
+      )
+      .optional(),
+    hiddenSections: z
+      .array(z.enum(["avatar", "description", "socials"]))
+      .max(3)
+      .refine(
+        (items) => new Set(items).size === items.length,
+        "Seções repetidas.",
+      )
+      .optional(),
     background: z
       .string()
       .regex(/^#[0-9a-fA-F]{6}$/)

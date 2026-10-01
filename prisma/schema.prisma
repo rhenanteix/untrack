@@ -110,6 +110,7 @@ model SmartPage {
   createdAt   DateTime        @default(now())
   updatedAt   DateTime        @updatedAt
   workspace   Workspace       @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  images      SmartPageImage[]
   blocks      SmartPageBlock[]
   analyticsEvents AnalyticsEvent[]
 
@@ -532,4 +533,19 @@ model UtmLink {
   client Client? @relation(fields: [clientId, workspaceId], references: [id, workspaceId])
   campaign Campaign? @relation(fields: [campaignId, workspaceId], references: [id, workspaceId])
   @@index([workspaceId, createdAt])
+}
+
+
+model SmartPageImage {
+  id String @id @default(cuid())
+  pageId String
+  data Bytes
+  createdAt DateTime @default(now())
+  page SmartPage @relation(fields: [pageId], references: [id], onDelete: Cascade)
+  @@index([pageId])
+}
+
+model AnonymousUse {
+  keyHash String @id @db.VarChar(64)
+  createdAt DateTime @default(now())
 }

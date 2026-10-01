@@ -29,6 +29,16 @@ export type SmartPageTheme = {
   textColor?: string;
   buttonColor?: string;
   buttonRadius?: number;
+  avatarSize?: number;
+  titleSize?: number;
+  spacing?: number;
+  layout?: "card" | "full";
+  font?: "sans" | "serif" | "mono";
+  alignment?: "center" | "left";
+  avatarShape?: "circle" | "rounded" | "square";
+  buttonStyle?: "solid" | "outline" | "soft";
+  sections?: ("avatar" | "title" | "description" | "links" | "socials")[];
+  hiddenSections?: ("avatar" | "description" | "socials")[];
 };
 export const themes: {
   id: ThemePreset;

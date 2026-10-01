@@ -26,7 +26,7 @@ export const PLAN_LIMITS: Record<Plan, Record<Resource, number>> = {
     dynamicQr: 0,
     domains: 0,
     history: 1000,
-    smartPages: 1,
+    smartPages: 0,
   },
   pro: {
     members: 10,

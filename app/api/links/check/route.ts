@@ -1,3 +1,4 @@
+import { withAnonymousUse } from "@/lib/anonymous-use";
 import { after, NextResponse } from "next/server";
 import { errorResponse, readJson } from "@/lib/api-response";
 import { track } from "@/lib/analytics";
@@ -7,7 +8,7 @@ import { urlInputSchema } from "@/modules/links/schemas";
 
 export const runtime = "nodejs";
 
-export async function POST(request: Request) {
+async function handlePost(request: Request) {
   const startedAt = performance.now();
   try {
     const rateHeaders = await enforceRateLimit(request, "links-check");
@@ -40,3 +41,5 @@ export async function POST(request: Request) {
     });
   }
 }
+
+export async function POST(request: Request) { return withAnonymousUse(request, () => handlePost(request)); }

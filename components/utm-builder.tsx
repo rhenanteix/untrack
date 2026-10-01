@@ -1,4 +1,5 @@
 "use client";
+import { GuestAccessNotice } from "@/components/guest-access-notice";
 
 import { FormEvent, useState } from "react";
 import Link from "next/link";
@@ -90,6 +91,7 @@ export function UtmBuilder() {
         <button className="button full-field" type="submit" disabled={loading}>
           {loading ? "Criando..." : "Criar URL com UTM"}
         </button>
+        <GuestAccessNotice error={error} />
         {error && (
           <p className="form-error full-field" role="alert">
             {error}

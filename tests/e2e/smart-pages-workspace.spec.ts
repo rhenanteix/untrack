@@ -1,3 +1,4 @@
+import { grantTestPremium, testDatabase } from "../helpers/premium";
 import { randomUUID } from "node:crypto";
 import { expect, test } from "@playwright/test";
 
@@ -17,6 +18,10 @@ async function register(
     },
   });
   expect(result.status(), await result.text()).toBe(200);
+  const workspace = await (
+    await request.get(`${baseURL}/api/workspaces`)
+  ).json();
+  await grantTestPremium(workspace.activeId);
 }
 
 test("Smart Pages loads, previews profile changes, saves and publishes", async ({
@@ -56,14 +61,20 @@ test("Smart Pages loads, previews profile changes, saves and publishes", async (
   await page
     .getByRole("button", { name: "Usar modelo Atelier", exact: true })
     .click();
-  await page.getByRole("button", { name: "Prévia", exact: true }).click();
+  if (
+    await page.getByRole("button", { name: "Prévia", exact: true }).isVisible()
+  )
+    await page.getByRole("button", { name: "Prévia", exact: true }).click();
   await expect(page.locator(".smart-page-preview strong")).toHaveText(
     "Aurora Design",
   );
   await expect(
     page.locator('.smart-page-preview [data-theme="editorial"]'),
   ).toBeVisible();
-  await page.getByRole("button", { name: "Editor", exact: true }).click();
+  if (
+    await page.getByRole("button", { name: "Editor", exact: true }).isVisible()
+  )
+    await page.getByRole("button", { name: "Editor", exact: true }).click();
   await page
     .getByRole("button", { name: "Salvar perfil", exact: true })
     .click();
@@ -397,5 +408,191 @@ test("server conflicts and invalid social URLs point to the correct form field",
     await expect(linkedin).toHaveAttribute("aria-invalid", "false");
   } finally {
     await other.close();
+  }
+});
+
+test("live card customization, upload isolation, reorder and downgrade", async ({
+  page,
+  context,
+  browser,
+  baseURL,
+}, testInfo) => {
+  await register(context.request, baseURL!);
+  const created = await context.request.post("/api/smart-pages", {
+    data: { title: "Cartão ao vivo", slug: `card-${randomUUID().slice(0, 8)}` },
+  });
+  expect(created.status()).toBe(201);
+  const record = await created.json();
+  await context.request.post(`/api/smart-pages/${record.id}/blocks`, {
+    data: {
+      type: "link",
+      settings: { title: "Portfólio", destinationUrl: "https://example.com" },
+    },
+  });
+  await page.goto("/untrack/smart-pages");
+  await page.getByRole("button", { name: /Cartão ao vivo/ }).click();
+  const name = page.locator('.smart-page-profile-form input[name="title"]');
+  await name.fill("Meu novo cartão");
+  await expect(page.locator(".smart-page-preview strong")).toHaveText(
+    "Meu novo cartão",
+  );
+  const sharp = (await import("sharp")).default;
+  const image = await sharp({
+    create: { width: 64, height: 64, channels: 3, background: "#336699" },
+  })
+    .png()
+    .toBuffer();
+  await page
+    .locator('input[type="file"]')
+    .setInputFiles({
+      name: "avatar.png",
+      mimeType: "image/png",
+      buffer: image,
+    });
+  await expect(
+    page.locator('.smart-page-profile-form input[name="avatarUrl"]'),
+  ).toHaveValue(/api\/smart-page-images/);
+  const avatarUrl = await page
+    .locator('.smart-page-profile-form input[name="avatarUrl"]')
+    .inputValue();
+  const visitor = await browser.newContext();
+  expect((await visitor.request.get(avatarUrl)).status()).toBe(404);
+  await page.getByRole("button", { name: "Modelos", exact: true }).click();
+  await page.getByLabel("Alinhamento", { exact: true }).selectOption("left");
+  await page.getByLabel("Tipografia", { exact: true }).selectOption("serif");
+  await page.getByRole("button", { name: "Subir Nome", exact: true }).click();
+  await expect(
+    page.locator('.smart-page-preview [data-alignment="left"]'),
+  ).toBeVisible();
+  await expect(
+    page.locator(".smart-page-preview [data-section]").first(),
+  ).toHaveAttribute("data-section", "title");
+  await page
+    .getByRole("button", { name: "Salvar perfil", exact: true })
+    .click();
+  await expect(page.getByText("Perfil salvo.", { exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Links", exact: true }).click();
+  await page
+    .locator('.smart-page-block-list input[name="title"]')
+    .fill("Projeto em tempo real");
+  await expect(page.locator(".smart-page-preview")).toContainText(
+    "Projeto em tempo real",
+  );
+  await page.getByRole("button", { name: "Salvar", exact: true }).click();
+  await expect(
+    page.getByText("Link atualizado.", { exact: true }),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "Publicar", exact: true }).click();
+  await expect(
+    page.getByText("Página publicada.", { exact: true }),
+  ).toBeVisible();
+  expect((await visitor.request.get(avatarUrl)).headers()["content-type"]).toBe(
+    "image/webp",
+  );
+  await page.getByRole("button", { name: "Modelos", exact: true }).click();
+  await page.screenshot({
+    path: testInfo.outputPath("live-card-editor.png"),
+    fullPage: true,
+  });
+  const publicPage = await visitor.newPage();
+  await publicPage.goto(`/page/${record.slug}`);
+  await expect(publicPage.locator('[data-layout="card"]')).toBeVisible();
+  await expect(
+    publicPage.getByRole("heading", { name: "Meu novo cartão" }),
+  ).toBeVisible();
+  await publicPage.screenshot({
+    path: testInfo.outputPath("profile-card.png"),
+    fullPage: true,
+  });
+  const workspace = await (await context.request.get("/api/workspaces")).json();
+  await testDatabase((db) =>
+    db.workspace.update({
+      where: { id: workspace.activeId },
+      data: { plan: "free" },
+    }),
+  );
+  expect(
+    (
+      await context.request.patch(`/api/smart-pages/${record.id}`, {
+        data: { title: "Blocked" },
+      })
+    ).status(),
+  ).toBe(403);
+  expect(
+    (
+      await context.request.post(`/api/smart-pages/${record.id}/images`, {
+        headers: { "Content-Type": "image/png" },
+        data: image,
+      })
+    ).status(),
+  ).toBe(403);
+  expect(
+    (
+      await context.request.post(`/api/smart-pages/${record.id}/publish`, {
+        data: { published: false },
+      })
+    ).status(),
+  ).toBe(200);
+  expect((await visitor.request.get(avatarUrl)).status()).toBe(404);
+  await visitor.close();
+});
+
+test("anonymous allowance is shared and atomic; a free account cannot create premium pages", async ({
+  browser,
+  baseURL,
+}) => {
+  const guest = await browser.newContext({
+    extraHTTPHeaders: {
+      "x-real-ip": `198.19.${Math.floor(Math.random() * 250)}.${Math.floor(Math.random() * 250)}`,
+    },
+  });
+  try {
+    const results = await Promise.all([
+      guest.request.post(`${baseURL}/api/links/analyze`, {
+        data: { url: "https://example.com/?utm_source=test" },
+      }),
+      guest.request.post(`${baseURL}/api/links/clean`, {
+        data: { url: "https://example.org" },
+      }),
+    ]);
+    expect(results.map((r) => r.status()).sort()).toEqual([200, 401]);
+    expect(
+      (
+        await guest.request.post(`${baseURL}/api/utm/generate`, {
+          data: {
+            url: "https://example.net",
+            source: "test",
+            medium: "social",
+            campaign: "launch",
+          },
+        })
+      ).status(),
+    ).toBe(401);
+    const signup = await guest.request.post(
+      `${baseURL}/api/auth/sign-up/email`,
+      {
+        headers: { origin: baseURL! },
+        data: {
+          name: "Free account",
+          email: `free-${randomUUID()}@example.com`,
+          password: "Senha de teste forte! 2026",
+        },
+      },
+    );
+    expect(signup.status()).toBe(200);
+    expect(
+      (
+        await guest.request.post(`${baseURL}/api/links/analyze`, {
+          data: { url: "https://example.org" },
+        })
+      ).status(),
+    ).toBe(200);
+    const premium = await guest.request.post(`${baseURL}/api/smart-pages`, {
+      data: { title: "Premium", slug: `free-${randomUUID().slice(0, 8)}` },
+    });
+    expect(premium.status()).toBe(403);
+    expect((await premium.json()).code).toBe("PREMIUM_REQUIRED");
+  } finally {
+    await guest.close();
   }
 });

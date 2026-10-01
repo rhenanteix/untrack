@@ -67,3 +67,5 @@ it.each([429, 503])("respeita bloqueio do rate limiter: %s", async (status) => {
   );
   expect(mocks.analyze).not.toHaveBeenCalled();
 });
+
+vi.mock("@/lib/anonymous-use", () => ({ withAnonymousUse: (_request: Request, action: () => Promise<Response>) => action() }));

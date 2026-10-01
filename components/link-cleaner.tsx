@@ -1,4 +1,5 @@
 "use client";
+import { GuestAccessNotice } from "@/components/guest-access-notice";
 
 import { FormEvent, useEffect, useState } from "react";
 import Link from "next/link";
@@ -191,6 +192,7 @@ export function LinkCleaner() {
             ))}
           </div>
         </fieldset>
+        <GuestAccessNotice error={error} />
         {error && (
           <p className="form-error" id="url-error" role="alert">
             {error}

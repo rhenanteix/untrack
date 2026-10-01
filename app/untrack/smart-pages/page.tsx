@@ -1,3 +1,5 @@
+import Link from "next/link";
+import { hasSmartPages, smartPagesPrice } from "@/modules/billing/plans";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { SmartPagesDashboard } from "@/components/untrack/smart-pages-dashboard";
@@ -16,7 +18,7 @@ import { actorFor } from "@/modules/workspaces/context";
 async function loadPageData(requestHeaders: Headers, userId: string) {
   try {
     const actor = await actorFor(userId, requestHeaders);
-    const [initial, managedLinks] = await Promise.all([
+    const [initial, managedLinks, workspace] = await Promise.all([
       listSmartPages(actor, 1),
       getPrisma().shortLink.findMany({
         where: { workspaceId: actor.workspaceId, distribution: "digital" },
@@ -24,8 +26,12 @@ async function loadPageData(requestHeaders: Headers, userId: string) {
         take: 100,
         select: { id: true, title: true, slug: true, destinationUrl: true },
       }),
+      getPrisma().workspace.findUniqueOrThrow({
+        where: { id: actor.workspaceId },
+        select: { plan: true },
+      }),
     ]);
-    return { ok: true as const, actor, initial, managedLinks };
+    return { ok: true as const, actor, initial, managedLinks, workspace };
   } catch (error) {
     const failure = workspaceLoadError(error);
     if (!["WORKSPACE_FORBIDDEN", "INVALID_WORKSPACE"].includes(failure.code))
@@ -40,25 +46,57 @@ export default async function SmartPagesPage() {
   if (!session) redirect("/entrar?next=/untrack/smart-pages");
   const data = await loadPageData(requestHeaders, session.user.id);
   if (!data.ok) return <WorkspaceLoadError {...data.error} />;
-  const { actor, initial, managedLinks } = data;
+  const { actor, initial, managedLinks, workspace } = data;
+  const premium = hasSmartPages(workspace.plan);
   return (
-    <SmartPagesDashboard
-      canEdit={actor.role !== "viewer"}
-      publicOrigin={appUrl().origin}
-      initial={{
-        ...initial,
-        items: initial.items.map((page) => ({
-          ...page,
-          publishedAt: page.publishedAt?.toISOString() ?? null,
-          createdAt: page.createdAt.toISOString(),
-          updatedAt: page.updatedAt.toISOString(),
-          theme: smartPageThemeSchema.safeParse(page.theme).data ?? {
-            preset: "minimal",
-          },
-          socialLinks: socialLinksSchema.safeParse(page.socialLinks).data ?? [],
-        })),
-      }}
-      managedLinks={managedLinks}
-    />
+    <>
+      {!premium && (
+        <section className="sp-premium-banner">
+          <span className="eyebrow">Smart Pages Premium</span>
+          <h1>Seu perfil merece um cartão à altura.</h1>
+          <p>
+            21 modelos, editor visual, foto personalizada e links para tudo o
+            que você faz.
+          </p>
+          <strong>{smartPagesPrice}</strong>
+          <p>
+            Preço previsto. Cobrança ainda não disponível. Nenhum pagamento será
+            solicitado agora.
+          </p>
+          <Link className="button button-secondary" href="/untrack/usage">
+            Ver plano e cotas
+          </Link>
+          <p>
+            Se você já possui páginas, elas continuam acessíveis. Criar ou
+            editar exige um workspace premium.
+          </p>
+        </section>
+      )}
+      <SmartPagesDashboard
+        canEdit={premium && actor.role !== "viewer"}
+        canUnpublish={actor.role !== "viewer"}
+        readOnlyReason={
+          !premium
+            ? "Seu plano permite consultar as páginas existentes. Criar e editar faz parte do Smart Pages Premium."
+            : undefined
+        }
+        publicOrigin={appUrl().origin}
+        initial={{
+          ...initial,
+          items: initial.items.map((page) => ({
+            ...page,
+            publishedAt: page.publishedAt?.toISOString() ?? null,
+            createdAt: page.createdAt.toISOString(),
+            updatedAt: page.updatedAt.toISOString(),
+            theme: smartPageThemeSchema.safeParse(page.theme).data ?? {
+              preset: "minimal",
+            },
+            socialLinks:
+              socialLinksSchema.safeParse(page.socialLinks).data ?? [],
+          })),
+        }}
+        managedLinks={managedLinks}
+      />
+    </>
   );
 }
