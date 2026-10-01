@@ -8,11 +8,13 @@
   --ws-line: #dfe5df;
   --ws-bg: #f5f7f3;
   --ws-panel: #fff;
-  --ws-radius: 12px;
+  --ws-radius: 8px;
   --ws-green: #285239;
   --ws-lime: #e8f6b2;
+  --ws-accent: #d4ef7a;
+  --ws-accent-soft: #f1f7dd;
   display: grid;
-  grid-template-columns: 232px minmax(0, 1fr);
+  grid-template-columns: 248px minmax(0, 1fr);
   align-items: start;
   min-height: 100svh;
   background: var(--ws-bg);
@@ -25,25 +27,27 @@
   overflow: auto;
   display: flex;
   flex-direction: column;
-  gap: 18px;
-  padding: 22px 14px;
+  gap: 20px;
+  padding: 22px 16px;
   border-right: 1px solid var(--ws-line);
   background: #fafbf8;
 }
 .product-brand {
-  font-size: 18px;
+  font-size: 17px;
+  font-weight: 800;
 }
 .product-main {
   min-width: 0;
 }
 .product-nav {
   display: grid;
-  gap: 20px;
+  gap: 16px;
 }
 .product-nav a {
   font-size: 13px;
-  min-height: 40px;
-  padding: 10px 12px;
+  font-weight: 650;
+  min-height: 38px;
+  padding: 9px 12px;
   border-radius: 8px;
 }
 .product-nav a[aria-current="page"] {
@@ -53,7 +57,8 @@
 }
 .workspace-nav-label {
   font-size: 10px;
-  letter-spacing: 1px;
+  font-weight: 800;
+  letter-spacing: 0;
   color: var(--ws-muted);
 }
 .product-account-menu,
@@ -99,9 +104,9 @@
 }
 .workspace-page,
 .product-main > .shell.page-section {
-  width: min(1320px, calc(100% - 56px));
+  width: min(1240px, calc(100% - 56px));
   margin: 0 auto;
-  padding: 28px 0 48px;
+  padding: 36px 0 56px;
 }
 .workspace-page-heading,
 .product-main .page-heading {
@@ -111,19 +116,31 @@
   gap: 18px;
   margin: 0 0 24px;
 }
+.workspace-overview-heading {
+  align-items: end;
+  margin-bottom: 28px;
+}
+.workspace-heading-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
 .workspace-page h1,
 .product-main .page-heading h1,
 .product-main .dashboard-heading h1 {
-  font-size: 26px;
-  letter-spacing: -0.7px;
-  line-height: 1.2;
+  font-size: 32px;
+  font-weight: 750;
+  letter-spacing: 0;
+  line-height: 1.15;
   margin: 0 0 8px;
 }
 .workspace-page h2,
 .workspace-panel h2 {
-  font-size: 16px;
-  line-height: 1.4;
-  margin: 0 0 12px;
+  font-size: 18px;
+  font-weight: 750;
+  line-height: 1.3;
+  margin: 0;
 }
 .workspace-page-heading p,
 .product-main .page-heading p {
@@ -137,61 +154,113 @@
 }
 .workspace-page .eyebrow {
   font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0;
   margin-bottom: 10px;
 }
 .workspace-data-note {
   font-size: 11px;
   color: var(--ws-muted);
 }
+.workspace-snapshot {
+  display: grid;
+  grid-template-columns: minmax(210px, 0.7fr) minmax(0, 1.8fr);
+  gap: 28px;
+  align-items: end;
+  margin-bottom: 28px;
+  border-bottom: 1px solid var(--ws-line);
+  padding-bottom: 28px;
+}
+.workspace-section-intro h2 {
+  margin: 0 0 8px;
+}
+.workspace-section-intro p {
+  max-width: 310px;
+  margin: 0;
+  color: var(--ws-muted);
+  font-size: 13px;
+}
 .workspace-kpis {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 12px;
-  margin: 16px 0 24px;
+  gap: 8px;
+  margin: 0;
 }
 .workspace-kpis > div {
   display: grid;
-  gap: 12px;
-  background: var(--ws-panel);
-  border: 1px solid var(--ws-line);
-  padding: 20px;
-  border-radius: var(--ws-radius);
+  align-content: start;
+  gap: 6px;
+  min-height: 132px;
+  border-left: 2px solid var(--ws-accent);
+  background: #fafcf7;
+  padding: 16px;
 }
-.workspace-kpis span {
+.workspace-kpis dt,
+.workspace-kpis small {
   font-size: 12px;
   color: var(--ws-muted);
 }
-.workspace-kpis strong {
+.workspace-kpis dd {
+  margin: 2px 0;
   font-size: 30px;
-  letter-spacing: -1px;
+  font-weight: 750;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0;
+  line-height: 1.1;
+}
+.workspace-kpis small {
+  line-height: 1.35;
+}
+.workspace-priority-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.35fr) minmax(280px, 0.65fr);
+  gap: 18px;
+  align-items: stretch;
+  margin-bottom: 18px;
 }
 .workspace-overview-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 18px;
 }
+.workspace-activity-grid {
+  margin-top: 18px;
+}
 .workspace-panel {
   border: 1px solid var(--ws-line);
   border-radius: var(--ws-radius);
   background: var(--ws-panel);
-  padding: 22px;
-  margin-bottom: 16px;
+  padding: 20px;
   min-width: 0;
 }
 .workspace-panel p {
   font-size: 13px;
   color: var(--ws-muted);
 }
-.workspace-panel ul {
+.workspace-panel ul,
+.workspace-panel ol {
   list-style: none;
   padding: 0;
   margin: 0;
 }
-.workspace-checklist li {
+.workspace-panel-heading {
   display: flex;
+  justify-content: space-between;
+  align-items: start;
+  gap: 16px;
+  margin-bottom: 18px;
+}
+.workspace-panel-heading p {
+  max-width: 250px;
+  margin: 0;
+  text-align: right;
+}
+.workspace-checklist li {
+  display: grid;
+  grid-template-columns: 24px minmax(0, 1fr) auto;
   align-items: center;
   gap: 12px;
-  padding: 12px 0;
+  padding: 13px 0;
   border-bottom: 1px solid #edf0eb;
   font-size: 13px;
 }
@@ -203,6 +272,64 @@
   background: var(--ws-lime);
   border-radius: 50%;
   color: var(--ws-green);
+}
+.workspace-checklist li small {
+  color: var(--ws-muted);
+  font-size: 11px;
+}
+.workspace-checklist li a {
+  font-weight: 700;
+  text-decoration: none;
+}
+.workspace-checklist li:not(:has(span[aria-label="Concluído"])) span {
+  background: #f0f2ed;
+  color: #79847d;
+}
+.workspace-attention {
+  border-color: #e3e0cd;
+  background: #fffef9;
+}
+.workspace-attention-list {
+  display: grid;
+  gap: 12px;
+}
+.workspace-attention-list li {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  border-top: 1px solid #ece8d8;
+  padding-top: 14px;
+}
+.workspace-attention-list li:first-child {
+  border-top: 0;
+  padding-top: 0;
+}
+.workspace-attention-list a {
+  font-weight: 700;
+}
+.workspace-attention-list p {
+  margin: 4px 0 0;
+}
+.workspace-attention-empty {
+  display: grid;
+  gap: 6px;
+  min-height: 118px;
+  align-content: center;
+  border-top: 1px solid #ece8d8;
+}
+.workspace-attention-empty strong {
+  font-size: 14px;
+}
+.workspace-attention-empty p {
+  margin: 0;
+}
+.workspace-inline-link {
+  align-self: center;
+  color: var(--ws-green);
+  font-size: 12px;
+  font-weight: 750;
+  text-decoration: none;
+  white-space: nowrap;
 }
 .workspace-recent li {
   display: flex;

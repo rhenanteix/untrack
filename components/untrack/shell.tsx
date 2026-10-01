@@ -15,16 +15,37 @@ interface Membership {
   role: string;
   workspace: { id: string; name: string; plan: string };
 }
+
+const administrationItems = [
+  { href: "/untrack/members", label: "Equipe" },
+  { href: "/untrack/domains", label: "Domínios" },
+  { href: "/untrack/usage", label: "Plano e cotas" },
+  { href: "/untrack/audit", label: "Auditoria" },
+  { href: "/untrack/api", label: "API" },
+];
+
 const groups = [
   {
-    label: "Workspace",
+    label: "Planejar",
     collapsible: false,
     items: [
       { href: "/conta", label: "Visão geral" },
       { href: "/untrack/clients", label: "Clientes" },
       { href: "/untrack/campaigns", label: "Campanhas" },
+    ],
+  },
+  {
+    label: "Publicar",
+    collapsible: false,
+    items: [
       { href: "/untrack/short-links", label: "Links" },
       { href: "/untrack/smart-pages", label: "Smart Pages" },
+    ],
+  },
+  {
+    label: "Distribuir e acompanhar",
+    collapsible: false,
+    items: [
       { href: "/untrack/utm", label: "Construtor UTM" },
       { href: "/untrack/qr", label: "QR Codes" },
       { href: "/untrack/link-health", label: "Qualidade" },
@@ -33,13 +54,7 @@ const groups = [
   {
     label: "Administração",
     collapsible: true,
-    items: [
-      { href: "/untrack/members", label: "Equipe" },
-      { href: "/untrack/domains", label: "Domínios" },
-      { href: "/untrack/usage", label: "Plano e cotas" },
-      { href: "/untrack/audit", label: "Auditoria" },
-      { href: "/untrack/api", label: "API" },
-    ],
+    items: administrationItems,
   },
 ];
 const roleNames: Record<string, string> = {
@@ -126,7 +141,7 @@ export function WorkspaceShell({ children }: { children: ReactNode }) {
     return items
       .filter(
         (item) =>
-          !groups[1].items.some((admin) => admin.href === item.href) ||
+          !administrationItems.some((admin) => admin.href === item.href) ||
           item.href === "/untrack/usage" ||
           ["owner", "admin"].includes(current?.role ?? ""),
       )

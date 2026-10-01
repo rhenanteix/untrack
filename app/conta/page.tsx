@@ -85,85 +85,173 @@ export default async function AccountPage() {
   const data = await overview(session.user.id, requestHeaders);
   if (!data.ok) return <WorkspaceLoadError {...data.error} />;
   const canWrite = data.actor.role !== "viewer";
+  const metrics = [
+    {
+      label: "Links",
+      value: data.links,
+      detail: "destinos prontos para compartilhar",
+    },
+    {
+      label: "Campanhas",
+      value: data.campaigns,
+      detail: "iniciativas organizadas no workspace",
+    },
+    {
+      label: "Páginas publicadas",
+      value: data.pages,
+      detail: "experiências públicas ativas",
+    },
+    {
+      label: "Cliques nos últimos 30 dias",
+      value: data.clicks,
+      detail: "interações registradas nos seus links",
+    },
+  ];
+  const nextSteps = [
+    {
+      label: "Criar seu primeiro cliente",
+      count: data.clients,
+      href: "/untrack/clients",
+    },
+    {
+      label: "Preparar uma campanha",
+      count: data.campaigns,
+      href: "/untrack/campaigns",
+    },
+    {
+      label: "Criar um link",
+      count: data.links,
+      href: "/untrack/short-links",
+    },
+    {
+      label: "Publicar uma Smart Page",
+      count: data.pages,
+      href: "/untrack/smart-pages",
+    },
+  ];
   return (
-    <section className="workspace-page">
-      <header className="workspace-page-heading">
+    <section className="workspace-page workspace-overview">
+      <header className="workspace-page-heading workspace-overview-heading">
         <div>
-          <span className="eyebrow">Visão geral</span>
+          <span className="eyebrow">Central de operações</span>
           <h1>{data.workspace.name}</h1>
-          <p>Ativos, atividade e próximos passos do seu workspace.</p>
+          <p>
+            Acompanhe seus ativos, resolva o que exige atenção e avance para a
+            próxima ação.
+          </p>
         </div>
-        {canWrite && (
-          <details className="create-menu">
-            <summary className="button">+ Criar</summary>
-            <div>
-              <Link href="/untrack/short-links?create=1">Link</Link>
-              <Link href="/untrack/campaigns?create=1">Campanha</Link>
-              <Link href="/untrack/smart-pages?create=1">Smart Page</Link>
-              <Link href="/untrack/clients">Cliente</Link>
-            </div>
-          </details>
-        )}
+        <div className="workspace-heading-actions">
+          <Link className="button button-secondary" href="/untrack/short-links">
+            Ver links
+          </Link>
+          {canWrite && (
+            <details className="create-menu">
+              <summary className="button">Criar</summary>
+              <div>
+                <Link href="/untrack/short-links?create=1">Novo link</Link>
+                <Link href="/untrack/campaigns?create=1">
+                  Nova campanha
+                </Link>
+                <Link href="/untrack/smart-pages?create=1">
+                  Nova Smart Page
+                </Link>
+                <Link href="/untrack/clients">Novo cliente</Link>
+              </div>
+            </details>
+          )}
+        </div>
       </header>
-      <p className="workspace-data-note">
-        Origem: registros do workspace. Cliques dos últimos 30 dias; ativos
-        representam o total atual.
-      </p>
-      <div id="insights" className="workspace-kpis">
-        {[
-          ["Links", data.links],
-          ["Campanhas", data.campaigns],
-          ["Páginas publicadas", data.pages],
-          ["Cliques · 30 dias", data.clicks],
-        ].map(([label, value]) => (
-          <div key={label}>
-            <span>{label}</span>
-            <strong>{value}</strong>
+      <section className="workspace-snapshot" aria-labelledby="workspace-snapshot-heading">
+        <div className="workspace-section-intro">
+          <span className="eyebrow">Panorama</span>
+          <h2 id="workspace-snapshot-heading">O que está em movimento</h2>
+          <p>
+            Os números combinam o total atual de ativos com a atividade recente.
+          </p>
+        </div>
+        <dl id="insights" className="workspace-kpis">
+          {metrics.map((metric) => (
+            <div key={metric.label}>
+              <dt>{metric.label}</dt>
+              <dd>{metric.value}</dd>
+              <small>{metric.detail}</small>
+            </div>
+          ))}
+        </dl>
+      </section>
+      <div className="workspace-priority-grid">
+        <section className="workspace-panel workspace-next-steps">
+          <div className="workspace-panel-heading">
+            <div>
+              <span className="eyebrow">Próxima ação</span>
+              <h2>Organize sua base</h2>
+            </div>
+            <p>Complete o essencial na ordem que faz sentido para o seu time.</p>
           </div>
-        ))}
-      </div>
-      <div className="workspace-overview-grid">
-        <section className="workspace-panel">
-          <h2>Próximos passos</h2>
-          <p>Seu progresso acompanha os registros salvos.</p>
-          <ul className="workspace-checklist">
-            {[
-              ["Criar seu primeiro cliente", data.clients, "/untrack/clients"],
-              ["Preparar uma campanha", data.campaigns, "/untrack/campaigns"],
-              ["Criar um link", data.links, "/untrack/short-links"],
-              ["Publicar sua página", data.pages, "/untrack/smart-pages"],
-            ].map(([label, count, href]) => (
-              <li key={label}>
-                <span aria-label={Number(count) > 0 ? "Concluído" : "Pendente"}>
-                  {Number(count) > 0 ? "✓" : "○"}
-                </span>
-                <Link href={String(href)}>{label}</Link>
-              </li>
-            ))}
-          </ul>
+          <ol className="workspace-checklist">
+            {nextSteps.map((step) => {
+              const done = step.count > 0;
+              return (
+                <li key={step.label}>
+                  <span aria-label={done ? "Concluído" : "Pendente"}>
+                    {done ? "✓" : "○"}
+                  </span>
+                  <Link href={step.href}>{step.label}</Link>
+                  <small>{done ? "Concluído" : "Pendente"}</small>
+                </li>
+              );
+            })}
+          </ol>
         </section>
-        <section className="workspace-panel">
-          <h2>Pendências verificadas</h2>
+        <section className="workspace-panel workspace-attention">
+          <div className="workspace-panel-heading">
+            <div>
+              <span className="eyebrow">Atenção</span>
+              <h2>Itens para acompanhar</h2>
+            </div>
+            <p>Ocorrências confirmadas pela monitoração das suas campanhas.</p>
+          </div>
           {data.incidents.length ? (
-            <ul>
+            <ul className="workspace-attention-list">
               {data.incidents.map((item) => (
                 <li key={item.id}>
-                  <Link href={`/untrack/campaigns/${item.campaignId}`}>
-                    {item.campaign.name}
+                  <div>
+                    <Link href={`/untrack/campaigns/${item.campaignId}`}>
+                      {item.campaign.name}
+                    </Link>
+                    <p>{item.message}</p>
+                  </div>
+                  <Link
+                    className="workspace-inline-link"
+                    href={`/untrack/campaigns/${item.campaignId}`}
+                  >
+                    Ver campanha
                   </Link>
-                  <p>{item.message}</p>
                 </li>
               ))}
             </ul>
           ) : (
-            <p>
-              Nenhum incidente aberto e confirmado. Isso não substitui uma
-              verificação de todos os ativos.
-            </p>
+            <div className="workspace-attention-empty">
+              <strong>Nenhuma pendência confirmada.</strong>
+              <p>
+                As campanhas monitoradas não têm incidentes abertos neste
+                momento.
+              </p>
+            </div>
           )}
         </section>
+      </div>
+      <div className="workspace-overview-grid workspace-activity-grid">
         <section className="workspace-panel">
-          <h2>Ativos recentes</h2>
+          <div className="workspace-panel-heading">
+            <div>
+              <span className="eyebrow">Retome o trabalho</span>
+              <h2>Ativos recentes</h2>
+            </div>
+            <Link className="workspace-inline-link" href="/untrack/short-links">
+              Ver biblioteca
+            </Link>
+          </div>
           <ul className="workspace-recent">
             {data.recentLinks.map((item) => (
               <li key={item.id}>
@@ -190,7 +278,12 @@ export default async function AccountPage() {
           )}
         </section>
         <section className="workspace-panel">
-          <h2>Atividade recente</h2>
+          <div className="workspace-panel-heading">
+            <div>
+              <span className="eyebrow">Registro</span>
+              <h2>Atividade recente</h2>
+            </div>
+          </div>
           <ul className="workspace-recent">
             {data.activity.map((item) => (
               <li key={item.id}>
