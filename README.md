@@ -93,7 +93,7 @@ opcional de `rolldown`, resolvida pelo npm conforme a plataforma.
 | `ANALYTICS_CONSOLE`        | não          | `true` registra eventos no console quando Prisma está off   |
 | `RATE_LIMIT_REQUESTS`      | não          | requisições por janela, padrão `100`                        |
 | `RATE_LIMIT_WINDOW`        | não          | janela em segundos, padrão `3600`                           |
-| `WHATSAPP_INTELLIGENCE`    | não          | `true` habilita o módulo WhatsApp Intelligence              |
+| `WHATSAPP_INTELLIGENCE`    | não          | `false` desabilita o módulo WhatsApp Intelligence           |
 
 A chave de persistência é `ANALYTICS_PERSISTENCE=prisma`. Não coloque segredos
 `UPSTASH_*` ou `DATABASE_URL` no cliente nem no repositório.

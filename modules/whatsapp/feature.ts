@@ -1,7 +1,7 @@
 import { ApiError } from "@/lib/api-response";
 
 export function isWhatsAppIntelligenceEnabled() {
-  return process.env.WHATSAPP_INTELLIGENCE === "true";
+  return process.env.WHATSAPP_INTELLIGENCE !== "false";
 }
 
 export function requireWhatsAppIntelligence() {
