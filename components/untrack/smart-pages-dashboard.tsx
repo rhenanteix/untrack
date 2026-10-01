@@ -4,9 +4,11 @@ import { useEffect, useRef, useState, type FormEvent } from "react";
 import { CopyButton } from "@/components/copy-button";
 import { ActionStatus, apiRequest, useAction } from "./shared";
 
+import { PageDesign } from "@/components/smart-pages/page-design";
+import { ThemeGallery } from "@/components/smart-pages/theme-gallery";
+import type { SmartPageTheme } from "@/modules/smart-pages/themes";
+
 type PageStatus = "draft" | "published";
-type ThemePreset =
-  "minimal" | "creator" | "business" | "dark" | "editorial" | "bold";
 type SocialNetwork =
   | "instagram"
   | "tiktok"
@@ -16,15 +18,6 @@ type SocialNetwork =
   | "facebook"
   | "whatsapp"
   | "website";
-
-const themePresets: { value: ThemePreset; label: string }[] = [
-  { value: "minimal", label: "Minimal" },
-  { value: "creator", label: "Creator" },
-  { value: "business", label: "Business" },
-  { value: "dark", label: "Dark" },
-  { value: "editorial", label: "Editorial" },
-  { value: "bold", label: "Bold" },
-];
 
 const socialNetworks: { value: SocialNetwork; label: string }[] = [
   { value: "instagram", label: "Instagram" },
@@ -43,7 +36,7 @@ interface SmartPageSummary {
   title: string;
   description: string;
   avatarUrl: string | null;
-  theme: { preset: ThemePreset };
+  theme: SmartPageTheme;
   socialLinks: { network: SocialNetwork; url: string }[];
   status: PageStatus;
   publishedAt: string | null;
@@ -99,38 +92,31 @@ function publicUrl(slug: string) {
 }
 
 function SmartPagePreview({ page }: { page: SmartPageDetail }) {
+  const visible = page.blocks.filter(
+    (block) =>
+      block.visible &&
+      (!block.link ||
+        (block.link.isActive &&
+          (!block.link.expiresAt ||
+            new Date(block.link.expiresAt) > new Date()))),
+  );
   return (
-    <div
-      className={`smart-page-preview smart-page-theme-${page.theme.preset}`}
-      aria-label="Prévia da Smart Page"
-    >
-      <div className="smart-page-preview-profile">
-        {page.avatarUrl ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={page.avatarUrl} alt="" width={72} height={72} />
-        ) : (
-          <span aria-hidden="true">{page.title.slice(0, 1).toUpperCase()}</span>
-        )}
-        <strong>{page.title}</strong>
-        {page.description ? <small>{page.description}</small> : null}
-      </div>
-      <div className="smart-page-preview-links">
-        {page.blocks
-          .filter((block) => block.visible)
-          .map((block) => (
-            <span key={block.id}>{block.settings.title}</span>
-          ))}
-        {!page.blocks.some((block) => block.visible) ? (
-          <small>Adicione seu primeiro link.</small>
-        ) : null}
-      </div>
-      {page.socialLinks.length ? (
-        <div className="smart-page-preview-socials">
-          {page.socialLinks.map((social) => (
-            <span key={social.network}>{social.network}</span>
-          ))}
-        </div>
-      ) : null}
+    <div className="smart-page-preview" aria-label="Prévia da Smart Page">
+      <PageDesign
+        title={page.title}
+        description={page.description}
+        avatarUrl={page.avatarUrl}
+        theme={page.theme}
+        preview
+        socials={page.socialLinks.map((social) => (
+          <span key={social.network}>{social.network}</span>
+        ))}
+      >
+        {visible.map((block) => (
+          <span key={block.id}>{block.settings.title}</span>
+        ))}
+        {!visible.length && <p>Adicione seu primeiro link.</p>}
+      </PageDesign>
     </div>
   );
 }
@@ -190,9 +176,7 @@ export function SmartPagesDashboard({
       title: String(data.get("title") ?? ""),
       description: String(data.get("description") ?? ""),
       avatarUrl: String(data.get("avatarUrl") ?? "") || null,
-      theme: {
-        preset: String(data.get("themePreset") ?? "minimal") as ThemePreset,
-      },
+      theme: profileDraft.theme ?? selected?.theme ?? { preset: "minimal" },
       socialLinks: socialNetworks.flatMap(({ value }) => {
         const url = String(data.get(`social-${value}`) ?? "").trim();
         return url ? [{ network: value, url }] : [];
@@ -213,7 +197,7 @@ export function SmartPagesDashboard({
       const page = await apiRequest<SmartPageDetail>(`/api/smart-pages/${id}`);
       setSelected({
         ...page,
-        theme: { preset: page.theme?.preset ?? "minimal" },
+        theme: page.theme ?? { preset: "minimal" },
         socialLinks: page.socialLinks ?? [],
       });
       setProfileDraft({});
@@ -280,7 +264,7 @@ export function SmartPagesDashboard({
             title: data.get("title"),
             description: data.get("description"),
             avatarUrl: data.get("avatarUrl") || null,
-            theme: { preset: data.get("themePreset") },
+            theme: profileDraft.theme ?? selected.theme,
             socialLinks,
           }),
         },
@@ -724,19 +708,14 @@ export function SmartPagesDashboard({
                         defaultValue={selected.slug}
                       />
                     </label>
-                    <label>
-                      Tema
-                      <select
-                        name="themePreset"
-                        defaultValue={selected.theme.preset}
-                      >
-                        {themePresets.map((theme) => (
-                          <option key={theme.value} value={theme.value}>
-                            {theme.label}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
+                    <ThemeGallery
+                      value={profileDraft.theme ?? selected.theme}
+                      disabled={!canEdit || action.busy}
+                      onChange={(theme) => {
+                        setProfileDraft((current) => ({ ...current, theme }));
+                        setDirty(true);
+                      }}
+                    />
                     <details className="smart-page-social-details">
                       <summary>Redes sociais (opcional)</summary>
                       <fieldset className="smart-page-social-inputs">

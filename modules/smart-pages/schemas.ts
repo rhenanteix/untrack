@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { themeIds } from "./themes";
 import { webUrlSchema } from "@/modules/validation/url-validation";
 
 const reservedSlugs = new Set(["new", "api", "admin"]);
@@ -19,10 +20,19 @@ export const smartPageStatusSchema = z.enum(["draft", "published"]);
 
 export const smartPageThemeSchema = z
   .object({
-    preset: z.enum(["minimal", "creator", "business", "dark", "editorial", "bold"]).default("minimal"),
-    background: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional(),
-    textColor: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional(),
-    buttonColor: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional(),
+    preset: z.enum(themeIds).default("minimal"),
+    background: z
+      .string()
+      .regex(/^#[0-9a-fA-F]{6}$/)
+      .optional(),
+    textColor: z
+      .string()
+      .regex(/^#[0-9a-fA-F]{6}$/)
+      .optional(),
+    buttonColor: z
+      .string()
+      .regex(/^#[0-9a-fA-F]{6}$/)
+      .optional(),
     buttonRadius: z.number().int().min(0).max(28).optional(),
   })
   .strict();
@@ -31,7 +41,16 @@ export const socialLinksSchema = z
   .array(
     z
       .object({
-        network: z.enum(["instagram", "tiktok", "youtube", "linkedin", "x", "facebook", "whatsapp", "website"]),
+        network: z.enum([
+          "instagram",
+          "tiktok",
+          "youtube",
+          "linkedin",
+          "x",
+          "facebook",
+          "whatsapp",
+          "website",
+        ]),
         url: webUrlSchema,
       })
       .strict(),
@@ -39,7 +58,10 @@ export const socialLinksSchema = z
   .max(8)
   .superRefine((links, context) => {
     if (new Set(links.map((link) => link.network)).size !== links.length) {
-      context.addIssue({ code: "custom", message: "Cada rede pode ser informada apenas uma vez." });
+      context.addIssue({
+        code: "custom",
+        message: "Cada rede pode ser informada apenas uma vez.",
+      });
     }
   });
 
@@ -58,6 +80,7 @@ export const smartPageUpdateSchema = smartPageInputSchema
   .omit({ slug: true })
   .extend({
     slug: smartPageSlugSchema.optional(),
+    description: z.string().trim().max(500).optional(),
     avatarUrl: webUrlSchema.nullable().optional(),
     theme: smartPageThemeSchema.optional(),
     socialLinks: socialLinksSchema.optional(),

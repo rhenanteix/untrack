@@ -52,10 +52,16 @@ test("Smart Pages loads, previews profile changes, saves and publishes", async (
   await expect(
     page.getByRole("button", { name: "Publicar", exact: true }),
   ).toBeDisabled();
+  await page
+    .getByRole("button", { name: "Usar modelo Atelier", exact: true })
+    .click();
   await page.getByRole("button", { name: "Prévia", exact: true }).click();
   await expect(page.locator(".smart-page-preview strong")).toHaveText(
     "Aurora Design",
   );
+  await expect(
+    page.locator('.smart-page-preview [data-theme="editorial"]'),
+  ).toBeVisible();
   await page.getByRole("button", { name: "Editor", exact: true }).click();
   await page
     .getByRole("button", { name: "Salvar perfil", exact: true })
@@ -80,6 +86,23 @@ test("Smart Pages loads, previews profile changes, saves and publishes", async (
   await expect(
     page.getByRole("button", { name: "Copiar endereço", exact: true }),
   ).toBeVisible();
+  const publicPath = await page
+    .getByRole("link", { name: "Abrir página", exact: true })
+    .getAttribute("href");
+  const published = await context.newPage();
+  await published.goto(publicPath!);
+  await expect(published.locator('[data-theme="editorial"]')).toBeVisible();
+  await expect(
+    published.getByRole("heading", { name: "Aurora Design" }),
+  ).toBeVisible();
+  await expect(
+    published.getByRole("link", { name: "Conheça nossos projetos" }),
+  ).toHaveAttribute("href", "https://example.com/portfolio");
+  await published.screenshot({
+    path: testInfo.outputPath("atelier-public.png"),
+    fullPage: true,
+  });
+  await published.close();
   const listing = page.waitForResponse((response) =>
     response.url().includes("/api/smart-pages?page=1&search="),
   );

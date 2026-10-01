@@ -108,3 +108,22 @@ redirects, timeout e limites de resposta.
 
 Para pontuação técnica configurável, razões por check e interface visual, use
 [Link Health](link-health.md) em `/link-health` ou `POST /api/link-health`.
+
+### Modelos de Smart Pages
+
+O editor oferece nove modelos (Studio, Aura, Forma, After Hours, Atelier,
+Amplifica, Botânica, Maré e Café), filtrados por categoria. Escolha o modelo
+em **Identidade visual** e use **Salvar perfil** para persistir a seleção.
+Em páginas publicadas, salvar atualiza a apresentação imediatamente.
+Os exemplos da galeria são demonstrativos; selecionar um modelo preserva
+textos, avatar, links e redes sociais da página.
+
+Galeria, prévia e página pública usam o componente `PageDesign`. Os IDs
+persistidos e metadados estão em `modules/smart-pages/themes.ts`; a aparência
+está em `components/smart-pages/themes.module.css`. IDs antigos continuam
+válidos. A seleção de outro modelo aplica sua paleta padrão; editar outros
+campos preserva eventuais cores personalizadas já salvas. Um PATCH que contém
+apenas `theme` preserva a descrição. A prévia não registra analytics.
+
+Os modelos usam o campo JSON `SmartPage.theme` existente: nenhuma migration,
+variável de ambiente ou serviço externo adicional é necessário.

@@ -15,16 +15,30 @@ export interface Actor {
   role: WorkspaceRole;
 }
 export async function ensurePersonalWorkspace(userId: string) {
-  return getPrisma().workspace.upsert({
-    where: { id: `personal:${userId}` },
-    update: {},
-    create: {
-      id: `personal:${userId}`,
-      name: "Meu workspace",
-      members: { create: { userId, role: "owner" } },
-      usage: { create: { resource: "members", count: 1 } },
-    },
-  });
+  try {
+    return await getPrisma().workspace.upsert({
+      where: { id: `personal:${userId}` },
+      update: {},
+      create: {
+        id: `personal:${userId}`,
+        name: "Meu workspace",
+        members: { create: { userId, role: "owner" } },
+        usage: { create: { resource: "members", count: 1 } },
+      },
+    });
+  } catch (error) {
+    // Nested upserts can race when the layout and API bootstrap concurrently.
+    if (
+      error instanceof Prisma.PrismaClientKnownRequestError &&
+      error.code === "P2002"
+    ) {
+      const existing = await getPrisma().workspace.findUnique({
+        where: { id: `personal:${userId}` },
+      });
+      if (existing) return existing;
+    }
+    throw error;
+  }
 }
 export async function actorFor(
   userId: string,
