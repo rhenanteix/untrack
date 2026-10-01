@@ -7,6 +7,20 @@ enum SmartPageStatus {
   draft
   published
 }
+
+enum ProjectStatus {
+  active
+  archived
+}
+
+enum ProjectResourceType {
+  shortLink
+  smartPage
+  campaign
+  utmLink
+  qrAsset
+}
+
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
@@ -248,6 +262,41 @@ model Workspace {
   deliveries NotificationDelivery[]
   smartPages SmartPage[]
   analyticsEvents AnalyticsEvent[]
+  projects Project[]
+}
+
+model Project {
+  id          String        @id @default(cuid())
+  workspaceId String
+  name        String        @db.VarChar(120)
+  slug        String        @db.VarChar(140)
+  description String        @default("") @db.VarChar(500)
+  icon        String        @default("folder") @db.VarChar(40)
+  color       String        @default("#285239") @db.VarChar(16)
+  status      ProjectStatus @default(active)
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+  archivedAt  DateTime?
+  workspace   Workspace     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  resources   ProjectResource[]
+
+  @@unique([workspaceId, slug])
+  @@unique([id, workspaceId])
+  @@index([workspaceId, status, updatedAt])
+}
+
+model ProjectResource {
+  id           String              @id @default(cuid())
+  workspaceId  String
+  projectId    String
+  resourceType ProjectResourceType
+  resourceId   String
+  createdAt    DateTime            @default(now())
+  project      Project             @relation(fields: [projectId, workspaceId], references: [id, workspaceId], onDelete: Cascade)
+
+  @@unique([projectId, resourceType, resourceId])
+  @@index([projectId, createdAt])
+  @@index([workspaceId, resourceType, resourceId])
 }
 
 model WorkspaceMember {

@@ -12,6 +12,7 @@ export const RESOURCES = [
   "domains",
   "history",
   "smartPages",
+  "projects",
 ] as const;
 export type Resource = (typeof RESOURCES)[number];
 export const PLAN_LIMITS: Record<Plan, Record<Resource, number>> = {
@@ -27,6 +28,7 @@ export const PLAN_LIMITS: Record<Plan, Record<Resource, number>> = {
     domains: 0,
     history: 1000,
     smartPages: 0,
+    projects: 10,
   },
   pro: {
     members: 10,
@@ -40,6 +42,7 @@ export const PLAN_LIMITS: Record<Plan, Record<Resource, number>> = {
     domains: 3,
     history: 20000,
     smartPages: 10,
+    projects: 100,
   },
   business: {
     members: 100,
@@ -53,6 +56,7 @@ export const PLAN_LIMITS: Record<Plan, Record<Resource, number>> = {
     domains: 50,
     history: 200000,
     smartPages: 100,
+    projects: 1000,
   },
 };
 export type Permission = "read" | "write" | "manage" | "owner";

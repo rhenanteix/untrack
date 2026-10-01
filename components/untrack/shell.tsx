@@ -30,6 +30,7 @@ const groups = [
     collapsible: false,
     items: [
       { href: "/conta", label: "Visão geral" },
+      { href: "/untrack/projects", label: "Projetos" },
       { href: "/untrack/clients", label: "Clientes" },
       { href: "/untrack/campaigns", label: "Campanhas" },
     ],
