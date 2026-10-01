@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { headers } from "next/headers";
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { sessionFromHeaders } from "@/lib/session";
 import { actorFor } from "@/modules/workspaces/context";
@@ -41,6 +42,12 @@ export default async function AccountPage() {
         </div>
         <SignOutButton />
       </div>
+      <nav className="account-product-nav" aria-label="Acessos da conta">
+        <Link href="/untrack/smart-pages"><strong>Smart Pages</strong><span>Publique sua página de links</span></Link>
+        <Link href="/untrack/campaigns"><strong>Campanhas</strong><span>Organize canais e resultados</span></Link>
+        <Link href="/encurtar"><strong>Short links</strong><span>Crie e acompanhe redirecionamentos</span></Link>
+        <Link href="/untrack/utm"><strong>UTM e QR</strong><span>Prepare distribuição rastreável</span></Link>
+      </nav>
       <AccountDashboard
         initialLinks={{
           items: links.slice(0, PAGE_SIZE).map(serializeLink),

@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
+import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState, type ReactNode } from "react";
-import { useRouter } from "next/navigation";
 import { apiRequest, useAction, ActionStatus } from "./shared";
 interface Membership {
   role: string;
@@ -14,7 +14,8 @@ export function WorkspaceShell({ children }: { children: ReactNode }) {
     [error, setError] = useState("");
   const [name, setName] = useState("");
   const action = useAction(),
-    router = useRouter();
+    router = useRouter(),
+    pathname = usePathname();
   useEffect(() => {
     apiRequest<{ items: Membership[]; activeId: string | null }>(
       "/api/workspaces",
@@ -33,97 +34,18 @@ export function WorkspaceShell({ children }: { children: ReactNode }) {
     });
     window.location.reload();
   }
-  return (
-    <section className="shell page-section">
-      <div className="page-heading">
-        <span className="eyebrow">Untrack</span>
-        <h1>Workspace</h1>
-        <p>Campanhas, links e distribuições da sua equipe.</p>
-      </div>
-      {loading ? (
-        <p role="status">Carregando workspaces...</p>
-      ) : error ? (
-        <p role="alert">{error}</p>
-      ) : (
-        <div className="tool-card account-form">
-          <label>
-            Workspace ativo
-            <select
-              value={active ?? ""}
-              disabled={action.busy}
-              onChange={(event) =>
-                void action.run(() => select(event.target.value))
-              }
-            >
-              <option value="" disabled>
-                Selecione um workspace
-              </option>
-              {memberships.map((item) => (
-                <option key={item.workspace.id} value={item.workspace.id}>
-                  {item.workspace.name} · {item.role} · {item.workspace.plan}
-                </option>
-              ))}
-            </select>
-          </label>
-          <details>
-            <summary>Criar workspace</summary>
-            <form
-              className="account-form"
-              onSubmit={(event) => {
-                event.preventDefault();
-                void action.run(async () => {
-                  await apiRequest("/api/workspaces", {
-                    method: "POST",
-                    body: JSON.stringify({ action: "create", name }),
-                  });
-                  router.refresh();
-                  window.location.reload();
-                });
-              }}
-            >
-              <label>
-                Nome
-                <input
-                  required
-                  maxLength={120}
-                  value={name}
-                  onChange={(event) => setName(event.target.value)}
-                />
-              </label>
-              <button className="button" disabled={action.busy}>
-                Criar workspace
-              </button>
-            </form>
-          </details>
-          <ActionStatus {...action} />
-        </div>
-      )}
-      <nav className="workspace-nav" aria-label="Módulos Untrack">
-        {[
-          ["members", "Equipe"],
-          ["clients", "Clientes"],
-          ["campaigns", "Campanhas"],
-          ["smart-pages", "Smart Pages"],
-          ["utm", "UTM"],
-          ["links", "Short links"],
-          ["qrs", "QR Codes"],
-          ["domains", "Domínios"],
-          ["usage", "Plano e cotas"],
-          ["audit", "Auditoria"],
-          ["api", "API"],
-        ].map(([path, label]) => (
-          <Link key={path} href={`/untrack/${path}`}>
-            {label}
-          </Link>
-        ))}
-        <Link href="/conta">Analytics</Link>
-        <Link href="/link-health">Checks de links</Link>
-      </nav>
-      {active && !loading ? (
-        children
-      ) : !loading && !error ? (
-        <p>Selecione um workspace para acessar os recursos privados.</p>
-      ) : null}
-    </section>
-  );
+  const groups = [
+    { label: "Visão geral", items: [["/conta", "Visão geral"], ["/untrack/smart-pages", "Smart Pages"], ["/untrack/campaigns", "Campanhas"]] },
+    { label: "Criar e distribuir", items: [["/encurtar", "Short links"], ["/untrack/utm", "UTM"], ["/untrack/qrs", "QR Codes"], ["/link-health", "Link Health"]] },
+    { label: "Gerenciar", items: [["/untrack/clients", "Clientes"], ["/untrack/domains", "Domínios"], ["/untrack/members", "Equipe"], ["/untrack/usage", "Plano e cotas"], ["/untrack/audit", "Auditoria"], ["/untrack/api", "API"]] },
+  ];
+  return <div className="product-shell">
+    <aside className="product-sidebar" aria-label="Navegação do produto">
+      <Link className="product-brand" href="/conta"><span aria-hidden="true">↗</span><strong>Untrack</strong></Link>
+      {loading ? <p role="status" className="product-loading">Carregando...</p> : error ? <p role="alert" className="form-error">{error}</p> : <div className="workspace-switcher"><label>Workspace<select value={active ?? ""} disabled={action.busy} onChange={(event) => void action.run(() => select(event.target.value))}><option value="" disabled>Selecione um workspace</option>{memberships.map((item) => <option key={item.workspace.id} value={item.workspace.id}>{item.workspace.name} · {item.role}</option>)}</select></label><details><summary>Novo workspace</summary><form onSubmit={(event) => { event.preventDefault(); void action.run(async () => { await apiRequest("/api/workspaces", { method: "POST", body: JSON.stringify({ action: "create", name }) }); router.refresh(); window.location.reload(); }); }}><label>Nome<input required maxLength={120} value={name} onChange={(event) => setName(event.target.value)} /></label><button className="button button-small" disabled={action.busy}>Criar</button></form></details></div>}
+      <nav className="product-nav">{groups.map((group) => <div key={group.label}><span>{group.label}</span>{group.items.map(([href, label]) => <Link key={href} href={href} aria-current={pathname === href || (href !== "/conta" && pathname.startsWith(`${href}/`)) ? "page" : undefined}>{label}</Link>)}</div>)}</nav>
+      <ActionStatus {...action} />
+    </aside>
+    <main className="product-main">{active && !loading ? children : !loading && !error ? <div className="product-empty"><h1>Escolha um workspace</h1><p>Crie ou selecione um workspace para acessar seus ativos.</p></div> : null}</main>
+  </div>;
 }
