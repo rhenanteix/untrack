@@ -1238,6 +1238,98 @@ code {
 .product-nav-advanced[open] summary {
   color: var(--ink);
 }
+/* Workspace navigation: one hierarchy for the whole sidebar. */
+.product-sidebar {
+  gap: 18px;
+  background: #fbfcfa;
+  padding: 18px 12px;
+}
+.workspace-switcher {
+  gap: 10px;
+  border: 1px solid #e0e6dd;
+  border-radius: 10px;
+  background: #f3f6f1;
+  padding: 12px;
+}
+.workspace-switcher select,
+.workspace-switcher input {
+  border-color: #d5ded1;
+  border-radius: 6px;
+  background: #fff;
+}
+.workspace-role { color: #61705f; }
+.product-nav {
+  gap: 18px;
+}
+.workspace-nav-group {
+  display: grid;
+  gap: 4px;
+}
+.workspace-nav-label,
+.workspace-nav-advanced summary {
+  display: block;
+  margin: 0 0 4px;
+  padding: 0 8px;
+  color: #718078;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+.workspace-nav-link {
+  position: relative;
+  display: flex;
+  align-items: center;
+  min-height: 38px;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  padding: 8px 10px;
+  color: #425149;
+  font-size: 13px;
+  font-weight: 650;
+  text-decoration: none;
+}
+.workspace-nav-link:hover {
+  border-color: #dbe5d5;
+  background: #f0f5ec;
+  color: #20352d;
+}
+.workspace-nav-link[aria-current="page"] {
+  border-color: #c4d5b8;
+  background: #e8f1e2;
+  color: #1f3e29;
+}
+.workspace-nav-link[aria-current="page"]::before {
+  position: absolute;
+  left: 0;
+  width: 3px;
+  height: 18px;
+  border-radius: 0 3px 3px 0;
+  background: #4b7a4b;
+  content: "";
+}
+.workspace-nav-advanced {
+  border-top: 1px solid #e4e9e1;
+  padding-top: 14px;
+}
+.workspace-nav-advanced summary {
+  cursor: pointer;
+  list-style: none;
+}
+.workspace-nav-advanced summary::-webkit-details-marker { display: none; }
+.workspace-nav-advanced summary::after {
+  float: right;
+  color: #8a968d;
+  content: "+";
+  font-size: 14px;
+  line-height: 9px;
+}
+.workspace-nav-advanced[open] summary::after { content: "-"; }
+.workspace-nav-advanced > div {
+  display: grid;
+  gap: 4px;
+  margin-top: 7px;
+}
 .product-main {
   min-width: 0;
 }

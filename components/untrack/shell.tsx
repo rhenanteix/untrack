@@ -7,14 +7,16 @@ interface Membership {
   role: string;
   workspace: { id: string; name: string; plan: string };
 }
-const groups = [
+const groups: {
+  label: string;
+  collapsible?: boolean;
+  items: { href: string; label: string }[];
+}[] = [
   {
-    label: "Comece aqui",
+    label: "Principal",
     items: [
       { href: "/conta#insights", label: "Dashboard e insights" },
       { href: "/untrack/smart-pages", label: "Minha página" },
-      { label: "Currículos", status: "Em breve" },
-      { label: "Portfólio", status: "Em breve" },
     ],
   },
   {
@@ -108,17 +110,10 @@ export function WorkspaceShell({ children }: { children: ReactNode }) {
     items: (typeof groups)[number]["items"],
   ) {
     return items.map((item) => {
-      if (!item.href) {
-        return (
-          <span className="product-nav-placeholder" key={item.label} aria-disabled="true">
-            {item.label}
-            <small>{"status" in item ? item.status : ""}</small>
-          </span>
-        );
-      }
       const itemPath = item.href.split("#", 1)[0];
       return (
         <Link
+          className="workspace-nav-link"
           key={item.href}
           href={item.href}
           onClick={() => setOpenedAt(null)}
@@ -233,13 +228,13 @@ export function WorkspaceShell({ children }: { children: ReactNode }) {
         <nav className="product-nav" aria-label="Módulos do workspace">
           {groups.map((group) => (
             group.collapsible ? (
-              <details className="product-nav-advanced" key={group.label}>
+              <details className="workspace-nav-group workspace-nav-advanced" key={group.label}>
                 <summary>{group.label}</summary>
                 <div>{renderItems(group.items)}</div>
               </details>
             ) : (
-              <div key={group.label}>
-                <span>{group.label}</span>
+              <div className="workspace-nav-group" key={group.label}>
+                <span className="workspace-nav-label">{group.label}</span>
                 {renderItems(group.items)}
               </div>
             )
