@@ -2702,6 +2702,50 @@ body:has(.product-shell) .site-footer{display:none}
   .sp-save-bar { margin: 12px -20px -20px; padding: 14px 20px; }
 }
 
+/* The editor needs priority over navigation on ordinary desktop widths. */
+@media (min-width: 1101px) {
+  .product-shell { grid-template-columns: 216px minmax(0, 1fr); }
+  .product-sidebar { gap: 18px; padding: 18px 11px; }
+  .product-nav { gap: 15px; }
+  .smart-pages-dashboard { width: min(1520px, calc(100% - 40px)); }
+  .smart-pages-grid { grid-template-columns: minmax(0, 1fr); gap: 18px; }
+  .smart-pages-sidebar {
+    grid-template-columns: minmax(210px, 270px) minmax(0, 1fr);
+    align-items: start;
+    padding: 14px;
+  }
+  .smart-page-create { position: sticky; top: 88px; }
+  .smart-page-list {
+    grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+    align-items: start;
+  }
+  .smart-page-list > h2,
+  .smart-page-list > .smart-page-search,
+  .smart-page-list > .muted,
+  .smart-page-list > .smart-page-pagination { grid-column: 1 / -1; }
+  .smart-page-list-item { min-height: 72px; }
+  .smart-page-workbench { grid-template-columns: minmax(0, 1fr); }
+  .smart-page-preview-panel { border-left: 0; border-top: 1px solid var(--sp-border); }
+  .smart-page-editor { max-width: 980px; width: 100%; margin: 0 auto; }
+}
+@media (min-width: 1280px) {
+  .smart-page-workbench { grid-template-columns: minmax(0, 1fr) 310px; }
+  .smart-page-preview-panel {
+    position: sticky;
+    top: 88px;
+    align-self: start;
+    max-height: calc(100svh - 110px);
+    overflow: auto;
+    border-top: 0;
+    border-left: 1px solid var(--sp-border);
+  }
+}
+@media (max-width: 1279px) and (min-width: 1101px) {
+  .smart-page-mobile-tabs { display: flex; }
+  .smart-page-workbench > .mobile-hidden { display: none; }
+  .smart-page-preview-panel { min-height: 0; }
+}
+
 /* ── Sections ─────────────────────────────────────────── */
 .lp-section {
   padding-block: 72px 80px;
