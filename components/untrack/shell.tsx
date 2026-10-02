@@ -18,6 +18,7 @@ import {
   FiSettings,
   FiTarget,
   FiTool,
+  FiUsers,
 } from "react-icons/fi";
 import type { IconType } from "react-icons";
 import {
@@ -54,6 +55,7 @@ const groups: NavigationGroup[] = [
     items: [
       { href: "/untrack/short-links", label: "Links", icon: FiLink },
       { href: "/untrack/smart-pages", label: "Smart Pages", icon: FiGrid },
+      { href: "/untrack/smart-cards", label: "Smart Cards", icon: FiUsers },
       { href: "/untrack/campaigns", label: "Campanhas", icon: FiTarget },
     ],
   },
@@ -69,6 +71,7 @@ const groups: NavigationGroup[] = [
     label: "Inteligência",
     items: [
       { href: "/conta#desempenho", label: "Analytics", icon: FiBarChart2 },
+      { href: "/untrack/audience", label: "Audience", icon: FiUsers },
       { href: "/untrack/link-health", label: "Monitoring", icon: FiActivity },
       { href: "/conta#insights", label: "Insights", icon: FiActivity },
     ],
@@ -89,11 +92,13 @@ export function useWorkspace() {
 
 function initials(name: string) {
   const words = name.trim().split(/\s+/).filter(Boolean);
-  return words
-    .slice(0, 2)
-    .map((word) => word[0])
-    .join("")
-    .toUpperCase() || "UT";
+  return (
+    words
+      .slice(0, 2)
+      .map((word) => word[0])
+      .join("")
+      .toUpperCase() || "UT"
+  );
 }
 
 function subscribeToSidebarPreference(listener: () => void) {
@@ -135,7 +140,10 @@ function WorkspaceSwitcher({
           <strong>{current?.workspace.name ?? "Seu workspace"}</strong>
           <small>{current ? planNames[current.workspace.plan] : ""}</small>
         </span>
-        <FiChevronDown className="workspace-switcher-chevron" aria-hidden="true" />
+        <FiChevronDown
+          className="workspace-switcher-chevron"
+          aria-hidden="true"
+        />
       </summary>
       <div className="workspace-switcher-popover">
         <span className="workspace-switcher-title">Workspaces</span>
@@ -153,7 +161,10 @@ function WorkspaceSwitcher({
                 <small>{planNames[item.workspace.plan]}</small>
               </span>
               {item.workspace.id === active ? (
-                <span className="workspace-switcher-selected" aria-label="Selecionado" />
+                <span
+                  className="workspace-switcher-selected"
+                  aria-label="Selecionado"
+                />
               ) : null}
             </button>
           ))}
@@ -202,7 +213,10 @@ function UserMenu({ name, plan }: { name: string; plan: string }) {
       <div className="workspace-user-popover">
         <Link href="/conta/perfil">Perfil</Link>
         <Link href="/conta/perfil">Conta</Link>
-        <Link href="/untrack/usage" onClick={() => analytics.track("upgrade_clicked")}>
+        <Link
+          href="/untrack/usage"
+          onClick={() => analytics.track("upgrade_clicked")}
+        >
           Plano e cobrança
         </Link>
         <Link href="/conta/perfil#preferencias">Preferências</Link>
@@ -304,7 +318,10 @@ export function WorkspaceShell({ children }: { children: ReactNode }) {
   }
 
   function toggleCollapsed() {
-    window.localStorage.setItem("untrack-sidebar-collapsed", String(!collapsed));
+    window.localStorage.setItem(
+      "untrack-sidebar-collapsed",
+      String(!collapsed),
+    );
     window.dispatchEvent(new Event("untrack-sidebar-preference"));
   }
 
@@ -418,11 +435,19 @@ export function WorkspaceShell({ children }: { children: ReactNode }) {
             <button
               className="workspace-sidebar-collapse"
               type="button"
-              aria-label={collapsed ? "Expandir barra lateral" : "Recolher barra lateral"}
-              title={collapsed ? "Expandir barra lateral" : "Recolher barra lateral"}
+              aria-label={
+                collapsed ? "Expandir barra lateral" : "Recolher barra lateral"
+              }
+              title={
+                collapsed ? "Expandir barra lateral" : "Recolher barra lateral"
+              }
               onClick={toggleCollapsed}
             >
-              {collapsed ? <FiChevronsRight aria-hidden="true" /> : <FiChevronsLeft aria-hidden="true" />}
+              {collapsed ? (
+                <FiChevronsRight aria-hidden="true" />
+              ) : (
+                <FiChevronsLeft aria-hidden="true" />
+              )}
             </button>
           </div>
           {loading ? (
@@ -484,7 +509,10 @@ export function WorkspaceShell({ children }: { children: ReactNode }) {
           ) : (
             <div className="product-empty">
               <h1>Escolha um workspace</h1>
-              <p>Seu acesso pode ter mudado. Selecione um workspace disponível no menu para continuar.</p>
+              <p>
+                Seu acesso pode ter mudado. Selecione um workspace disponível no
+                menu para continuar.
+              </p>
               <button type="button" onClick={() => setOpenedAt(pathname)}>
                 Abrir seletor de workspace
               </button>

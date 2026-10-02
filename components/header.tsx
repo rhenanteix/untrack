@@ -26,6 +26,7 @@ const staticTopLevelRoutes = new Set([
   "api",
   "blog",
   "cadastro",
+  "c",
   "conta",
   "contato",
   "cookies",
@@ -185,6 +186,7 @@ export function Header() {
   if (
     pathname.startsWith("/conta") ||
     pathname.startsWith("/untrack") ||
+    pathname.startsWith("/c/") ||
     pathname.startsWith("/page/") ||
     isPublicSmartPagePath(pathname)
   )

@@ -49,7 +49,8 @@ export function Footer() {
       ],
     },
   ];
-  if (pathname.startsWith("/untrack/smart-pages")) return null;
+  if (pathname.startsWith("/untrack/smart-pages") || pathname.startsWith("/c/"))
+    return null;
   return (
     <footer className="site-footer">
       <div className="shell footer-inner">

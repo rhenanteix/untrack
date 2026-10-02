@@ -1,0 +1,317 @@
+.page {
+  --card-background: #f7f8f1;
+  --card-background-secondary: #dff0d5;
+  --card-ink: #17322c;
+  --card-action: #1f5a45;
+  --card-action-text: #ffffff;
+  --card-radius: 10px;
+  display: grid;
+  min-height: 100svh;
+  place-items: start center;
+  padding: clamp(18px, 5vw, 48px) 16px;
+  color: var(--card-ink);
+  background-color: var(--card-background-secondary);
+  background-image:
+    linear-gradient(90deg, #ffffff24 1px, transparent 1px),
+    linear-gradient(#ffffff24 1px, transparent 1px);
+  background-size: 22px 22px;
+}
+
+.page[data-font="serif"] {
+  font-family: Georgia, serif;
+}
+.page[data-font="mono"] {
+  font-family: "Courier New", monospace;
+}
+
+.card {
+  width: min(100%, 480px);
+  min-height: calc(100svh - 36px);
+  padding: clamp(22px, 6vw, 36px);
+  border: 1px solid color-mix(in srgb, var(--card-ink) 15%, transparent);
+  border-radius: 16px;
+  background: var(--card-background);
+  box-shadow: 0 18px 50px #162e2421;
+}
+
+.presetDark .card {
+  --card-background: #18302b;
+  --card-ink: #eff7e5;
+  --card-action: #d9f27c;
+  --card-action-text: #18302b;
+}
+.presetBold .card {
+  border-width: 2px;
+  box-shadow: 8px 8px 0 #17322c;
+}
+.presetCreator .card {
+  --card-background: #fff7e7;
+  --card-action: #b83e35;
+  --card-action-text: #ffffff;
+}
+.presetCorporate .card {
+  --card-background: #f4f8fb;
+  --card-action: #174d72;
+}
+
+.topline,
+.identity,
+.secondaryActions,
+.linkList,
+.contactForm {
+  display: grid;
+}
+.topline {
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+}
+.brand {
+  font-weight: 850;
+  letter-spacing: 0;
+}
+.logo {
+  max-width: 116px;
+  max-height: 32px;
+  object-fit: contain;
+  object-position: left center;
+}
+.share,
+.sheetClose {
+  border: 0;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.identity {
+  grid-template-columns: 74px minmax(0, 1fr);
+  align-items: center;
+  gap: 16px;
+  margin-top: clamp(46px, 10vw, 72px);
+}
+.avatar,
+.avatarFallback {
+  width: 74px;
+  height: 74px;
+  object-fit: cover;
+  border: 2px solid color-mix(in srgb, var(--card-ink) 16%, transparent);
+}
+.avatarFallback {
+  display: grid;
+  place-items: center;
+  background: var(--card-background-secondary);
+  font-size: 21px;
+  font-weight: 800;
+}
+.avatar[data-shape="circle"],
+.avatarFallback[data-shape="circle"] {
+  border-radius: 50%;
+}
+.avatar[data-shape="rounded"],
+.avatarFallback[data-shape="rounded"] {
+  border-radius: 16px;
+}
+.avatar[data-shape="square"],
+.avatarFallback[data-shape="square"] {
+  border-radius: 0;
+}
+.identity h1 {
+  margin: 0;
+  font-size: clamp(26px, 8vw, 36px);
+  letter-spacing: 0;
+  line-height: 1.05;
+  overflow-wrap: anywhere;
+}
+.headline,
+.bio,
+.location {
+  margin: 0;
+  color: color-mix(in srgb, var(--card-ink) 72%, transparent);
+}
+.headline {
+  margin-top: 5px;
+  font-size: 14px;
+  line-height: 1.45;
+}
+.bio {
+  margin-top: 24px;
+  font-size: 15px;
+  line-height: 1.65;
+  white-space: pre-line;
+}
+.location {
+  margin-top: 13px;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.primaryActions {
+  margin-top: 30px;
+}
+.primaryButton {
+  display: grid;
+  width: 100%;
+  min-height: 48px;
+  place-items: center;
+  border: 1px solid var(--card-action);
+  border-radius: var(--card-radius);
+  background: var(--card-action);
+  color: var(--card-action-text);
+  cursor: pointer;
+  font-weight: 800;
+  line-height: 1.2;
+  text-align: center;
+  text-decoration: none;
+}
+.primaryButton:disabled {
+  cursor: wait;
+  opacity: 0.65;
+}
+.secondaryActions {
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-top: 9px;
+}
+.secondaryActions a,
+.secondaryActions button {
+  min-height: 40px;
+  border: 1px solid color-mix(in srgb, var(--card-ink) 20%, transparent);
+  border-radius: var(--card-radius);
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 750;
+  text-align: center;
+  text-decoration: none;
+}
+.secondaryActions a {
+  display: grid;
+  place-items: center;
+}
+.secondaryActions button {
+  padding: 0 8px;
+}
+
+.linkList {
+  gap: 9px;
+  margin-top: 28px;
+}
+.linkList a {
+  display: flex;
+  min-height: 52px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 15px;
+  border: 1px solid color-mix(in srgb, var(--card-ink) 18%, transparent);
+  border-radius: var(--card-radius);
+  color: inherit;
+  font-size: 14px;
+  font-weight: 750;
+  line-height: 1.25;
+  text-decoration: none;
+}
+.linkList a:hover {
+  background: color-mix(
+    in srgb,
+    var(--card-background-secondary) 64%,
+    transparent
+  );
+}
+.footer {
+  margin-top: 36px;
+  color: color-mix(in srgb, var(--card-ink) 58%, transparent);
+  font-size: 11px;
+  text-align: center;
+}
+
+.sheetBackdrop {
+  position: fixed;
+  z-index: 20;
+  inset: 0;
+  display: grid;
+  align-items: end;
+  background: #152c257a;
+}
+.sheet {
+  width: min(100%, 560px);
+  max-height: min(84svh, 760px);
+  overflow: auto;
+  margin: 0 auto;
+  padding: 18px 20px calc(24px + env(safe-area-inset-bottom));
+  border-radius: 16px 16px 0 0;
+  background: #ffffff;
+  color: #17322c;
+  box-shadow: 0 -12px 44px #11221c33;
+}
+.sheetClose {
+  display: block;
+  margin-left: auto;
+}
+.contactForm {
+  gap: 14px;
+  margin-top: 8px;
+}
+.contactForm h2,
+.submitted h2 {
+  margin: 0;
+  font-size: 22px;
+  line-height: 1.2;
+}
+.contactForm > p,
+.submitted p {
+  margin: 0;
+  color: #536862;
+  font-size: 13px;
+  line-height: 1.55;
+}
+.contactForm label {
+  display: grid;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 750;
+}
+.contactForm input,
+.contactForm select {
+  width: 100%;
+  min-height: 46px;
+  border: 1px solid #c8d3cb;
+  border-radius: 8px;
+  padding: 9px 11px;
+  background: #fff;
+  color: #17322c;
+}
+.privacy {
+  color: #285239;
+  font-size: 12px;
+  font-weight: 700;
+}
+.formError {
+  margin: 0;
+  color: #a83a37;
+  font-size: 13px;
+  font-weight: 700;
+}
+.submitted {
+  display: grid;
+  gap: 14px;
+  padding: 24px 0 8px;
+}
+
+@media (min-width: 700px) {
+  .page {
+    place-items: center;
+    padding: 48px 24px;
+  }
+  .card {
+    min-height: 740px;
+    border-radius: 18px;
+  }
+  .sheet {
+    border-radius: 16px 16px 0 0;
+  }
+}

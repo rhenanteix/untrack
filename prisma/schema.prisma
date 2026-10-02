@@ -8,6 +8,36 @@ enum SmartPageStatus {
   published
 }
 
+enum SmartCardStatus {
+  draft
+  published
+  archived
+}
+
+enum SmartCardActionType {
+  website
+  whatsapp
+  email
+  phone
+  calendar
+  smartPage
+  custom
+}
+
+enum AudienceContactStatus {
+  new_contact
+  interested
+  qualified
+  customer
+  not_interested
+}
+
+enum ContactTemperature {
+  cold
+  warm
+  hot
+}
+
 enum ProductStatus {
   draft
   active
@@ -81,6 +111,8 @@ model AnalyticsEvent {
   workspaceId      String?
   smartPageId      String?
   smartPageBlockId String?
+  smartCardId      String?
+  smartCardActionId String?
   day              DateTime?       @db.Date
   visitorHash      String?         @db.VarChar(64)
   referrer         String?         @db.VarChar(253)
@@ -88,11 +120,16 @@ model AnalyticsEvent {
   workspace        Workspace?      @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   smartPage        SmartPage?      @relation(fields: [smartPageId], references: [id], onDelete: Cascade)
   smartPageBlock   SmartPageBlock? @relation(fields: [smartPageBlockId], references: [id], onDelete: Cascade)
+  smartCard        SmartCard?      @relation(fields: [smartCardId], references: [id], onDelete: Cascade)
+  smartCardAction  SmartCardAction? @relation(fields: [smartCardActionId], references: [id], onDelete: SetNull)
 
   @@index([name, occurredAt])
   @@index([smartPageId, day])
   @@index([smartPageBlockId, day])
   @@index([smartPageId, visitorHash])
+  @@index([smartCardId, day])
+  @@index([smartCardActionId, day])
+  @@index([smartCardId, visitorHash])
 }
 
 model User {
@@ -114,6 +151,7 @@ model User {
   projectMemberships ProjectMember[]
   favorites Favorite[]
   recentResources RecentResource[]
+  ownedSmartCards SmartCard[] @relation("SmartCardOwner")
 }
 
 model Session {
@@ -181,6 +219,127 @@ model SmartPage {
 
   @@index([workspaceId, createdAt])
   @@index([status, publishedAt])
+}
+
+model SmartCard {
+  id               String          @id @default(cuid())
+  workspaceId      String
+  ownerId          String
+  campaignId       String?
+  qrAssetId        String?         @unique
+  slug             String          @unique @db.VarChar(60)
+  firstName        String          @db.VarChar(80)
+  lastName         String          @default("") @db.VarChar(80)
+  headline         String          @default("") @db.VarChar(160)
+  company          String          @default("") @db.VarChar(120)
+  bio              String          @default("") @db.VarChar(500)
+  avatarUrl        String?         @db.VarChar(4096)
+  logoUrl          String?         @db.VarChar(4096)
+  phone            String?         @db.VarChar(40)
+  whatsapp         String?         @db.VarChar(40)
+  email            String?         @db.VarChar(254)
+  websiteUrl       String?         @db.VarChar(4096)
+  location         String?         @db.VarChar(160)
+  theme            Json            @default("{}")
+  contactForm      Json            @default("{}")
+  privacyPolicyUrl String?         @db.VarChar(4096)
+  status           SmartCardStatus @default(draft)
+  publishedAt      DateTime?
+  archivedAt       DateTime?
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+  workspace        Workspace       @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  owner            User            @relation("SmartCardOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+  campaign         Campaign?       @relation(fields: [campaignId, workspaceId], references: [id, workspaceId])
+  qrAsset          QrAsset?        @relation("SmartCardQr", fields: [qrAssetId], references: [id], onDelete: SetNull)
+  actions          SmartCardAction[]
+  contactExchanges SmartCardContactExchange[]
+  analyticsEvents  AnalyticsEvent[]
+
+  @@index([workspaceId, status, updatedAt])
+  @@index([ownerId, createdAt])
+  @@index([campaignId])
+}
+
+model SmartCardAction {
+  id             String              @id @default(cuid())
+  smartCardId    String
+  type           SmartCardActionType
+  label          String              @db.VarChar(80)
+  url            String              @db.VarChar(4096)
+  position       Int
+  visible        Boolean             @default(true)
+  analyticsEnabled Boolean            @default(true)
+  createdAt      DateTime            @default(now())
+  updatedAt      DateTime            @updatedAt
+  smartCard      SmartCard           @relation(fields: [smartCardId], references: [id], onDelete: Cascade)
+  analyticsEvents AnalyticsEvent[]
+
+  @@unique([smartCardId, position])
+  @@index([smartCardId, position])
+}
+
+model AudienceContact {
+  id          String                @id @default(cuid())
+  workspaceId String
+  firstName   String                @default("") @db.VarChar(80)
+  lastName    String                @default("") @db.VarChar(80)
+  email       String?               @db.VarChar(254)
+  phone       String?               @db.VarChar(40)
+  whatsapp    String?               @db.VarChar(40)
+  company     String?               @db.VarChar(120)
+  jobTitle    String?               @db.VarChar(160)
+  city        String?               @db.VarChar(120)
+  customFields Json                 @default("{}")
+  status      AudienceContactStatus @default(new_contact)
+  temperature ContactTemperature    @default(cold)
+  createdAt   DateTime              @default(now())
+  updatedAt   DateTime              @updatedAt
+  workspace   Workspace             @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  exchanges   SmartCardContactExchange[]
+  events      AudienceContactEvent[]
+
+  @@index([workspaceId, createdAt])
+  @@index([workspaceId, email])
+  @@index([workspaceId, phone])
+}
+
+model SmartCardContactExchange {
+  id           String           @id @default(cuid())
+  workspaceId  String
+  smartCardId  String
+  contactId    String
+  campaignId   String?
+  source       String           @default("direct") @db.VarChar(80)
+  sourceLabel  String?          @db.VarChar(120)
+  intent       String?          @db.VarChar(160)
+  context      Json             @default("{}")
+  consentText  String           @db.VarChar(1000)
+  consentedAt  DateTime         @default(now())
+  capturedAt   DateTime         @default(now())
+  workspace    Workspace        @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  smartCard    SmartCard        @relation(fields: [smartCardId], references: [id], onDelete: Cascade)
+  contact      AudienceContact  @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  campaign     Campaign?        @relation(fields: [campaignId, workspaceId], references: [id, workspaceId])
+
+  @@index([workspaceId, capturedAt])
+  @@index([smartCardId, capturedAt])
+  @@index([contactId, capturedAt])
+  @@index([campaignId, capturedAt])
+}
+
+model AudienceContactEvent {
+  id          String          @id @default(cuid())
+  workspaceId String
+  contactId   String
+  name        String          @db.VarChar(80)
+  metadata    Json            @default("{}")
+  occurredAt  DateTime        @default(now())
+  workspace   Workspace       @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  contact     AudienceContact @relation(fields: [contactId], references: [id], onDelete: Cascade)
+
+  @@index([contactId, occurredAt])
+  @@index([workspaceId, occurredAt])
 }
 
 model Product {
@@ -349,6 +508,10 @@ model Workspace {
   recentResources RecentResource[]
   whatsappLinks WhatsappLink[]
   products Product[]
+  smartCards SmartCard[]
+  audienceContacts AudienceContact[]
+  smartCardContactExchanges SmartCardContactExchange[]
+  audienceContactEvents AudienceContactEvent[]
 }
 
 model Project {
@@ -566,6 +729,8 @@ model Campaign {
   incidents CampaignIncident[]
   approvals CampaignApproval[]
   whatsappLinks WhatsappLink[]
+  smartCards SmartCard[]
+  smartCardContactExchanges SmartCardContactExchange[]
   @@unique([id, workspaceId])
   @@index([workspaceId, createdAt])
   @@index([workspaceId, status])
@@ -796,6 +961,7 @@ model QrAsset {
   campaign Campaign? @relation(fields: [campaignId, workspaceId], references: [id, workspaceId])
   redirect ShortLink? @relation(fields: [redirectId], references: [id], onDelete: Restrict)
   campaignAssets CampaignAsset[]
+  smartCard SmartCard? @relation("SmartCardQr")
   @@index([workspaceId, createdAt])
 }
 
