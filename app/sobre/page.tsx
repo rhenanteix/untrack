@@ -4,16 +4,16 @@ import { StaticInfoPage } from "@/components/static-info-page";
 export const metadata: Metadata = {
   title: "Sobre",
   description:
-    "Conheça a visão da Untrack para o trabalho com links e campanhas.",
+    "Conheça a visão da LinkOr para o trabalho com links e campanhas.",
   alternates: { canonical: "/sobre" },
 };
 
 export default function AboutPage() {
   return (
     <StaticInfoPage
-      eyebrow="Sobre a Untrack"
+      eyebrow="Sobre a LinkOr"
       title="Links são pontos de decisão, não apenas endereços."
-      description="A Untrack reúne criação, organização e análise para que links e campanhas possam ser acompanhados como parte do trabalho diário."
+      description="A LinkOr reúne criação, organização e análise para que links e campanhas possam ser acompanhados como parte do trabalho diário."
       sections={[
         {
           title: "Comece simples",

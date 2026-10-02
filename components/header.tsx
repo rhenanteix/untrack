@@ -194,11 +194,8 @@ export function Header() {
   return (
     <header className="site-header">
       <div className="shell header-inner">
-        <Link className="brand" href="/" aria-label="Untrack, início">
-          <span aria-hidden="true" className="brand-mark">
-            ↗
-          </span>
-          <span className="brand-name">Untrack</span>
+        <Link className="brand" href="/" aria-label="LinkOr, início">
+          <span aria-hidden="true" className="brand-logo" />
         </Link>
 
         <nav className="desktop-nav" aria-label="Navegação principal">
@@ -274,13 +271,13 @@ export function Header() {
               <section className="mega-menu-free-tools">
                 <div>
                   <span>Ferramentas gratuitas</span>
-                  <strong>Comece agora. Sem cadastro para experimentar.</strong>
+                  <strong>Crie sua conta gratuita para começar.</strong>
                 </div>
                 <div>
                   {freeTools.map((product) => (
                     <Link
                       key={product.slug}
-                      href={product.toolHref}
+                      href={`/cadastro?next=${encodeURIComponent(product.toolHref)}`}
                       onClick={() =>
                         trackProductNavigation(
                           product.slug,

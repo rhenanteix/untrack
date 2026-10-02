@@ -3,7 +3,7 @@ import { StaticInfoPage } from "@/components/static-info-page";
 
 export const metadata: Metadata = {
   title: "Recursos",
-  description: "Recursos da Untrack para criar, analisar e acompanhar links.",
+  description: "Recursos da LinkOr para criar, analisar e acompanhar links.",
   alternates: { canonical: "/recursos" },
 };
 

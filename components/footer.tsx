@@ -58,10 +58,9 @@ export function Footer() {
           <Link
             className="footer-wordmark"
             href="/"
-            aria-label="Untrack, início"
+            aria-label="LinkOr, início"
           >
-            <span aria-hidden="true">↗</span>
-            Untrack
+            <span aria-hidden="true" className="footer-logo" />
           </Link>
           <p>{copy.footer.description}</p>
           <Link className="footer-cta" href="/cadastro">
@@ -82,7 +81,7 @@ export function Footer() {
         </div>
       </div>
       <div className="shell footer-bottom">
-        <span>© {new Date().getFullYear()} Untrack</span>
+        <span>© {new Date().getFullYear()} LinkOr</span>
         <nav aria-label="Legal">
           <Link href="/privacidade">{copy.footer.privacy}</Link>
           <Link href="/termos">{copy.footer.terms}</Link>

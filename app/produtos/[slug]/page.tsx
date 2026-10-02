@@ -23,15 +23,15 @@ export async function generateMetadata({
     alternates: { canonical: path },
     openGraph: {
       type: "website",
-      title: `${product.seoTitle} | Untrack`,
+      title: `${product.seoTitle} | LinkOr`,
       description: product.summary,
       url: path,
-      siteName: "Untrack",
+      siteName: "LinkOr",
       images: [{ url: `${path}/opengraph-image` }],
     },
     twitter: {
       card: "summary_large_image",
-      title: `${product.seoTitle} | Untrack`,
+      title: `${product.seoTitle} | LinkOr`,
       description: product.summary,
       images: [`${path}/opengraph-image`],
     },

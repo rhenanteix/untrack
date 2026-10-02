@@ -19,7 +19,7 @@ export const publicCopy = {
       startFree: "Começar grátis",
     },
     menu: {
-      productsLabel: "Produtos Untrack",
+      productsLabel: "Produtos LinkOr",
       productsTitle:
         "Comece com uma ferramenta. Conecte o restante quando precisar.",
       allProducts: "Ver todos os produtos",
@@ -45,7 +45,7 @@ export const publicCopy = {
       title: "Todos os seus links em um só lugar.",
       subtitle: "Crie, organize, acompanhe e otimize seus links e campanhas.",
       explore: "Explorar produtos",
-      dashboardLabel: "Visão do dashboard da Untrack",
+      dashboardLabel: "Visão do dashboard da LinkOr",
       overview: "Visão geral",
       lastDays: "Últimos 30 dias",
       clicks: "Cliques",
@@ -120,7 +120,7 @@ export const publicCopy = {
       startFree: "Start free",
     },
     menu: {
-      productsLabel: "Untrack products",
+      productsLabel: "LinkOr products",
       productsTitle: "Start with one tool. Connect the rest when you need it.",
       allProducts: "See all products",
       allResources: "Explore resources",
@@ -145,7 +145,7 @@ export const publicCopy = {
       title: "All your links in one place.",
       subtitle: "Create, organize, track, and optimize your links and campaigns.",
       explore: "Explore products",
-      dashboardLabel: "Untrack dashboard overview",
+      dashboardLabel: "LinkOr dashboard overview",
       overview: "Overview",
       lastDays: "Last 30 days",
       clicks: "Clicks",
@@ -217,7 +217,7 @@ export const publicCopy = {
       startFree: "Empezar gratis",
     },
     menu: {
-      productsLabel: "Productos Untrack",
+      productsLabel: "Productos LinkOr",
       productsTitle:
         "Empieza con una herramienta. Conecta el resto cuando lo necesites.",
       allProducts: "Ver todos los productos",
@@ -243,7 +243,7 @@ export const publicCopy = {
       title: "Todos tus enlaces en un solo lugar.",
       subtitle: "Crea, organiza, acompaña y optimiza tus enlaces y campañas.",
       explore: "Explorar productos",
-      dashboardLabel: "Resumen del dashboard de Untrack",
+      dashboardLabel: "Resumen del dashboard de LinkOr",
       overview: "Resumen",
       lastDays: "Últimos 30 días",
       clicks: "Clics",

@@ -125,14 +125,14 @@ export function LandingPage() {
                 <p>{product.description}</p>
                 <CommercialLink
                   className="text-link"
-                  events={["navigation_free_tool_clicked"]}
+                  events={["navigation_free_tool_clicked", "signup_clicked"]}
                   analyticsContext={{
                     product: product.slug,
                     category: product.category,
                     source: "home",
                     location: "free-tools",
                   }}
-                  href={product.toolHref}
+                  href={`/cadastro?next=${encodeURIComponent(product.toolHref)}`}
                 >
                   {freeToolLabels[product.slug as keyof typeof freeToolLabels]}
                 </CommercialLink>

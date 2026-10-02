@@ -10,7 +10,7 @@ function createAuth() {
       "Configure BETTER_AUTH_SECRET com pelo menos 32 caracteres aleatórios.",
     );
   return betterAuth({
-    appName: "Arrume Meu Link",
+    appName: "LinkOr",
     baseURL: process.env.BETTER_AUTH_URL ?? appUrl().origin,
     secret,
     database: prismaAdapter(getPrisma(), { provider: "postgresql" }),

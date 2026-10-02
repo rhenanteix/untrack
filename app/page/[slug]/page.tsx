@@ -244,7 +244,7 @@ export async function generateMetadata({
       url,
       title: page.title,
       description: page.description || undefined,
-      siteName: "Arrume Meu Link",
+      siteName: "LinkOr",
       images: page.avatarUrl ? [{ url: page.avatarUrl }] : undefined,
     },
     twitter: {

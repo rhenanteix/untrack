@@ -13,7 +13,7 @@ test("apresenta a plataforma e encaminha para produtos e cadastro", async ({
   await expect(
     page.getByRole("heading", { name: "Seus links podem fazer muito mais." }),
   ).toBeVisible();
-  await expect(page.getByLabel("Visão do dashboard da Untrack")).toBeVisible();
+  await expect(page.getByLabel("Visão do dashboard da LinkOr")).toBeVisible();
   await expect(
     page.getByRole("link", { name: "Começar grátis" }).first(),
   ).toHaveAttribute("href", "/cadastro");
@@ -25,9 +25,12 @@ test("apresenta a plataforma e encaminha para produtos e cadastro", async ({
   await expect(
     page.getByRole("heading", { name: "Uma página para tudo." }),
   ).toBeVisible();
+  await expect(
+    page.getByRole("link", { name: "Criar QR Code" }),
+  ).toHaveAttribute("href", "/cadastro?next=%2Fgerar-qrcode");
 });
 
-test("catálogo e Product Page encaminham o QR Code para a ferramenta", async ({
+test("catálogo e Product Page encaminham o QR Code para o cadastro", async ({
   page,
 }) => {
   await page.goto("/produtos");
@@ -39,7 +42,7 @@ test("catálogo e Product Page encaminham o QR Code para a ferramenta", async ({
     }),
   ).toBeVisible();
   await page.getByRole("link", { name: "Testar agora" }).first().click();
-  await expect(page).toHaveURL(/\/gerar-qrcode$/);
+  await expect(page).toHaveURL(/\/cadastro\?next=%2Fgerar-qrcode$/);
 });
 
 test("limpa um rastreador pela API da aplicação", async ({ page }) => {

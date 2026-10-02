@@ -71,7 +71,7 @@ export const products = [
     headline: "Transforme seu WhatsApp em um canal mensurável.",
     summary:
       "Crie links para WhatsApp, acompanhe cliques e conecte seus acessos às suas campanhas.",
-    seoTitle: "Links para WhatsApp | Untrack",
+    seoTitle: "Links para WhatsApp | LinkOr",
     toolHref: "/untrack/whatsapp",
     ctaLabel: "Começar grátis",
     anonymousUsage: false,
@@ -174,7 +174,7 @@ export const products = [
     headline: "Crie QR Codes que você consegue acompanhar.",
     summary:
       "Gere QR Codes rapidamente e conecte acessos offline aos seus links e campanhas.",
-    seoTitle: "QR Code Grátis | Untrack",
+    seoTitle: "QR Code Grátis | LinkOr",
     toolHref: "/gerar-qrcode",
     ctaLabel: "Testar agora",
     anonymousUsage: true,
@@ -210,7 +210,7 @@ export const products = [
     headline: "Saiba o que acontece depois do clique.",
     summary:
       "Acompanhe cliques dos seus links, fontes e desempenho para decidir o que ajustar a seguir.",
-    seoTitle: "Analytics de Links e Campanhas | Untrack",
+    seoTitle: "Analytics de Links e Campanhas | LinkOr",
     toolHref: "/conta",
     ctaLabel: "Começar grátis",
     anonymousUsage: false,
@@ -227,7 +227,7 @@ export const products = [
     headline: "Saiba quando seus links precisam de atenção.",
     summary:
       "Acompanhe sinais de saúde, alterações e incidentes das suas campanhas no workspace.",
-    seoTitle: "Monitoring de Links | Untrack",
+    seoTitle: "Monitoring de Links | LinkOr",
     toolHref: "/untrack/link-health",
     ctaLabel: "Conhecer Monitoring",
     anonymousUsage: false,

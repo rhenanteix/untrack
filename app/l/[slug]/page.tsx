@@ -20,14 +20,14 @@ export async function generateMetadata({
   return {
     title: link?.title || "Link compartilhado",
     description:
-      link?.description || "Um link compartilhado com Arrume Meu Link.",
+      link?.description || "Um link compartilhado com LinkOr.",
     robots: { index: false, follow: false },
     openGraph: {
       title: link?.title || "Link compartilhado",
       description: link?.description || "Confira o destino antes de continuar.",
       url: publicLinkUrl(slug, true),
       type: "website",
-      siteName: "Arrume Meu Link",
+      siteName: "LinkOr",
     },
   };
 }

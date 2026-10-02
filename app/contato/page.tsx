@@ -3,7 +3,7 @@ import { StaticInfoPage } from "@/components/static-info-page";
 
 export const metadata: Metadata = {
   title: "Contato",
-  description: "Encontre o melhor ponto de partida para usar a Untrack.",
+  description: "Encontre o melhor ponto de partida para usar a LinkOr.",
   alternates: { canonical: "/contato" },
 };
 

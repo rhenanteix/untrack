@@ -7,17 +7,11 @@ import type { Product } from "@/lib/products";
 import { getProduct } from "@/lib/products";
 
 function ProductCta({ product }: { product: Product }) {
-  const href = product.anonymousUsage
-    ? product.toolHref
-    : `/cadastro?next=${encodeURIComponent(product.toolHref)}`;
+  const href = `/cadastro?next=${encodeURIComponent(product.toolHref)}`;
   return (
     <CommercialLink
       className="button product-primary-cta"
-      events={
-        product.anonymousUsage
-          ? ["product_cta_clicked", "free_tool_started"]
-          : ["product_cta_clicked", "signup_clicked"]
-      }
+      events={["product_cta_clicked", "signup_clicked"]}
       analyticsContext={{
         product: product.slug,
         category: product.category,
@@ -57,8 +51,8 @@ export function ProductLandingTemplate({ product }: { product: Product }) {
             </div>
             {product.anonymousUsage && (
               <p className="product-guest-note">
-                Teste uma vez sem criar conta. Depois, crie sua conta para
-                continuar gratuitamente.
+                Crie sua conta gratuita para usar a ferramenta e manter seus
+                resultados acessíveis no seu workspace.
               </p>
             )}
           </div>
@@ -140,7 +134,7 @@ export function ProductLandingTemplate({ product }: { product: Product }) {
 
       <section className="product-final-cta">
         <div className="shell">
-          <span className="eyebrow">Untrack</span>
+          <span className="eyebrow">LinkOr</span>
           <h2>
             Comece com {product.name}. Encontre a plataforma inteira quando
             precisar.

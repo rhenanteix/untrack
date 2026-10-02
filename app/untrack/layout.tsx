@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { sessionFromHeaders } from "@/lib/session";
 
 export const metadata = {
-  title: { default: "Visão geral", template: "%s · Untrack" },
+  title: { default: "Visão geral", template: "%s · LinkOr" },
   robots: { index: false, follow: false },
 };
 export default async function Layout({

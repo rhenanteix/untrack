@@ -1,4 +1,19 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
-  <rect width="512" height="512" rx="112" fill="#172a3a"/>
-  <path d="M153 359 359 153M214 153h145v145" fill="none" stroke="#d8f768" stroke-linecap="round" stroke-linejoin="round" stroke-width="48"/>
+  <rect width="512" height="512" rx="112" fill="#172a3a" />
+  <path
+    d="M156 142v218h140"
+    fill="none"
+    stroke="#d8f768"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+    stroke-width="48"
+  />
+  <path
+    d="M222 290c13-61 62-103 125-103h22m-59-59 59 59-59 59"
+    fill="none"
+    stroke="#f6f7f2"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+    stroke-width="38"
+  />
 </svg>

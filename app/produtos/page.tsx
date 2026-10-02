@@ -5,17 +5,17 @@ import { getProductsByCategory, productCategories } from "@/lib/products";
 export const metadata: Metadata = {
   title: "Produtos",
   description:
-    "Conheça as ferramentas da Untrack para criar, organizar e entender links e campanhas.",
+    "Conheça as ferramentas da LinkOr para criar, organizar e entender links e campanhas.",
   alternates: { canonical: "/produtos" },
   openGraph: {
-    title: "Produtos | Untrack",
+    title: "Produtos | LinkOr",
     description:
       "Ferramentas para criar, organizar e entender links e campanhas.",
     url: "/produtos",
   },
   twitter: {
     card: "summary",
-    title: "Produtos | Untrack",
+    title: "Produtos | LinkOr",
     description:
       "Ferramentas para criar, organizar e entender links e campanhas.",
   },

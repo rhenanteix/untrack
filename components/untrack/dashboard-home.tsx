@@ -330,7 +330,7 @@ export function DashboardHome({
         <section className="dashboard-welcome" aria-labelledby="welcome-heading">
           <FiLink aria-hidden="true" />
           <div>
-            <h2 id="welcome-heading">Bem-vindo ao Untrack</h2>
+            <h2 id="welcome-heading">Bem-vindo ao LinkOr</h2>
             <p>Comece criando seu primeiro destino rastreável para acompanhar tudo por aqui.</p>
           </div>
           {canWrite ? (

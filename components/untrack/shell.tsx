@@ -373,7 +373,7 @@ export function WorkspaceShell({ children }: { children: ReactNode }) {
           </button>
           <Link href="/conta" className="product-brand">
             <FiLink aria-hidden="true" />
-            <strong>Untrack</strong>
+            <strong>LinkOr</strong>
           </Link>
           {canWrite ? (
             <Link
@@ -430,7 +430,7 @@ export function WorkspaceShell({ children }: { children: ReactNode }) {
           <div className="product-sidebar-brand-row">
             <Link className="product-brand" href="/conta">
               <FiLink aria-hidden="true" />
-              <strong>Untrack</strong>
+              <strong>LinkOr</strong>
             </Link>
             <button
               className="workspace-sidebar-collapse"

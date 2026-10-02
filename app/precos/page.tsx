@@ -8,7 +8,7 @@ export const metadata: Metadata = {
     "Comece gratuitamente e encontre o plano certo para operar seus links em escala.",
   alternates: { canonical: "/precos" },
   openGraph: {
-    title: "Preços | Untrack",
+    title: "Preços | LinkOr",
     description:
       "Comece gratuitamente e encontre o plano certo para operar seus links em escala.",
     url: "/precos",

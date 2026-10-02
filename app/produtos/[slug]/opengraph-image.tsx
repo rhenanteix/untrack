@@ -1,7 +1,7 @@
 import { ImageResponse } from "next/og";
 import { getProduct, products } from "@/lib/products";
 
-export const alt = "Untrack Link Intelligence Platform";
+export const alt = "LinkOr Link Intelligence Platform";
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 
@@ -32,7 +32,7 @@ export default async function ProductOpenGraphImage({
       }}
     >
       <div style={{ display: "flex", fontSize: 28, fontWeight: 700 }}>
-        UNTRACK / LINK INTELLIGENCE
+        LINKOR / LINK INTELLIGENCE
       </div>
       <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
         <div style={{ color: "#567000", display: "flex", fontSize: 26 }}>

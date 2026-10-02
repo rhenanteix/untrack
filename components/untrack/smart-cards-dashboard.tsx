@@ -1620,7 +1620,7 @@ export function SmartCardsDashboard({
                       {activeCard.logoUrl ? (
                         <img src={activeCard.logoUrl} alt="" />
                       ) : (
-                        "Untrack"
+                        "LinkOr"
                       )}
                     </div>
                     {activeCard.avatarUrl ? (

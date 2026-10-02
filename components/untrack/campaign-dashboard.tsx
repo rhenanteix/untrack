@@ -1111,7 +1111,7 @@ export function CampaignDashboard({
               <span className="workspace-section-kicker">Monitoramento</span>
               <h2>Saúde dos pontos de distribuição</h2>
               <p>
-                O Untrack só apresenta verificações que já foram executadas.
+                O LinkOr só apresenta verificações que já foram executadas.
               </p>
             </div>
           </div>

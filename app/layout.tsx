@@ -14,24 +14,29 @@ const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
 export const metadata: Metadata = {
   metadataBase: new URL(appUrl),
   title: {
-    default: "Untrack — Seus links, organizados e rastreáveis",
-    template: "%s | Untrack",
+    default: "LinkOr — Seus links, organizados e rastreáveis",
+    template: "%s | LinkOr",
   },
   description:
     "Smart Pages, short links, UTMs, QR Codes e saúde de links em uma única plataforma.",
-  applicationName: "Untrack",
+  applicationName: "LinkOr",
   manifest: "/manifest.webmanifest",
+  icons: {
+    icon: [{ url: "/icon.svg", type: "image/svg+xml" }],
+    shortcut: ["/icon.svg"],
+    apple: ["/icon.svg"],
+  },
   openGraph: {
     type: "website",
     locale: "pt_BR",
-    siteName: "Untrack",
-    title: "Untrack — Seus links, organizados e rastreáveis",
+    siteName: "LinkOr",
+    title: "LinkOr — Seus links, organizados e rastreáveis",
     description:
       "Smart Pages, short links, UTMs, QR Codes e saúde de links em uma única plataforma.",
   },
   twitter: {
     card: "summary",
-    title: "Untrack",
+    title: "LinkOr",
     description: "Organize, rastreie e compartilhe seus links com estilo.",
   },
 };
@@ -44,7 +49,7 @@ export const viewport: Viewport = {
 const jsonLd = {
   "@context": "https://schema.org",
   "@type": "WebApplication",
-  name: "Untrack",
+  name: "LinkOr",
   applicationCategory: "UtilitiesApplication",
   operatingSystem: "Any",
   description:

@@ -259,7 +259,7 @@ export function PublicSmartCard({
               alt={card.company || "Logo"}
             />
           ) : (
-            <span className={styles.brand}>Untrack</span>
+            <span className={styles.brand}>LinkOr</span>
           )}
           <button
             className={styles.share}
@@ -364,7 +364,7 @@ export function PublicSmartCard({
           </div>
         )}
 
-        <footer className={styles.footer}>Feito com Untrack</footer>
+        <footer className={styles.footer}>Feito com LinkOr</footer>
       </section>
 
       {formOpen && (

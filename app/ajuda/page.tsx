@@ -4,7 +4,7 @@ import { StaticInfoPage } from "@/components/static-info-page";
 export const metadata: Metadata = {
   title: "Ajuda",
   description:
-    "Encontre a ferramenta Untrack certa para a sua próxima tarefa com links.",
+    "Encontre a ferramenta LinkOr certa para a sua próxima tarefa com links.",
   alternates: { canonical: "/ajuda" },
 };
 

@@ -84,9 +84,14 @@ export function PageDesign({
       data-pattern={theme.backgroundPattern}
       style={
         {
-          "--avatar-size": theme.avatarSize === undefined ? undefined : `${theme.avatarSize}px`,
-          "--title-size": theme.titleSize === undefined ? undefined : `${theme.titleSize}px`,
-          "--spacing": theme.spacing === undefined ? undefined : `${theme.spacing}px`,
+          "--avatar-size":
+            theme.avatarSize === undefined
+              ? undefined
+              : `${theme.avatarSize}px`,
+          "--title-size":
+            theme.titleSize === undefined ? undefined : `${theme.titleSize}px`,
+          "--spacing":
+            theme.spacing === undefined ? undefined : `${theme.spacing}px`,
           "--bg": theme.background,
           "--ink": theme.textColor,
           "--button": theme.buttonColor,
@@ -158,7 +163,7 @@ export function PageDesign({
             ) : null,
           )}
         <div className={styles.signature}>
-          feito com <b>untrack</b>
+          feito com <b>LinkOr</b>
           <span aria-hidden="true"> ↗</span>
         </div>
       </div>

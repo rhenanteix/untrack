@@ -1164,7 +1164,7 @@ export function SmartPagesDashboard({
               aria-label="Voltar para a conta"
             >
               <span aria-hidden="true">↗</span>
-              <strong>untrack</strong>
+              <strong>LinkOr</strong>
             </Link>
             <span className="sp-studio-divider" aria-hidden="true" />
             <strong>Smart Pages</strong>

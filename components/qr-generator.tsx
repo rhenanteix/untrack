@@ -96,7 +96,7 @@ export function QrGenerator() {
       setDataUrl(data.dataUrl);
       setGeneratedUrl(submittedUrl);
       analytics.track("qr_generated");
-      if (response.headers.get("X-Untrack-Anonymous-Use") === "consumed") {
+      if (response.headers.get("X-LinkOr-Anonymous-Use") === "consumed") {
         analytics.track("anonymous_usage_consumed");
         analytics.track("free_tool_completed");
         setShowSignupPrompt(true);
@@ -116,7 +116,7 @@ export function QrGenerator() {
 
   async function share() {
     try {
-      await navigator.share({ title: "Arrume Meu Link", url: generatedUrl });
+      await navigator.share({ title: "LinkOr", url: generatedUrl });
     } catch (cause) {
       if (!(cause instanceof Error && cause.name === "AbortError")) {
         setError("Não foi possível compartilhar. Use o botão Copiar.");

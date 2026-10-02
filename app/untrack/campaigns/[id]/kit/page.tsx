@@ -53,7 +53,7 @@ export default function CampaignKitPage({ params: paramsPromise }: { params: Pro
   return (
     <section className="shell page-section">
       <div className="page-heading">
-        <span className="eyebrow">Untrack</span>
+        <span className="eyebrow">LinkOr</span>
         <h1>Kit de campanha: {campaign.name}</h1>
         <p>Informe o destino e os canais para gerar UTMs, links e QR Codes.</p>
       </div>
