@@ -2,6 +2,14 @@
 import { useRouter, useSearchParams } from "next/navigation";
 
 import { useEffect, useRef, useState, type FormEvent } from "react";
+import {
+  HiOutlineChartBarSquare,
+  HiOutlineEye,
+  HiOutlineLink,
+  HiOutlinePaintBrush,
+  HiOutlineShare,
+  HiOutlineUserCircle,
+} from "react-icons/hi2";
 import { BlockDestinationFields } from "@/components/smart-pages/block-destination-fields";
 import { AppearanceControls } from "@/components/smart-pages/appearance-controls";
 import { ImageUpload } from "@/components/smart-pages/image-upload";
@@ -984,11 +992,31 @@ export function SmartPagesDashboard({
                   }}
                 >
                   {[
-                    ["profile", "01", "Perfil"],
-                    ["appearance", "02", "Aparência"],
-                    ["links", "03", "Links"],
-                    ["analytics", "04", "Resultados"],
-                  ].map(([id, number, label]) => (
+                    {
+                      id: "profile",
+                      number: "01",
+                      label: "Perfil",
+                      Icon: HiOutlineUserCircle,
+                    },
+                    {
+                      id: "appearance",
+                      number: "02",
+                      label: "Aparência",
+                      Icon: HiOutlinePaintBrush,
+                    },
+                    {
+                      id: "links",
+                      number: "03",
+                      label: "Links",
+                      Icon: HiOutlineLink,
+                    },
+                    {
+                      id: "analytics",
+                      number: "04",
+                      label: "Resultados",
+                      Icon: HiOutlineChartBarSquare,
+                    },
+                  ].map(({ id, number, label, Icon }) => (
                     <button
                       type="button"
                       key={id}
@@ -999,6 +1027,7 @@ export function SmartPagesDashboard({
                       aria-controls={`sp-panel-${id}`}
                       onClick={() => setEditorSection(id)}
                     >
+                      <Icon aria-hidden="true" />
                       <span aria-hidden="true">{number}</span>
                       {label}
                     </button>
@@ -1742,24 +1771,53 @@ export function SmartPagesDashboard({
                     : "smart-page-preview-panel"
                 }
               >
-                <h2>Seu cartão ao vivo</h2>
-                <p className="muted">
-                  {dirty
-                    ? "As alterações aparecem aqui enquanto você edita. Salve para publicar o resultado."
-                    : "Confira a aparência antes de compartilhar."}
-                </p>
-                <SmartPagePreview
-                  page={{
-                    ...selected,
-                    ...profileDraft,
-                    blocks: [
-                      ...selected.blocks.map(
-                        (block) => blockDrafts[block.id] ?? block,
-                      ),
-                      ...(newBlockDraft ? [newBlockDraft] : []),
-                    ],
-                  }}
-                />
+                  <div className="smart-page-preview-heading">
+                    <div>
+                      <span>PRÉVIA AO VIVO</span>
+                      <h2>Seu link em ação</h2>
+                    </div>
+                    <div className="smart-page-preview-actions">
+                      <a
+                        href={publicUrl(selected.slug)}
+                        target="_blank"
+                        rel="noreferrer"
+                        aria-label="Abrir prévia em nova aba"
+                        title="Abrir prévia em nova aba"
+                      >
+                        <HiOutlineEye aria-hidden="true" />
+                      </a>
+                      <CopyButton
+                        value={`${publicOrigin}${publicUrl(selected.slug)}`}
+                        label="Copiar endereço da página"
+                      >
+                        <HiOutlineShare aria-hidden="true" />
+                      </CopyButton>
+                    </div>
+                  </div>
+                  <p className="muted">
+                    {dirty
+                      ? "A prévia acompanha suas alterações. Salve para publicar."
+                      : "Pronta para compartilhar com seu público."}
+                  </p>
+                  <div className="smart-page-device">
+                    <div className="smart-page-device-bar" aria-hidden="true">
+                      <i />
+                      <span />
+                      <b />
+                    </div>
+                    <SmartPagePreview
+                      page={{
+                        ...selected,
+                        ...profileDraft,
+                        blocks: [
+                          ...selected.blocks.map(
+                            (block) => blockDrafts[block.id] ?? block,
+                          ),
+                          ...(newBlockDraft ? [newBlockDraft] : []),
+                        ],
+                      }}
+                    />
+                  </div>
               </div>
             </>
           )}

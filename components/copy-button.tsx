@@ -1,14 +1,16 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { analytics } from "@/lib/client/analytics";
 
 export function CopyButton({
   value,
   label = "Copiar",
+  children,
 }: {
   value: string;
   label?: string;
+  children?: ReactNode;
 }) {
   const [copied, setCopied] = useState(false);
   const [error, setError] = useState("");
@@ -30,8 +32,14 @@ export function CopyButton({
 
   return (
     <>
-      <button className="button button-secondary" type="button" onClick={copy}>
-        {copied ? "Link copiado!" : label}
+      <button
+        className="button button-secondary"
+        type="button"
+        onClick={copy}
+        aria-label={copied ? "Link copiado!" : label}
+        title={copied ? "Link copiado!" : label}
+      >
+        {children ?? (copied ? "Link copiado!" : label)}
       </button>
       {error && (
         <span className="form-error" role="alert">

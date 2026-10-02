@@ -2057,3 +2057,278 @@
   padding: 0;
   accent-color: var(--ws-green);
 }
+
+/* Smart Pages uses an editorial studio surface while preserving the shared workspace controls. */
+.smart-pages-dashboard.is-editing {
+  width: min(1540px, calc(100% - 48px));
+}
+.smart-pages-dashboard.is-editing .smart-page-workbench {
+  grid-template-columns: minmax(0, 1fr) minmax(350px, 426px);
+  min-height: calc(100svh - 136px);
+  overflow: hidden;
+  border: 1px solid var(--ws-line);
+  border-radius: 12px;
+  background: var(--ws-panel);
+  box-shadow: 0 18px 45px #20312d0a;
+}
+.smart-pages-dashboard.is-editing .smart-page-editor {
+  display: grid;
+  grid-template-columns: 82px minmax(0, 1fr);
+  gap: 0 40px;
+  padding: 38px 44px 56px !important;
+}
+.smart-pages-dashboard.is-editing .smart-page-editor-heading {
+  grid-column: 1 / -1;
+  align-items: flex-start;
+  gap: 24px;
+  padding-bottom: 30px;
+  margin-bottom: 30px;
+  border-bottom: 1px solid var(--ws-line);
+}
+.smart-pages-dashboard.is-editing .smart-page-editor-heading h2 {
+  margin: 9px 0 3px;
+  font-size: 28px;
+  letter-spacing: 0;
+}
+.smart-pages-dashboard.is-editing .smart-page-editor-heading > div > p:not(.smart-page-save-status) {
+  margin: 0;
+  color: var(--ws-muted);
+  font-size: 12px;
+}
+.smart-pages-dashboard.is-editing .smart-page-save-status {
+  margin: 14px 0 0 !important;
+  color: #4f6e52 !important;
+  font-size: 11px !important;
+}
+.smart-pages-dashboard.is-editing .smart-page-editor > .sp-editor-sections {
+  position: sticky;
+  top: 28px;
+  align-self: start;
+  display: grid;
+  gap: 11px;
+  grid-column: 1;
+  grid-row: 2 / span 4;
+  padding: 0;
+  border: 0;
+}
+.smart-pages-dashboard.is-editing .sp-editor-sections button {
+  display: grid;
+  place-items: center;
+  width: 54px;
+  min-height: 54px;
+  flex: none;
+  padding: 7px;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  color: #69746f;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1.1;
+}
+.smart-pages-dashboard.is-editing .sp-editor-sections button > svg {
+  width: 23px;
+  height: 23px;
+  margin-bottom: 3px;
+}
+.smart-pages-dashboard.is-editing .sp-editor-sections button span {
+  display: none;
+}
+.smart-pages-dashboard.is-editing .sp-editor-sections button[aria-selected="true"] {
+  border-color: #20312d;
+  background: #20312d;
+  color: #fff;
+  box-shadow: 0 7px 16px #20312d1f;
+}
+.smart-pages-dashboard.is-editing .smart-page-editor > .smart-page-profile-form,
+.smart-pages-dashboard.is-editing .smart-page-editor > .smart-page-block-editor,
+.smart-pages-dashboard.is-editing .smart-page-editor > .smart-page-metrics {
+  grid-column: 2;
+  min-width: 0;
+}
+.smart-pages-dashboard.is-editing .smart-page-profile-form {
+  padding-top: 0;
+}
+.smart-pages-dashboard.is-editing .sp-save-bar {
+  position: static;
+  min-height: 54px;
+  margin: 0 0 26px;
+  padding: 0 0 18px;
+  border-bottom: 1px solid var(--ws-line);
+}
+.smart-pages-dashboard.is-editing .smart-page-form-fields > legend,
+.smart-pages-dashboard.is-editing .smart-page-block-editor > h3,
+.smart-pages-dashboard.is-editing .smart-page-metrics h3 {
+  font-size: 20px;
+  letter-spacing: 0;
+}
+.smart-pages-dashboard.is-editing .sp-section-intro {
+  max-width: 560px;
+  margin-bottom: 28px;
+  color: var(--ws-muted);
+  font-size: 13px;
+  line-height: 1.65;
+}
+.smart-pages-dashboard.is-editing .smart-page-preview-panel {
+  display: flex;
+  position: sticky;
+  top: 18px;
+  min-height: calc(100svh - 172px);
+  max-height: calc(100svh - 172px);
+  flex-direction: column;
+  overflow: auto;
+  border-left: 1px solid var(--ws-line);
+  background: #f6f7f2;
+  padding: 30px 28px 34px;
+}
+.smart-page-preview-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+}
+.smart-page-preview-heading > div:first-child > span {
+  display: block;
+  margin-bottom: 5px;
+  color: #6f7d60;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+}
+.smart-pages-dashboard.is-editing .smart-page-preview-panel h2 {
+  margin: 0;
+  font-size: 17px;
+  letter-spacing: 0;
+}
+.smart-page-preview-actions {
+  display: flex;
+  gap: 7px;
+}
+.smart-page-preview-actions > a,
+.smart-page-preview-actions > button {
+  display: grid;
+  width: 36px;
+  height: 36px;
+  min-height: 36px !important;
+  place-items: center;
+  padding: 0 !important;
+  border: 1px solid var(--ws-line) !important;
+  border-radius: 50% !important;
+  background: #fff !important;
+  color: var(--ws-ink) !important;
+  box-shadow: none !important;
+  font-size: 0 !important;
+}
+.smart-page-preview-actions > a:hover,
+.smart-page-preview-actions > button:hover {
+  border-color: #8da889 !important;
+  background: #edf4e3 !important;
+}
+.smart-page-preview-actions svg {
+  width: 18px;
+  height: 18px;
+}
+.smart-pages-dashboard.is-editing .smart-page-preview-panel > .muted {
+  display: block;
+  margin: 8px 0 22px;
+  color: var(--ws-muted);
+  font-size: 11px;
+  line-height: 1.5;
+}
+.smart-page-device {
+  width: min(100%, 332px);
+  margin: 0 auto;
+  overflow: hidden;
+  border: 8px solid #20312d;
+  border-radius: 30px;
+  background: #20312d;
+  box-shadow: 0 20px 35px #20312d29;
+}
+.smart-page-device-bar {
+  display: flex;
+  height: 28px;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 13px;
+  color: #fff;
+}
+.smart-page-device-bar i,
+.smart-page-device-bar b {
+  display: block;
+  width: 8px;
+  height: 8px;
+  border: 1px solid #dce6d1;
+  border-radius: 50%;
+}
+.smart-page-device-bar span {
+  width: 76px;
+  height: 5px;
+  border-radius: 99px;
+  background: #dce6d1;
+}
+.smart-page-device .smart-page-preview {
+  width: 100%;
+  max-width: none;
+  max-height: min(642px, calc(100svh - 312px));
+  overflow: auto;
+  background: #fff;
+}
+.smart-page-device .smart-page-preview > div {
+  min-height: 570px;
+}
+@media (max-width: 900px) {
+  .smart-pages-dashboard.is-editing {
+    width: calc(100% - 28px);
+  }
+  .smart-pages-dashboard.is-editing .smart-page-workbench {
+    display: block;
+    min-height: 0;
+    overflow: visible;
+  }
+  .smart-pages-dashboard.is-editing .smart-page-editor {
+    display: block;
+    padding: 24px 18px 36px !important;
+  }
+  .smart-pages-dashboard.is-editing .smart-page-editor-heading {
+    margin-bottom: 20px;
+    padding-bottom: 20px;
+  }
+  .smart-pages-dashboard.is-editing .smart-page-editor-heading h2 {
+    font-size: 23px;
+  }
+  .smart-pages-dashboard.is-editing .smart-page-editor > .sp-editor-sections {
+    position: static;
+    display: flex;
+    width: auto;
+    overflow-x: auto;
+    margin: 0 -18px 22px;
+    padding: 0 18px 8px;
+  }
+  .smart-pages-dashboard.is-editing .sp-editor-sections button {
+    display: flex;
+    width: auto;
+    min-width: 96px;
+    min-height: 42px;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    border-color: var(--ws-line);
+    border-radius: 8px;
+    font-size: 11px;
+  }
+  .smart-pages-dashboard.is-editing .sp-editor-sections button > svg {
+    width: 17px;
+    height: 17px;
+    margin: 0;
+  }
+  .smart-pages-dashboard.is-editing .smart-page-preview-panel {
+    position: static;
+    min-height: 0;
+    max-height: none;
+    padding: 24px 18px 34px;
+    border-top: 1px solid var(--ws-line);
+    border-left: 0;
+  }
+  .smart-page-device .smart-page-preview {
+    max-height: none;
+  }
+}
