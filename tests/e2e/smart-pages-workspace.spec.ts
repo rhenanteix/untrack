@@ -76,28 +76,39 @@ test("Smart Pages loads, previews profile changes, saves and publishes", async (
     .getByRole("button", { name: "Salvar perfil", exact: true })
     .click();
   await expect(page.getByText("Perfil salvo.", { exact: true })).toBeVisible();
-  await page.getByRole("tab", { name: "Links", exact: true }).click();
-  await page
-    .locator('form.smart-page-add-block input[name="title"]')
-    .fill("Conheça nossos projetos");
-  await page
-    .locator('form.smart-page-add-block input[name="destinationUrl"]')
+  await page.getByRole("tab", { name: "Conteúdo", exact: true }).click();
+  await page.getByRole("button", { name: "+ Adicionar", exact: true }).click();
+  const addContent = page.getByRole("dialog", { name: "Adicionar conteúdo" });
+  await addContent.locator('input[name="title"]').fill("Conheça nossos projetos");
+  await addContent
+    .locator('input[name="destinationUrl"]')
     .fill("https://example.com/portfolio");
-  await page
+  await addContent
     .getByRole("button", { name: "Adicionar link", exact: true })
     .click();
+  await expect(
+    page.getByRole("button", { name: /Conheça nossos projetos/ }),
+  ).toBeVisible();
+  await page.getByRole("button", { name: /Conheça nossos projetos/ }).click();
+  await page
+    .locator('.sp-content-block-editor input[name="title"]')
+    .fill("Projetos Aurora");
+  await expect(page.locator(".smart-page-save-status")).toHaveText("Salvo");
+  await expect(page.locator(".smart-page-preview")).toContainText(
+    "Projetos Aurora",
+  );
   await page.getByRole("button", { name: "Publicar", exact: true }).click();
   await expect(
     page.getByText("Página publicada.", { exact: true }),
   ).toBeVisible();
   await expect(
-    page.getByRole("link", { name: "Abrir página", exact: true }),
+    page.getByRole("link", { name: "Visualizar", exact: true }),
   ).toBeVisible();
   await expect(
-    page.getByRole("button", { name: "Copiar endereço", exact: true }),
+    page.getByRole("button", { name: "Compartilhar", exact: true }),
   ).toBeVisible();
   const publicPath = await page
-    .getByRole("link", { name: "Abrir página", exact: true })
+    .getByRole("link", { name: "Visualizar", exact: true })
     .getAttribute("href");
   const published = await context.newPage();
   await published.goto(publicPath!);
@@ -106,7 +117,7 @@ test("Smart Pages loads, previews profile changes, saves and publishes", async (
     published.getByRole("heading", { name: "Aurora Design" }),
   ).toBeVisible();
   await expect(
-    published.getByRole("link", { name: "Conheça nossos projetos" }),
+    published.getByRole("link", { name: "Projetos Aurora" }),
   ).toHaveAttribute("href", "https://example.com/portfolio");
   await published.screenshot({
     path: testInfo.outputPath("atelier-public.png"),

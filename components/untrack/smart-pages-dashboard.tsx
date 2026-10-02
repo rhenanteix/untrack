@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import type { IconType } from "react-icons";
 import {
+  HiOutlineArrowLeft,
   HiOutlineChartBarSquare,
   HiOutlineEye,
   HiOutlineLink,
@@ -23,14 +24,16 @@ import {
   FaXTwitter,
   FaYoutube,
 } from "react-icons/fa6";
-import { BlockDestinationFields } from "@/components/smart-pages/block-destination-fields";
 import { AppearanceControls } from "@/components/smart-pages/appearance-controls";
+import { AddContentModal } from "@/components/smart-pages/editor/add-content-modal";
+import { ContentList } from "@/components/smart-pages/editor/content-list";
+import type { SmartPageContentBlock } from "@/components/smart-pages/editor/content-block";
+import { SmartPagePreview } from "@/components/smart-pages/editor/smart-page-preview";
 import { ImageUpload } from "@/components/smart-pages/image-upload";
 import { SmartForm, SmartField } from "@/components/smart-pages/smart-form";
 import { CopyButton } from "@/components/copy-button";
 import { ActionStatus, apiRequest, useAction } from "./shared";
 
-import { PageDesign } from "@/components/smart-pages/page-design";
 import { ThemeGallery } from "@/components/smart-pages/theme-gallery";
 import type { SmartPageTheme } from "@/modules/smart-pages/themes";
 
@@ -123,28 +126,7 @@ interface SmartPageSummary {
   _count?: { blocks: number };
 }
 
-interface SmartPageBlock {
-  id: string;
-  type: "link" | "product";
-  position: number;
-  settings: {
-    title?: string;
-    destinationUrl?: string;
-    openInNewTab?: boolean;
-    buttonLabel?: string;
-  };
-  visible: boolean;
-  analyticsEnabled: boolean;
-  linkId?: string | null;
-  link: {
-    slug: string;
-    domainKey: string;
-    isActive: boolean;
-    expiresAt: string | null;
-  } | null;
-  productId?: string | null;
-  product?: { id: string; name: string } | null;
-}
+type SmartPageBlock = SmartPageContentBlock;
 
 interface SmartPageDetail extends SmartPageSummary {
   blocks: SmartPageBlock[];
@@ -196,40 +178,6 @@ function publicUrl(slug: string) {
   return `/page/${encodeURIComponent(slug)}`;
 }
 
-function SmartPagePreview({ page }: { page: SmartPageDetail }) {
-  const visible = page.blocks.filter(
-    (block) =>
-      block.visible &&
-      (!block.link ||
-        (block.link.isActive &&
-          (!block.link.expiresAt ||
-            new Date(block.link.expiresAt) > new Date()))),
-  );
-  return (
-    <div className="smart-page-preview" aria-label="Prévia da Smart Page">
-      <PageDesign
-        title={page.title}
-        description={page.description}
-        avatarUrl={page.avatarUrl}
-        theme={page.theme}
-        preview
-        socials={page.socialLinks.map((social) => (
-          <span key={social.network}>{social.network}</span>
-        ))}
-      >
-        {visible.map((block) => (
-          <span key={block.id}>
-            {block.type === "product"
-              ? block.product?.name ?? "Produto indisponível"
-              : block.settings.title}
-          </span>
-        ))}
-        {!visible.length && <p>Adicione seu primeiro link.</p>}
-      </PageDesign>
-    </div>
-  );
-}
-
 export function SmartPagesDashboard({
   initial,
   managedLinks,
@@ -268,10 +216,8 @@ export function SmartPagesDashboard({
   const [blockDrafts, setBlockDrafts] = useState<
     Record<string, SmartPageBlock>
   >({});
-  const [newBlockDraft, setNewBlockDraft] = useState<SmartPageBlock | null>(
-    null,
-  );
   const [activeForm, setActiveForm] = useState("");
+  const [contentModalOpen, setContentModalOpen] = useState(false);
   const [editorSection, setEditorSection] = useState("profile");
   const [search, setSearch] = useState(params.get("search") ?? "");
   const [appliedSearch, setAppliedSearch] = useState(
@@ -288,8 +234,16 @@ export function SmartPagesDashboard({
   );
   const [dirty, setDirty] = useState(false);
   const [dirtyBlocks, setDirtyBlocks] = useState<string[]>([]);
+  const [autosaveState, setAutosaveState] = useState<
+    "saved" | "saving" | "error"
+  >("saved");
+  const [autosaveError, setAutosaveError] = useState("");
+  const [autosaveRevision, setAutosaveRevision] = useState(0);
   const editorRef = useRef<HTMLHeadingElement>(null);
-  const hasUnsaved = dirty || dirtyBlocks.length > 0 || newBlockDraft !== null;
+  const blockDraftVersions = useRef<Record<string, number>>({});
+  const failedBlockDraftVersions = useRef<Record<string, number>>({});
+  const autosavingBlockId = useRef<string | null>(null);
+  const hasUnsaved = dirty || dirtyBlocks.length > 0;
   const draftSocialLinks =
     profileDraft.socialLinks ?? selected?.socialLinks ?? [];
   const activeSocial = socialNetworks.find(
@@ -309,6 +263,77 @@ export function SmartPagesDashboard({
     window.addEventListener("beforeunload", warn);
     return () => window.removeEventListener("beforeunload", warn);
   }, [hasUnsaved]);
+  useEffect(() => {
+    const blockId = dirtyBlocks.find(
+      (id) => blockDrafts[id]?.type === "link",
+    );
+    const draft = blockId ? blockDrafts[blockId] : null;
+    if (
+      !selected ||
+      !blockId ||
+      !draft ||
+      autosavingBlockId.current ||
+      failedBlockDraftVersions.current[blockId] ===
+        blockDraftVersions.current[blockId]
+    )
+      return;
+    const version = blockDraftVersions.current[blockId] ?? 0;
+    const timeout = window.setTimeout(() => {
+      autosavingBlockId.current = blockId;
+      setAutosaveState("saving");
+      void apiRequest<SmartPageBlock>(
+        `/api/smart-pages/${selected.id}/blocks/${blockId}`,
+        {
+          method: "PATCH",
+          body: JSON.stringify({
+            type: "link",
+            linkId: draft.linkId ?? null,
+            visible: draft.visible,
+            analyticsEnabled: draft.analyticsEnabled,
+            settings: {
+              title: draft.settings.title ?? "",
+              destinationUrl: draft.settings.destinationUrl || undefined,
+              openInNewTab: draft.settings.openInNewTab ?? true,
+            },
+          }),
+        },
+      )
+        .then((updated) => {
+          setSelected((current) =>
+            current
+              ? {
+                  ...current,
+                  blocks: current.blocks.map((item) =>
+                    item.id === updated.id ? updated : item,
+                  ),
+                }
+              : current,
+          );
+          if (blockDraftVersions.current[blockId] !== version) return;
+          setBlockDrafts((current) => {
+            const next = { ...current };
+            delete next[blockId];
+            return next;
+          });
+          setDirtyBlocks((ids) => ids.filter((id) => id !== blockId));
+          setAutosaveError("");
+          setAutosaveState("saved");
+        })
+        .catch((error) => {
+          if (blockDraftVersions.current[blockId] !== version) return;
+          failedBlockDraftVersions.current[blockId] = version;
+          setAutosaveError(
+            error instanceof Error ? error.message : "Não foi possível salvar o conteúdo.",
+          );
+          setAutosaveState("error");
+        })
+        .finally(() => {
+          autosavingBlockId.current = null;
+          setAutosaveRevision((current) => current + 1);
+        });
+    }, 650);
+    return () => window.clearTimeout(timeout);
+  }, [autosaveRevision, blockDrafts, dirtyBlocks, selected]);
   useEffect(() => {
     if (!editId) {
       // Clear the detail when browser navigation returns to the library.
@@ -334,9 +359,9 @@ export function SmartPagesDashboard({
         setDirty(false);
         setDirtyBlocks([]);
         setBlockDrafts({});
-        setNewBlockDraft(null);
         setEditorSection("profile");
         setEditorTab("editor");
+        setContentModalOpen(false);
         setSocialPickerOpen(false);
         setActiveSocialNetwork(null);
         setShowCreate(false);
@@ -393,7 +418,7 @@ export function SmartPagesDashboard({
     setSelected(null);
     setDirty(false);
     setDirtyBlocks([]);
-    setNewBlockDraft(null);
+    setContentModalOpen(false);
     router.push(`/untrack/smart-pages?${query}`, { scroll: false });
   }
   async function loadPages(page: number, query = appliedSearch) {
@@ -496,7 +521,11 @@ export function SmartPagesDashboard({
       setDirty(false);
       setDirtyBlocks([]);
       setBlockDrafts({});
-      setNewBlockDraft(null);
+      blockDraftVersions.current = {};
+      failedBlockDraftVersions.current = {};
+      setAutosaveError("");
+      setAutosaveState("saved");
+      setContentModalOpen(false);
       setShowCreate(false);
       action.setNotice(
         "Rascunho criado. Adicione seus links e publique quando estiver pronto.",
@@ -568,7 +597,7 @@ export function SmartPagesDashboard({
         current ? { ...current, blocks: [...current.blocks, block] } : current,
       );
       form.reset();
-      setNewBlockDraft(null);
+      setContentModalOpen(false);
       action.setNotice("Link adicionado.");
     });
   }
@@ -592,6 +621,7 @@ export function SmartPagesDashboard({
       });
       setProducts((current) => [product, ...current]);
       form.reset();
+      setContentModalOpen(false);
       action.setNotice("Produto criado. Adicione-o à sua página quando quiser.");
     });
   }
@@ -618,53 +648,8 @@ export function SmartPagesDashboard({
         current ? { ...current, blocks: [...current.blocks, block] } : current,
       );
       form.reset();
+      setContentModalOpen(false);
       action.setNotice("Produto adicionado à página.");
-    });
-  }
-
-  async function saveBlock(
-    event: FormEvent<HTMLFormElement>,
-    block: SmartPageBlock,
-  ) {
-    event.preventDefault();
-    if (!selected) return;
-    setActiveForm(block.id);
-    const data = new FormData(event.currentTarget);
-    await action.run(async () => {
-      const updated = await apiRequest<SmartPageBlock>(
-        `/api/smart-pages/${selected.id}/blocks/${block.id}`,
-        {
-          method: "PATCH",
-          body: JSON.stringify({
-            type: "link",
-            linkId: data.get("linkId") || null,
-            visible: data.get("visible") === "on",
-            analyticsEnabled: data.get("analyticsEnabled") === "on",
-            settings: {
-              title: data.get("title"),
-              destinationUrl: data.get("destinationUrl") || undefined,
-              openInNewTab: data.get("openInNewTab") === "on",
-            },
-          }),
-        },
-      );
-      setSelected((current) =>
-        current
-          ? {
-              ...current,
-              blocks: current.blocks.map((item) =>
-                item.id === updated.id ? updated : item,
-              ),
-            }
-          : current,
-      );
-      setDirtyBlocks((ids) => ids.filter((id) => id !== block.id));
-      setBlockDrafts((current) => {
-        const next = { ...current };
-        delete next[block.id];
-        return next;
-      });
-      action.setNotice("Link atualizado.");
     });
   }
 
@@ -721,26 +706,111 @@ export function SmartPagesDashboard({
           : current,
       );
       setDirtyBlocks((ids) => ids.filter((id) => id !== blockId));
+      setBlockDrafts((current) => {
+        const next = { ...current };
+        delete next[blockId];
+        return next;
+      });
       action.setNotice("Link excluído.");
     });
   }
 
-  async function moveBlock(blockId: string, direction: -1 | 1) {
+  async function toggleBlock(block: SmartPageBlock) {
     if (!selected) return;
-    const position = selected.blocks.findIndex((block) => block.id === blockId);
-    const destination = position + direction;
-    if (destination < 0 || destination >= selected.blocks.length) return;
-    const blocks = [...selected.blocks];
-    [blocks[position], blocks[destination]] = [
-      blocks[destination],
-      blocks[position],
-    ];
+    if (block.type === "product" && !block.productId) return;
+    const previous = selected.blocks;
+    const visible = !block.visible;
+    setSelected((current) =>
+      current
+        ? {
+            ...current,
+            blocks: current.blocks.map((item) =>
+              item.id === block.id ? { ...item, visible } : item,
+            ),
+          }
+        : current,
+    );
     await action.run(async () => {
-      await apiRequest(`/api/smart-pages/${selected.id}/blocks`, {
-        method: "PATCH",
-        body: JSON.stringify({ blockIds: blocks.map((block) => block.id) }),
-      });
-      setSelected((current) => (current ? { ...current, blocks } : current));
+      try {
+        const updated = await apiRequest<SmartPageBlock>(
+          `/api/smart-pages/${selected.id}/blocks/${block.id}`,
+          {
+            method: "PATCH",
+            body: JSON.stringify(
+              block.type === "product"
+                ? {
+                    type: "product",
+                    productId: block.productId,
+                    visible,
+                    analyticsEnabled: block.analyticsEnabled,
+                    settings: {
+                      buttonLabel: block.settings.buttonLabel ?? "Ver produto",
+                    },
+                  }
+                : {
+                    type: "link",
+                    linkId: block.linkId ?? null,
+                    visible,
+                    analyticsEnabled: block.analyticsEnabled,
+                    settings: {
+                      title: block.settings.title ?? "",
+                      destinationUrl: block.settings.destinationUrl || undefined,
+                      openInNewTab: block.settings.openInNewTab ?? true,
+                    },
+                  },
+            ),
+          },
+        );
+        setSelected((current) =>
+          current
+            ? {
+                ...current,
+                blocks: current.blocks.map((item) =>
+                  item.id === updated.id ? updated : item,
+                ),
+              }
+            : current,
+        );
+        setBlockDrafts((current) => {
+          const draft = current[block.id];
+          return draft
+            ? { ...current, [block.id]: { ...draft, visible } }
+            : current;
+        });
+        if (blockDraftVersions.current[block.id] !== undefined) {
+          blockDraftVersions.current[block.id] += 1;
+          delete failedBlockDraftVersions.current[block.id];
+        }
+      } catch (error) {
+        setSelected((current) =>
+          current ? { ...current, blocks: previous } : current,
+        );
+        throw error;
+      }
+    });
+  }
+
+  async function reorderBlocks(blockIds: string[]) {
+    if (!selected || blockIds.length !== selected.blocks.length) return;
+    const byId = new Map(selected.blocks.map((block) => [block.id, block]));
+    const blocks = blockIds.map((id) => byId.get(id)).filter(
+      (block): block is SmartPageBlock => Boolean(block),
+    );
+    if (blocks.length !== selected.blocks.length) return;
+    const previous = selected.blocks;
+    setSelected((current) => (current ? { ...current, blocks } : current));
+    await action.run(async () => {
+      try {
+        await apiRequest(`/api/smart-pages/${selected.id}/blocks`, {
+          method: "PATCH",
+          body: JSON.stringify({ blockIds }),
+        });
+      } catch (error) {
+        setSelected((current) =>
+          current ? { ...current, blocks: previous } : current,
+        );
+        throw error;
+      }
     });
   }
 
@@ -779,22 +849,24 @@ export function SmartPagesDashboard({
       className={`smart-pages-dashboard sp-studio ${editId ? "is-editing" : "is-library"}`}
     >
       <div className="sp-studio-topbar">
-        <div className="sp-studio-product">
-          <Link href="/conta" className="sp-studio-brand" aria-label="Voltar para a conta">
-            <span aria-hidden="true">↗</span>
-            <strong>untrack</strong>
-          </Link>
-          <span className="sp-studio-divider" aria-hidden="true" />
-          <strong>Smart Pages</strong>
-        </div>
-        {editId && (
+        {editId ? (
           <button
             type="button"
-            className="button button-secondary"
+            className="sp-studio-back"
             onClick={backToLibrary}
           >
-            Todas as páginas
+            <HiOutlineArrowLeft aria-hidden="true" />
+            Smart Pages
           </button>
+        ) : (
+          <div className="sp-studio-product">
+            <Link href="/conta" className="sp-studio-brand" aria-label="Voltar para a conta">
+              <span aria-hidden="true">↗</span>
+              <strong>untrack</strong>
+            </Link>
+            <span className="sp-studio-divider" aria-hidden="true" />
+            <strong>Smart Pages</strong>
+          </div>
         )}
       </div>
       <div className="dashboard-heading">
@@ -1025,11 +1097,19 @@ export function SmartPagesDashboard({
                     <h2 ref={editorRef} tabIndex={-1}>
                       {selected.title}
                     </h2>
-                    <p>/page/{selected.slug}</p>
+                    <p className="sp-editor-url">untrack.app/page/{selected.slug}</p>
                     <p className="smart-page-save-status" role="status">
-                      {hasUnsaved
-                        ? "Alterações não salvas — salve antes de publicar ou trocar de página."
-                        : "Todas as alterações salvas"}
+                      {action.busy
+                        ? "Salvando…"
+                        : autosaveState === "saving"
+                          ? "Salvando…"
+                        : action.error
+                          ? "Erro ao salvar"
+                          : autosaveState === "error"
+                            ? "Erro ao salvar"
+                          : hasUnsaved
+                            ? "Alterações pendentes"
+                            : "Salvo"}
                     </p>
                   </div>
                   <div className="action-row">
@@ -1040,13 +1120,13 @@ export function SmartPagesDashboard({
                         target="_blank"
                         rel="noreferrer"
                       >
-                        Abrir página
+                        Visualizar
                       </a>
                     )}
                     {selected.status === "published" && (
                       <CopyButton
                         value={`${publicOrigin}${publicUrl(selected.slug)}`}
-                        label="Copiar endereço"
+                        label="Compartilhar"
                       />
                     )}
                     <button
@@ -1115,7 +1195,7 @@ export function SmartPagesDashboard({
                     {
                       id: "links",
                       number: "03",
-                      label: "Links",
+                      label: "Conteúdo",
                       Icon: HiOutlineLink,
                     },
                     {
@@ -1404,412 +1484,81 @@ export function SmartPagesDashboard({
                 </SmartForm>
 
                 <section
-                  id="sp-panel-links"
+                  id="sp-panel-content"
                   role="tabpanel"
                   aria-labelledby="sp-tab-links"
                   hidden={editorSection !== "links"}
-                  className="smart-page-block-editor"
+                  className="smart-page-block-editor sp-content-editor"
                 >
-                  <h3 id="smart-page-content-heading">
-                    Seus links, na ordem certa
-                  </h3>
-                  <p className="muted">
-                    Adicione seu LinkedIn, currículo em PDF hospedado, projetos
-                    ou contato. Use URLs completas (https://). Você pode
-                    reordenar os links abaixo.
-                  </p>
-                  <fieldset
-                    className="smart-page-form-fields"
-                    disabled={!canEdit || action.busy}
-                  >
-                    <SmartForm
-                      className="smart-page-add-block"
-                      onSubmit={addBlock}
-                      onChange={(event) => {
-                        const data = new FormData(event.currentTarget);
-                        const title = String(data.get("title") ?? "");
-                        const destinationUrl = String(
-                          data.get("destinationUrl") ?? "",
-                        );
-                        setNewBlockDraft(
-                          title || destinationUrl
-                            ? {
-                                id: "preview-new",
-                                type: "link",
-                                position: selected.blocks.length,
-                                visible: true,
-                                analyticsEnabled: false,
-                                linkId:
-                                  String(data.get("linkId") || "") || null,
-                                link:
-                                  managedLinks.find(
-                                    (link) => link.id === data.get("linkId"),
-                                  ) ?? null,
-                                settings: {
-                                  title: title || "Novo link",
-                                  destinationUrl,
-                                  openInNewTab: true,
-                                },
-                              }
-                            : null,
-                        );
-                      }}
-                      failure={activeForm === "add" ? action.failure : null}
+                  <div className="sp-content-editor-heading">
+                    <div>
+                      <span>CONTEÚDO DA PÁGINA</span>
+                      <h3 id="smart-page-content-heading">Monte sua página</h3>
+                      <p className="muted">
+                        Arraste para reorganizar. Selecione um card para editar apenas o que precisar.
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      className="button"
+                      disabled={!canEdit || action.busy}
+                      onClick={() => setContentModalOpen(true)}
                     >
-                      <SmartField>
-                        Título
-                        <input
-                          required
-                          name="title"
-                          maxLength={120}
-                          placeholder="Meu portfólio"
-                        />
-                      </SmartField>
-                      <BlockDestinationFields links={managedLinks} />
-                      <SmartField className="smart-page-check">
-                        <input
-                          type="checkbox"
-                          name="openInNewTab"
-                          defaultChecked
-                        />{" "}
-                        Abrir em nova aba
-                      </SmartField>
-                      <button className="button" disabled={action.busy}>
-                        Adicionar link
-                      </button>
-                    </SmartForm>
-                    <details className="sp-advanced">
-                      <summary>Produtos</summary>
-                      <SmartForm
-                        onSubmit={createProduct}
-                        failure={
-                          activeForm === "create-product"
-                            ? action.failure
-                            : null
-                        }
-                      >
-                        <SmartField>
-                          Nome do produto
-                          <input required name="name" maxLength={120} />
-                        </SmartField>
-                        <SmartField>
-                          Endereço do produto
-                          <input
-                            required
-                            name="slug"
-                            minLength={3}
-                            maxLength={140}
-                            pattern="[a-z0-9]+(?:-[a-z0-9]+)*"
-                          />
-                        </SmartField>
-                        <SmartField>
-                          Tipo
-                          <select name="type" defaultValue="digital">
-                            <option value="digital">Produto digital</option>
-                            <option value="physical">Produto físico</option>
-                            <option value="course">Curso</option>
-                            <option value="booking">Agendamento</option>
-                            <option value="session">Sessão</option>
-                            <option value="mentorship">Mentoria</option>
-                            <option value="coaching">Coaching</option>
-                            <option value="bundle">Bundle</option>
-                            <option value="event">Evento</option>
-                            <option value="subscription">Assinatura</option>
-                          </select>
-                        </SmartField>
-                        <SmartField>
-                          Preço (R$)
-                          <input
-                            required
-                            name="price"
-                            type="number"
-                            min="0"
-                            max="9999999.99"
-                            step="0.01"
-                          />
-                        </SmartField>
-                        <SmartField>
-                          Status
-                          <select name="status" defaultValue="draft">
-                            <option value="draft">Rascunho</option>
-                            <option value="active">Ativo</option>
-                          </select>
-                        </SmartField>
-                        <button className="button button-secondary" disabled={action.busy}>
-                          Criar produto
-                        </button>
-                      </SmartForm>
-                      <SmartForm
-                        onSubmit={addProductBlock}
-                        failure={
-                          activeForm === "add-product" ? action.failure : null
-                        }
-                      >
-                        <SmartField>
-                          Produto
-                          <select required name="productId" defaultValue="">
-                            <option value="" disabled>
-                              Selecione um produto
-                            </option>
-                            {products
-                              .filter((product) => product.status !== "archived")
-                              .map((product) => (
-                                <option key={product.id} value={product.id}>
-                                  {product.name}
-                                  {product.status === "draft" ? " (rascunho)" : ""}
-                                </option>
-                              ))}
-                          </select>
-                        </SmartField>
-                        <SmartField>
-                          Texto do botão
-                          <input
-                            name="buttonLabel"
-                            maxLength={40}
-                            defaultValue="Ver produto"
-                          />
-                        </SmartField>
-                        <button
-                          className="button button-secondary"
-                          disabled={action.busy || !products.some((product) => product.status !== "archived")}
-                        >
-                          Adicionar produto
-                        </button>
-                      </SmartForm>
-                    </details>
-                    <ol className="smart-page-block-list">
-                      {selected.blocks.map((block, index) =>
-                        block.type === "product" ? (
-                          <li key={`${block.id}:${block.productId}`}>
-                            <details className="sp-link-card">
-                              <summary>
-                                <strong>
-                                  {block.product?.name ??
-                                    "Produto indisponível"}
-                                </strong>
-                                <span>
-                                  {block.visible ? "Visível" : "Oculto"} · Produto{" "}
-                                  {index + 1}
-                                </span>
-                              </summary>
-                              {block.productId ? (
-                                <SmartForm
-                                  failure={
-                                    activeForm === block.id
-                                      ? action.failure
-                                      : null
-                                  }
-                                  onSubmit={(event) =>
-                                    saveProductBlock(event, block)
-                                  }
-                                >
-                                  <SmartField>
-                                    Texto do botão
-                                    <input
-                                      required
-                                      name="buttonLabel"
-                                      maxLength={40}
-                                      defaultValue={
-                                        block.settings.buttonLabel ?? "Ver produto"
-                                      }
-                                    />
-                                  </SmartField>
-                                  <div className="smart-page-block-options">
-                                    <SmartField className="smart-page-check">
-                                      <input
-                                        type="checkbox"
-                                        name="visible"
-                                        defaultChecked={block.visible}
-                                      />{" "}
-                                      Visível
-                                    </SmartField>
-                                    <SmartField className="smart-page-check">
-                                      <input
-                                        type="checkbox"
-                                        name="analyticsEnabled"
-                                        defaultChecked={block.analyticsEnabled}
-                                      />{" "}
-                                      Medir cliques
-                                    </SmartField>
-                                  </div>
-                                  <div className="action-row">
-                                    <button
-                                      className="button button-secondary"
-                                      disabled={action.busy}
-                                    >
-                                      Salvar
-                                    </button>
-                                    <button
-                                      type="button"
-                                      className="button button-quiet"
-                                      disabled={action.busy || index === 0}
-                                      onClick={() =>
-                                        void moveBlock(block.id, -1)
-                                      }
-                                    >
-                                      Mover acima
-                                    </button>
-                                    <button
-                                      type="button"
-                                      className="button button-quiet"
-                                      disabled={
-                                        action.busy ||
-                                        index === selected.blocks.length - 1
-                                      }
-                                      onClick={() =>
-                                        void moveBlock(block.id, 1)
-                                      }
-                                    >
-                                      Mover abaixo
-                                    </button>
-                                    <button
-                                      type="button"
-                                      className="button button-quiet danger-text"
-                                      disabled={action.busy}
-                                      onClick={() => void deleteBlock(block.id)}
-                                    >
-                                      Excluir
-                                    </button>
-                                  </div>
-                                </SmartForm>
-                              ) : (
-                                <p>O produto associado não está mais disponível.</p>
-                              )}
-                            </details>
-                          </li>
-                        ) : (
-                        <li
-                          key={`${block.id}:${block.settings.title}:${block.visible}:${block.linkId}`}
-                        >
-                          <details className="sp-link-card">
-                            <summary>
-                              <strong>
-                                {blockDrafts[block.id]?.settings.title ??
-                                  block.settings.title}
-                              </strong>
-                              <span>
-                                {block.visible ? "Visível" : "Oculto"} · Link{" "}
-                                {index + 1}
-                              </span>
-                            </summary>
-                            <SmartForm
-                              failure={
-                                activeForm === block.id ? action.failure : null
-                              }
-                              onChange={(event) => {
-                                const data = new FormData(event.currentTarget);
-                                setBlockDrafts((current) => ({
-                                  ...current,
-                                  [block.id]: {
-                                    ...block,
-                                    linkId:
-                                      String(data.get("linkId") || "") || null,
-                                    link:
-                                      managedLinks.find(
-                                        (link) =>
-                                          link.id === data.get("linkId"),
-                                      ) ?? null,
-                                    visible: data.get("visible") === "on",
-                                    settings: {
-                                      ...block.settings,
-                                      title: String(data.get("title") ?? ""),
-                                      destinationUrl: String(
-                                        data.get("destinationUrl") ?? "",
-                                      ),
-                                    },
-                                  },
-                                }));
-                                setDirtyBlocks((ids) =>
-                                  ids.includes(block.id)
-                                    ? ids
-                                    : [...ids, block.id],
-                                );
-                              }}
-                              onSubmit={(event) => saveBlock(event, block)}
-                            >
-                              <SmartField>
-                                Título
-                                <input
-                                  required
-                                  name="title"
-                                  maxLength={120}
-                                  defaultValue={block.settings.title}
-                                />
-                              </SmartField>
-                              <BlockDestinationFields
-                                links={managedLinks}
-                                initialUrl={block.settings.destinationUrl}
-                                initialLinkId={block.linkId}
-                              />
-                              <div className="smart-page-block-options">
-                                <SmartField className="smart-page-check">
-                                  <input
-                                    type="checkbox"
-                                    name="visible"
-                                    defaultChecked={block.visible}
-                                  />{" "}
-                                  Visível
-                                </SmartField>
-                                <SmartField className="smart-page-check">
-                                  <input
-                                    type="checkbox"
-                                    name="analyticsEnabled"
-                                    defaultChecked={block.analyticsEnabled}
-                                  />{" "}
-                                  Medir cliques
-                                </SmartField>
-                                <SmartField className="smart-page-check">
-                                  <input
-                                    type="checkbox"
-                                    name="openInNewTab"
-                                    defaultChecked={block.settings.openInNewTab}
-                                  />{" "}
-                                  Nova aba
-                                </SmartField>
-                              </div>
-                              <div className="action-row">
-                                <button
-                                  className="button button-secondary"
-                                  disabled={action.busy}
-                                >
-                                  Salvar
-                                </button>
-                                <button
-                                  type="button"
-                                  className="button button-quiet"
-                                  disabled={action.busy || index === 0}
-                                  onClick={() => void moveBlock(block.id, -1)}
-                                >
-                                  Mover acima
-                                </button>
-                                <button
-                                  type="button"
-                                  className="button button-quiet"
-                                  disabled={
-                                    action.busy ||
-                                    index === selected.blocks.length - 1
-                                  }
-                                  onClick={() => void moveBlock(block.id, 1)}
-                                >
-                                  Mover abaixo
-                                </button>
-                                <button
-                                  type="button"
-                                  className="button button-quiet danger-text"
-                                  disabled={action.busy}
-                                  onClick={() => void deleteBlock(block.id)}
-                                >
-                                  Excluir
-                                </button>
-                              </div>
-                            </SmartForm>
-                          </details>
-                        </li>
-                        ),
-                      )}
-                    </ol>
-                  </fieldset>
+                      + Adicionar
+                    </button>
+                  </div>
+                  <ContentList
+                    blocks={selected.blocks}
+                    drafts={blockDrafts}
+                    managedLinks={managedLinks}
+                    busy={action.busy}
+                    failure={activeForm ? action.failure : null}
+                    canEdit={canEdit}
+                    onDraftChange={(draft) => {
+                      action.setNotice("");
+                      blockDraftVersions.current[draft.id] =
+                        (blockDraftVersions.current[draft.id] ?? 0) + 1;
+                      delete failedBlockDraftVersions.current[draft.id];
+                      setAutosaveError("");
+                      setBlockDrafts((current) => ({
+                        ...current,
+                        [draft.id]: draft,
+                      }));
+                      setDirtyBlocks((ids) =>
+                        ids.includes(draft.id) ? ids : [...ids, draft.id],
+                      );
+                    }}
+                    onSaveProduct={(event, block) =>
+                      void saveProductBlock(event, block)
+                    }
+                    onToggle={(block) => void toggleBlock(block)}
+                    onDelete={(block) => void deleteBlock(block.id)}
+                    onReorder={(blockIds) => void reorderBlocks(blockIds)}
+                  />
+                  {autosaveError && (
+                    <p className="sp-content-autosave-error" role="alert">
+                      {autosaveError}
+                    </p>
+                  )}
                 </section>
+
+                <AddContentModal
+                  open={contentModalOpen}
+                  links={managedLinks}
+                  products={products}
+                  busy={action.busy}
+                  failure={
+                    activeForm === "add" ||
+                    activeForm === "add-product" ||
+                    activeForm === "create-product"
+                      ? action.error
+                      : ""
+                  }
+                  onClose={() => setContentModalOpen(false)}
+                  onAddLink={addBlock}
+                  onAddProduct={addProductBlock}
+                  onCreateProduct={createProduct}
+                />
                 <section
                   id="sp-panel-analytics"
                   role="tabpanel"
@@ -1981,7 +1730,6 @@ export function SmartPagesDashboard({
                           ...selected.blocks.map(
                             (block) => blockDrafts[block.id] ?? block,
                           ),
-                          ...(newBlockDraft ? [newBlockDraft] : []),
                         ],
                       }}
                     />
