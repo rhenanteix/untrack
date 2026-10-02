@@ -66,11 +66,11 @@ test("shared shell, real libraries, filters, bulk isolation and recoverable erro
   await page.goto("/conta");
   await expect(page.locator(".workspace-nav-link").first()).toBeAttached();
   await expect(
-    page.getByRole("heading", { name: "Visão geral" }),
+    page.getByRole("heading", { name: /Boa (dia|tarde|noite), Biblioteca/i }),
   ).toBeVisible();
-  await expect(page.getByRole("link", { name: "Todos os links" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Links" })).toBeVisible();
   await expect(page.getByRole("link", { name: "UTM Builder" })).toBeVisible();
-  await expect(page.getByRole("link", { name: "Minhas páginas" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Smart Pages" })).toBeVisible();
   await expect(page.getByRole("link", { name: "Analytics" })).toBeVisible();
   await expect(page.getByText("Em breve", { exact: true })).toHaveCount(0);
   await noOverflow(page);
@@ -79,7 +79,7 @@ test("shared shell, real libraries, filters, bulk isolation and recoverable erro
     fullPage: true,
   });
   const baseline = workspaceRequests;
-  await nav(page, "Todos os links");
+  await nav(page, "Links");
   await expect(
     page.getByRole("link", { name: "Portfolio real", exact: true }),
   ).toBeVisible();

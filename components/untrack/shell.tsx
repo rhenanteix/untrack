@@ -1,113 +1,237 @@
 "use client";
+
 import Link from "next/link";
-import { SignOutButton } from "@/components/sign-out-button";
 import { usePathname } from "next/navigation";
 import {
+  FiActivity,
+  FiBarChart2,
+  FiChevronDown,
+  FiChevronsLeft,
+  FiChevronsRight,
+  FiGrid,
+  FiHome,
+  FiLink,
+  FiMenu,
+  FiMessageCircle,
+  FiMoreHorizontal,
+  FiPlus,
+  FiSettings,
+  FiTarget,
+  FiTool,
+} from "react-icons/fi";
+import type { IconType } from "react-icons";
+import {
   createContext,
-  useContext,
   useCallback,
+  useContext,
   useEffect,
   useState,
+  useSyncExternalStore,
   type ReactNode,
 } from "react";
+import { SignOutButton } from "@/components/sign-out-button";
+import { authClient } from "@/lib/client/auth";
 import { analytics } from "@/lib/client/analytics";
-import { apiRequest, useAction, ActionStatus } from "./shared";
-import { WorkspaceCommandPalette } from "./workspace-command-palette";
+import { ActionStatus, apiRequest, useAction } from "./shared";
+
 interface Membership {
   role: string;
   workspace: { id: string; name: string; plan: string };
 }
 
-type NavigationItem = { href: string; label: string };
-type NavigationGroup = {
-  label: string;
-  collapsible: boolean;
-  items: NavigationItem[];
+type NavigationItem = { href: string; label: string; icon: IconType };
+type NavigationGroup = { label: string; items: NavigationItem[] };
+
+const overviewItem: NavigationItem = {
+  href: "/conta",
+  label: "Início",
+  icon: FiHome,
 };
-
-const overviewItem = { href: "/conta", label: "Visão geral" };
-
-const restrictedAdministrationHrefs = new Set([
-  "/untrack/members",
-  "/untrack/domains",
-  "/untrack/audit",
-  "/untrack/api",
-]);
-
-const administrationItems: NavigationItem[] = [
-  { href: "/conta/perfil", label: "Perfil" },
-  { href: "/untrack/members", label: "Equipe" },
-  { href: "/untrack/domains", label: "Domínios" },
-  { href: "/untrack/usage", label: "Plano e cotas" },
-  { href: "/untrack/audit", label: "Auditoria" },
-  { href: "/untrack/api", label: "API" },
-];
 
 const groups: NavigationGroup[] = [
   {
-    label: "Links",
-    collapsible: false,
+    label: "Gestão",
     items: [
-      { href: "/untrack/short-links", label: "Todos os links" },
-      { href: "/untrack/whatsapp", label: "WhatsApp" },
+      { href: "/untrack/short-links", label: "Links", icon: FiLink },
+      { href: "/untrack/smart-pages", label: "Smart Pages", icon: FiGrid },
+      { href: "/untrack/campaigns", label: "Campanhas", icon: FiTarget },
     ],
   },
   {
-    label: "Campanhas",
-    collapsible: false,
+    label: "Ferramentas",
     items: [
-      { href: "/untrack/campaigns", label: "Campanhas" },
-      { href: "/untrack/utm", label: "UTM Builder" },
-      { href: "/untrack/qr", label: "QR Codes" },
-    ],
-  },
-  {
-    label: "Smart Pages",
-    collapsible: false,
-    items: [
-      { href: "/untrack/smart-pages", label: "Minhas páginas" },
+      { href: "/untrack/utm", label: "UTM Builder", icon: FiTool },
+      { href: "/untrack/qr", label: "QR Codes", icon: FiGrid },
+      { href: "/untrack/whatsapp", label: "WhatsApp", icon: FiMessageCircle },
     ],
   },
   {
     label: "Inteligência",
-    collapsible: false,
     items: [
-      { href: "/conta#desempenho", label: "Analytics" },
-      { href: "/untrack/link-health", label: "Monitoring" },
-      { href: "/conta#atencao", label: "Insights" },
+      { href: "/conta#desempenho", label: "Analytics", icon: FiBarChart2 },
+      { href: "/untrack/link-health", label: "Monitoring", icon: FiActivity },
+      { href: "/conta#insights", label: "Insights", icon: FiActivity },
     ],
   },
-  {
-    label: "Configurações",
-    collapsible: true,
-    items: administrationItems,
-  },
 ];
-const roleNames: Record<string, string> = {
-  owner: "Proprietário",
-  admin: "Administrador",
-  editor: "Editor",
-  viewer: "Leitor",
-};
+
 const planNames: Record<string, string> = {
   free: "Gratuito",
-  pro: "Profissional",
-  business: "Empresarial",
+  pro: "Professional",
+  business: "Business",
 };
+
 const WorkspaceContext = createContext<Membership | undefined>(undefined);
+
 export function useWorkspace() {
   return useContext(WorkspaceContext);
 }
+
+function initials(name: string) {
+  const words = name.trim().split(/\s+/).filter(Boolean);
+  return words
+    .slice(0, 2)
+    .map((word) => word[0])
+    .join("")
+    .toUpperCase() || "UT";
+}
+
+function subscribeToSidebarPreference(listener: () => void) {
+  window.addEventListener("storage", listener);
+  window.addEventListener("untrack-sidebar-preference", listener);
+  return () => {
+    window.removeEventListener("storage", listener);
+    window.removeEventListener("untrack-sidebar-preference", listener);
+  };
+}
+
+function sidebarIsCollapsed() {
+  return window.localStorage.getItem("untrack-sidebar-collapsed") === "true";
+}
+
+function WorkspaceSwitcher({
+  active,
+  current,
+  memberships,
+  busy,
+  onSelect,
+  onCreate,
+}: {
+  active: string | null;
+  current: Membership | undefined;
+  memberships: Membership[];
+  busy: boolean;
+  onSelect: (id: string) => void;
+  onCreate: (name: string) => void;
+}) {
+  const [name, setName] = useState("");
+  return (
+    <details className="workspace-switcher">
+      <summary title="Trocar workspace">
+        <span className="workspace-switcher-mark" aria-hidden="true">
+          <FiGrid />
+        </span>
+        <span className="workspace-switcher-copy">
+          <strong>{current?.workspace.name ?? "Seu workspace"}</strong>
+          <small>{current ? planNames[current.workspace.plan] : ""}</small>
+        </span>
+        <FiChevronDown className="workspace-switcher-chevron" aria-hidden="true" />
+      </summary>
+      <div className="workspace-switcher-popover">
+        <span className="workspace-switcher-title">Workspaces</span>
+        <div className="workspace-switcher-options">
+          {memberships.map((item) => (
+            <button
+              key={item.workspace.id}
+              type="button"
+              disabled={busy}
+              onClick={() => onSelect(item.workspace.id)}
+              aria-current={item.workspace.id === active ? "page" : undefined}
+            >
+              <span>
+                <strong>{item.workspace.name}</strong>
+                <small>{planNames[item.workspace.plan]}</small>
+              </span>
+              {item.workspace.id === active ? (
+                <span className="workspace-switcher-selected" aria-label="Selecionado" />
+              ) : null}
+            </button>
+          ))}
+        </div>
+        <form
+          className="workspace-create-form"
+          onSubmit={(event) => {
+            event.preventDefault();
+            onCreate(name);
+          }}
+        >
+          <label>
+            <span>Novo workspace</span>
+            <input
+              required
+              maxLength={120}
+              value={name}
+              disabled={busy}
+              onChange={(event) => setName(event.target.value)}
+            />
+          </label>
+          <button type="submit" disabled={busy}>
+            <FiPlus aria-hidden="true" />
+            Criar workspace
+          </button>
+        </form>
+        <Link href="/conta/perfil">Gerenciar workspaces</Link>
+      </div>
+    </details>
+  );
+}
+
+function UserMenu({ name, plan }: { name: string; plan: string }) {
+  return (
+    <details className="workspace-user-menu">
+      <summary title="Abrir menu da conta">
+        <span className="workspace-user-avatar" aria-hidden="true">
+          {initials(name)}
+        </span>
+        <span className="workspace-user-copy">
+          <strong>{name}</strong>
+          <small>{plan}</small>
+        </span>
+        <FiMoreHorizontal aria-hidden="true" />
+      </summary>
+      <div className="workspace-user-popover">
+        <Link href="/conta/perfil">Perfil</Link>
+        <Link href="/conta/perfil">Conta</Link>
+        <Link href="/untrack/usage" onClick={() => analytics.track("upgrade_clicked")}>
+          Plano e cobrança
+        </Link>
+        <Link href="/conta/perfil#preferencias">Preferências</Link>
+        <Link href="/ajuda">Ajuda</Link>
+        <hr />
+        <SignOutButton />
+      </div>
+    </details>
+  );
+}
+
 export function WorkspaceShell({ children }: { children: ReactNode }) {
-  const [memberships, setMemberships] = useState<Membership[]>([]),
-    [active, setActive] = useState<string | null>(null),
-    [loading, setLoading] = useState(true),
-    [error, setError] = useState("");
-  const [name, setName] = useState(""),
-    [openedAt, setOpenedAt] = useState<string | null>(null);
-  const action = useAction(),
-    pathname = usePathname();
+  const [memberships, setMemberships] = useState<Membership[]>([]);
+  const [active, setActive] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [openedAt, setOpenedAt] = useState<string | null>(null);
+  const action = useAction();
+  const pathname = usePathname();
+  const { data: session } = authClient.useSession();
+  const collapsed = useSyncExternalStore(
+    subscribeToSidebarPreference,
+    sidebarIsCollapsed,
+    () => false,
+  );
   const open = openedAt === pathname;
+  const current = memberships.find((item) => item.workspace.id === active);
+  const accountName = session?.user.name || "Sua conta";
+
   const load = useCallback(async () => {
     setLoading(true);
     setError("");
@@ -118,16 +242,17 @@ export function WorkspaceShell({ children }: { children: ReactNode }) {
       }>("/api/workspaces");
       setMemberships(data.items);
       setActive(data.activeId);
-    } catch (error) {
+    } catch (loadError) {
       setError(
-        error instanceof Error
-          ? error.message
+        loadError instanceof Error
+          ? loadError.message
           : "Não foi possível carregar os workspaces.",
       );
     } finally {
       setLoading(false);
     }
   }, []);
+
   useEffect(() => {
     const controller = new AbortController();
     apiRequest<{ items: Membership[]; activeId: string | null }>(
@@ -140,81 +265,113 @@ export function WorkspaceShell({ children }: { children: ReactNode }) {
           setActive(data.activeId);
         }
       })
-      .catch((error: Error) => {
-        if (!controller.signal.aborted) setError(error.message);
+      .catch((loadError: Error) => {
+        if (!controller.signal.aborted) setError(loadError.message);
       })
       .finally(() => {
         if (!controller.signal.aborted) setLoading(false);
       });
     return () => controller.abort();
   }, []);
-  async function select(id: string) {
-    if (id === active) return;
-    await apiRequest("/api/workspaces", {
-      method: "POST",
-      body: JSON.stringify({ action: "select", workspaceId: id }),
-    });
-    window.location.reload();
-  }
+
   useEffect(() => {
-    if (open)
+    if (open) {
       requestAnimationFrame(() =>
         document.querySelector<HTMLElement>("#workspace-navigation a")?.focus(),
       );
+    }
   }, [open]);
-  const current = memberships.find((item) => item.workspace.id === active);
-  function renderItems(items: NavigationItem[]) {
-    return items
-      .filter(
-        (item) =>
-          !restrictedAdministrationHrefs.has(item.href) ||
-          ["owner", "admin"].includes(current?.role ?? ""),
-      )
-      .map((item) => {
-        const itemPath = item.href.split("#", 1)[0];
-        const isAnchor = item.href.includes("#");
-        return (
-          <Link
-            className="workspace-nav-link"
-            key={item.href}
-            href={item.href}
-            onClick={() => {
-              analytics.track("module_opened");
-              setOpenedAt(null);
-            }}
-            aria-current={
-              !isAnchor &&
-              (pathname === itemPath ||
-              (itemPath !== "/conta" && pathname.startsWith(`${itemPath}/`))
-                ? "page"
-                : undefined)
-            }
-          >
-            {item.label}
-          </Link>
-        );
+
+  function select(id: string) {
+    if (id === active) return;
+    void action.run(async () => {
+      await apiRequest("/api/workspaces", {
+        method: "POST",
+        body: JSON.stringify({ action: "select", workspaceId: id }),
       });
+      window.location.reload();
+    });
   }
+
+  function createWorkspace(name: string) {
+    void action.run(async () => {
+      await apiRequest("/api/workspaces", {
+        method: "POST",
+        body: JSON.stringify({ action: "create", name }),
+      });
+      window.location.reload();
+    });
+  }
+
+  function toggleCollapsed() {
+    window.localStorage.setItem("untrack-sidebar-collapsed", String(!collapsed));
+    window.dispatchEvent(new Event("untrack-sidebar-preference"));
+  }
+
+  function renderItems(items: NavigationItem[]) {
+    return items.map((item) => {
+      const itemPath = item.href.split("#", 1)[0];
+      const isAnchor = item.href.includes("#");
+      const isCurrent =
+        !isAnchor &&
+        (pathname === itemPath ||
+          (itemPath !== "/conta" && pathname.startsWith(`${itemPath}/`)));
+      const Icon = item.icon;
+      return (
+        <Link
+          className="workspace-nav-link"
+          key={item.href}
+          href={item.href}
+          title={collapsed ? item.label : undefined}
+          onClick={() => {
+            analytics.track("module_opened");
+            setOpenedAt(null);
+          }}
+          aria-current={isCurrent ? "page" : undefined}
+        >
+          <Icon aria-hidden="true" />
+          <span>{item.label}</span>
+        </Link>
+      );
+    });
+  }
+
+  const canWrite = current ? current.role !== "viewer" : false;
+  const plan = current ? planNames[current.workspace.plan] : "";
+
   return (
     <WorkspaceContext.Provider value={current}>
-      <div className="product-shell">
+      <div className={`product-shell${collapsed ? " is-collapsed" : ""}`}>
         <div className="product-mobile-bar">
-          <Link href="/conta" className="product-brand">
-            <span aria-hidden="true">↗</span>
-            <strong>Untrack</strong>
-          </Link>
           <button
             id="workspace-menu-toggle"
-            className="button button-secondary"
+            className="product-mobile-menu"
             type="button"
+            aria-label="Menu do workspace"
             aria-controls="workspace-navigation"
             aria-expanded={open}
             onClick={() => setOpenedAt(open ? null : pathname)}
           >
-            {open ? "Fechar navegação" : "Menu do workspace"}
+            <FiMenu aria-hidden="true" />
           </button>
+          <Link href="/conta" className="product-brand">
+            <FiLink aria-hidden="true" />
+            <strong>Untrack</strong>
+          </Link>
+          {canWrite ? (
+            <Link
+              className="product-mobile-create"
+              href="/untrack/short-links?create=1"
+              aria-label="Criar link"
+              title="Criar link"
+            >
+              <FiPlus aria-hidden="true" />
+            </Link>
+          ) : (
+            <span className="product-mobile-spacer" aria-hidden="true" />
+          )}
         </div>
-        {open && (
+        {open ? (
           <button
             className="workspace-drawer-backdrop"
             aria-label="Fechar navegação"
@@ -223,10 +380,13 @@ export function WorkspaceShell({ children }: { children: ReactNode }) {
               document.getElementById("workspace-menu-toggle")?.focus();
             }}
           />
-        )}
+        ) : null}
         <aside
           role={open ? "dialog" : undefined}
           aria-modal={open || undefined}
+          id="workspace-navigation"
+          className={`product-sidebar${open ? " is-open" : ""}`}
+          aria-label="Navegação do produto"
           onKeyDown={(event) => {
             if (event.key === "Escape") {
               setOpenedAt(null);
@@ -235,11 +395,11 @@ export function WorkspaceShell({ children }: { children: ReactNode }) {
             if (open && event.key === "Tab") {
               const focusables = Array.from(
                 event.currentTarget.querySelectorAll<HTMLElement>(
-                  "a[href],button:not([disabled]),select,summary,input",
+                  "a[href],button:not([disabled]),summary,input",
                 ),
               ).filter((element) => element.getClientRects().length > 0);
-              const first = focusables[0],
-                last = focusables.at(-1);
+              const first = focusables[0];
+              const last = focusables.at(-1);
               if (event.shiftKey && document.activeElement === first) {
                 event.preventDefault();
                 last?.focus();
@@ -249,147 +409,66 @@ export function WorkspaceShell({ children }: { children: ReactNode }) {
               }
             }
           }}
-          id="workspace-navigation"
-          className={`product-sidebar${open ? " is-open" : ""}`}
-          aria-label="Navegação do produto"
         >
-          <Link className="product-brand" href="/conta">
-            <span aria-hidden="true">↗</span>
-            <strong>Untrack</strong>
-          </Link>
+          <div className="product-sidebar-brand-row">
+            <Link className="product-brand" href="/conta">
+              <FiLink aria-hidden="true" />
+              <strong>Untrack</strong>
+            </Link>
+            <button
+              className="workspace-sidebar-collapse"
+              type="button"
+              aria-label={collapsed ? "Expandir barra lateral" : "Recolher barra lateral"}
+              title={collapsed ? "Expandir barra lateral" : "Recolher barra lateral"}
+              onClick={toggleCollapsed}
+            >
+              {collapsed ? <FiChevronsRight aria-hidden="true" /> : <FiChevronsLeft aria-hidden="true" />}
+            </button>
+          </div>
           {loading ? (
             <p role="status" className="product-loading">
               Carregando workspaces...
             </p>
           ) : error ? (
-            <div role="alert">
-              <p className="form-error">{error}</p>
-              <button
-                className="button button-secondary"
-                onClick={() => void load()}
-              >
+            <div className="workspace-sidebar-error" role="alert">
+              <p>{error}</p>
+              <button type="button" onClick={() => void load()}>
                 Recarregar workspaces
               </button>
             </div>
           ) : (
-            <div className="workspace-switcher">
-              <label>
-                Workspace
-                <select
-                  value={active ?? ""}
-                  disabled={action.busy}
-                  onChange={(event) =>
-                    void action.run(() => select(event.target.value))
-                  }
-                >
-                  <option value="" disabled>
-                    Selecione um workspace
-                  </option>
-                  {memberships.map((item) => (
-                    <option key={item.workspace.id} value={item.workspace.id}>
-                      {item.workspace.name}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              {current && (
-                <p className="workspace-role">
-                  {roleNames[current.role]} ·{" "}
-                  {planNames[current.workspace.plan]}
-                </p>
-              )}
-              <details>
-                <summary>Criar outro workspace</summary>
-                <form
-                  onSubmit={(event) => {
-                    event.preventDefault();
-                    void action.run(async () => {
-                      await apiRequest("/api/workspaces", {
-                        method: "POST",
-                        body: JSON.stringify({ action: "create", name }),
-                      });
-                      window.location.reload();
-                    });
-                  }}
-                >
-                  <label>
-                    Nome do workspace
-                    <input
-                      required
-                      maxLength={120}
-                      value={name}
-                      onChange={(event) => setName(event.target.value)}
-                    />
-                  </label>
-                  <button
-                    className="button button-small"
-                    disabled={action.busy}
-                  >
-                    Criar workspace
-                  </button>
-                </form>
-              </details>
-            </div>
+            <WorkspaceSwitcher
+              active={active}
+              current={current}
+              memberships={memberships}
+              busy={action.busy}
+              onSelect={select}
+              onCreate={createWorkspace}
+            />
           )}
           <nav className="product-nav" aria-label="Módulos do workspace">
             <div className="workspace-nav-group workspace-nav-overview">
               {renderItems([overviewItem])}
             </div>
-            {groups.map((group) =>
-              group.collapsible ? (
-                <details
-                  className="workspace-nav-group workspace-nav-advanced"
-                  key={group.label}
-                >
-                  <summary>{group.label}</summary>
-                  <div>{renderItems(group.items)}</div>
-                </details>
-              ) : (
-                <div className="workspace-nav-group" key={group.label}>
-                  <span className="workspace-nav-label">{group.label}</span>
-                  {renderItems(group.items)}
-                </div>
-              ),
-            )}
+            {groups.map((group) => (
+              <div className="workspace-nav-group" key={group.label}>
+                <span className="workspace-nav-label">{group.label}</span>
+                {renderItems(group.items)}
+              </div>
+            ))}
           </nav>
-          <details className="product-quick-tools">
-            <summary>Mais ferramentas</summary>
-            <Link href="/limpar-link">Limpar link</Link>
-            <Link href="/link-health">Analisar link</Link>
-            <Link href="/untrack/projects">Projetos</Link>
-          </details>
-          <details className="product-account-menu">
-            <summary>Conta</summary>
-            <Link href="/untrack/usage" onClick={() => analytics.track("upgrade_clicked")}>Plano e upgrade</Link>
-            <SignOutButton />
-          </details>
+          <Link
+            className="workspace-settings-link workspace-nav-link"
+            href="/conta/perfil"
+            title={collapsed ? "Configurações" : undefined}
+          >
+            <FiSettings aria-hidden="true" />
+            <span>Configurações</span>
+          </Link>
+          <UserMenu name={accountName} plan={plan} />
           <ActionStatus {...action} />
         </aside>
-        <div className="product-main">
-          <div className="workspace-topbar">
-            <nav aria-label="Caminho de navegação">
-              <Link href="/conta">
-                {current?.workspace.name ?? "Workspace"}
-              </Link>
-              <span aria-hidden="true"> / </span>
-              <span>
-                {[overviewItem, ...groups.flatMap((group) => group.items)]
-                  .find(
-                    (item) =>
-                      pathname === item.href ||
-                      (item.href !== "/conta" &&
-                        pathname.startsWith(`${item.href}/`)),
-                  )?.label ??
-                  (pathname.startsWith("/conta/perfil")
-                    ? "Perfil e histórico"
-                    : "Detalhes do link")}
-              </span>
-            </nav>
-            <span className="workspace-role">
-              {current ? roleNames[current.role] : ""}
-            </span>
-            <WorkspaceCommandPalette />
-          </div>
+        <main className="product-main">
           {loading ? (
             <div className="product-empty" role="status">
               <h1>Preparando seu workspace</h1>
@@ -405,19 +484,13 @@ export function WorkspaceShell({ children }: { children: ReactNode }) {
           ) : (
             <div className="product-empty">
               <h1>Escolha um workspace</h1>
-              <p>
-                Seu acesso pode ter mudado. Selecione um workspace disponível no
-                menu para continuar.
-              </p>
-              <button
-                className="button button-secondary"
-                onClick={() => setOpenedAt(pathname)}
-              >
+              <p>Seu acesso pode ter mudado. Selecione um workspace disponível no menu para continuar.</p>
+              <button type="button" onClick={() => setOpenedAt(pathname)}>
                 Abrir seletor de workspace
               </button>
             </div>
           )}
-        </div>
+        </main>
       </div>
     </WorkspaceContext.Provider>
   );
