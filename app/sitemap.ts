@@ -1,4 +1,5 @@
 import type { MetadataRoute } from "next";
+import { products } from "@/lib/products";
 
 export default function sitemap(): MetadataRoute.Sitemap {
   const baseUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
@@ -11,16 +12,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
     "/link-health",
     "/analisar-link",
     "/produtos",
-    "/produtos/short-links",
-    "/produtos/whatsapp",
-    "/produtos/link-analyzer",
-    "/produtos/link-cleaner",
-    "/produtos/link-health",
-    "/produtos/campanhas",
-    "/produtos/utm-builder",
-    "/produtos/qr-code",
-    "/produtos/smart-pages",
-    "/produtos/analytics",
+    ...products.map((product) => `/produtos/${product.slug}`),
     "/precos",
     "/recursos",
     "/sobre",

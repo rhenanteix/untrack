@@ -11,14 +11,20 @@ test("apresenta a plataforma e encaminha para produtos e cadastro", async ({
 }) => {
   await page.goto("/");
   await expect(
-    page.getByRole("heading", { name: "Todos os seus links em um só lugar." }),
+    page.getByRole("heading", { name: "Seus links podem fazer muito mais." }),
   ).toBeVisible();
   await expect(page.getByLabel("Visão do dashboard da Untrack")).toBeVisible();
   await expect(
     page.getByRole("link", { name: "Começar grátis" }).first(),
   ).toHaveAttribute("href", "/cadastro");
   await page.getByRole("link", { name: "Explorar produtos" }).first().click();
-  await expect(page).toHaveURL(/\/#produtos$/);
+  await expect(page).toHaveURL(/\/#ferramentas$/);
+  await expect(
+    page.getByRole("heading", { name: "Comece com uma ferramenta gratuita." }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "Uma página para tudo." }),
+  ).toBeVisible();
 });
 
 test("catálogo e Product Page encaminham o QR Code para a ferramenta", async ({

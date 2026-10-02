@@ -1,10 +1,10 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { ProductLandingTemplate } from "@/components/product-landing-template";
-import { getProduct, products } from "@/lib/products";
+import { getProduct, getProductPaths } from "@/lib/products";
 
 export function generateStaticParams() {
-  return products.map((product) => ({ slug: product.slug }));
+  return getProductPaths().map((slug) => ({ slug }));
 }
 
 export async function generateMetadata({
@@ -15,16 +15,15 @@ export async function generateMetadata({
   const { slug } = await params;
   const product = getProduct(slug);
   if (!product) return {};
-  const title = product.name === "QR Code" ? "QR Code Generator" : product.name;
   const path = `/produtos/${product.slug}`;
 
   return {
-    title,
+    title: product.seoTitle,
     description: product.summary,
     alternates: { canonical: path },
     openGraph: {
       type: "website",
-      title: `${title} | Untrack`,
+      title: `${product.seoTitle} | Untrack`,
       description: product.summary,
       url: path,
       siteName: "Untrack",
@@ -32,7 +31,7 @@ export async function generateMetadata({
     },
     twitter: {
       card: "summary_large_image",
-      title: `${title} | Untrack`,
+      title: `${product.seoTitle} | Untrack`,
       description: product.summary,
       images: [`${path}/opengraph-image`],
     },

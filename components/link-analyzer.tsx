@@ -7,6 +7,7 @@ import {
 } from "@/components/guest-access-notice";
 import { analytics } from "@/lib/client/analytics";
 import type { LinkAnalysis } from "@/modules/link-analyzer/types";
+import { ToolCrossSell } from "@/components/tool-cross-sell";
 
 function AnalysisResult({ analysis }: { analysis: LinkAnalysis }) {
   return (
@@ -64,6 +65,13 @@ function AnalysisResult({ analysis }: { analysis: LinkAnalysis }) {
           {analysis.unknownParameters.length}.
         </p>
       </details>
+      <ToolCrossSell
+        product="analisar-link"
+        title="Quer continuar acompanhando este link?"
+        description="Use o Monitoring no workspace para acompanhar sinais de saúde e agir quando algo mudar."
+        label="Monitorar este link"
+        href="/cadastro?next=/untrack/link-health"
+      />
     </section>
   );
 }

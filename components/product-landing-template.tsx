@@ -7,7 +7,9 @@ import type { Product } from "@/lib/products";
 import { getProduct } from "@/lib/products";
 
 function ProductCta({ product }: { product: Product }) {
-  const href = product.anonymousUsage ? product.toolHref : "/cadastro";
+  const href = product.anonymousUsage
+    ? product.toolHref
+    : `/cadastro?next=${encodeURIComponent(product.toolHref)}`;
   return (
     <CommercialLink
       className="button product-primary-cta"
@@ -16,6 +18,12 @@ function ProductCta({ product }: { product: Product }) {
           ? ["product_cta_clicked", "free_tool_started"]
           : ["product_cta_clicked", "signup_clicked"]
       }
+      analyticsContext={{
+        product: product.slug,
+        category: product.category,
+        source: "product-page",
+        location: "cta",
+      }}
       href={href}
     >
       {product.ctaLabel}
@@ -91,10 +99,13 @@ export function ProductLandingTemplate({ product }: { product: Product }) {
       <section className="product-section product-section-alt">
         <div className="shell product-audience-grid">
           <div>
-            <span className="eyebrow">Para quem é</span>
-            <h2>Feito para o trabalho com links no dia a dia.</h2>
+            <span className="eyebrow">Por que usar</span>
+            <h2>Um próximo passo claro para cada link.</h2>
           </div>
-          <p>{product.audience}</p>
+          <div>
+            <p>{product.summary}</p>
+            <p className="product-audience-copy">{product.audience}</p>
+          </div>
         </div>
       </section>
 
@@ -109,7 +120,13 @@ export function ProductLandingTemplate({ product }: { product: Product }) {
               {related.map((item) => (
                 <CommercialLink
                   key={item.slug}
-                  events={["product_related_clicked"]}
+                  events={["product_related_clicked", "product_cross_sell_clicked"]}
+                  analyticsContext={{
+                    product: item.slug,
+                    category: item.category,
+                    source: product.slug,
+                    location: "related-products",
+                  }}
                   href={`/produtos/${item.slug}`}
                 >
                   <span>{item.name}</span>

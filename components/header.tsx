@@ -2,11 +2,16 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { analytics } from "@/lib/client/analytics";
 import { usePublicLanguage } from "@/components/public-language-provider";
 import { publicLocales } from "@/lib/public-i18n";
-import { getProductsByCategory, productCategories } from "@/lib/products";
+import {
+  getFreeTools,
+  getProduct,
+  getProductsForMenuCategory,
+  productMenuCategories,
+} from "@/lib/products";
 
 const localeFlags = {
   "pt-BR": "🇧🇷",
@@ -17,23 +22,31 @@ const localeFlags = {
 export function Header() {
   const pathname = usePathname();
   const { locale, setLocale, copy } = usePublicLanguage();
-  const [openedAt, setOpenedAt] = useState<string | null>(null);
-  const open = openedAt === pathname;
+  const [desktopMenu, setDesktopMenu] = useState<
+    "products" | "solutions" | "resources" | null
+  >(null);
+  const [mobileOpenedAt, setMobileOpenedAt] = useState<string | null>(null);
+  const desktopMenuRefs = useRef<Array<HTMLDetailsElement | null>>([]);
+  const mobileNavRef = useRef<HTMLDivElement>(null);
+  const menuToggleRef = useRef<HTMLButtonElement>(null);
+  const mobileOpen = mobileOpenedAt === pathname;
+  const freeTools = getFreeTools();
+  const linkInBio = getProduct("link-in-bio");
   const resourceLinks = [
     {
-      href: "/produtos/analytics",
-      label: copy.menu.analytics,
-      description: copy.menu.analyticsDescription,
+      href: "/blog",
+      label: "Blog",
+      description: "Ideias e referências para trabalhar melhor com links.",
     },
     {
-      href: "/produtos/link-analyzer",
-      label: copy.menu.intelligence,
-      description: copy.menu.intelligenceDescription,
+      href: "/recursos",
+      label: "Guias",
+      description: "Conteúdos para criar, organizar e acompanhar links.",
     },
     {
-      href: "/produtos/whatsapp",
-      label: copy.menu.whatsapp,
-      description: copy.menu.whatsappDescription,
+      href: "/ajuda",
+      label: "Central de ajuda",
+      description: "Respostas para usar as ferramentas e a plataforma.",
     },
   ];
   const solutionLinks = [
@@ -57,18 +70,50 @@ export function Header() {
       label: copy.menu.agencies,
       description: copy.menu.agenciesDescription,
     },
+    {
+      href: "/produtos/monitoring",
+      label: "Times",
+      description: "Organize, monitore e acompanhe links importantes.",
+    },
   ];
 
-  function categoryLabel(category: (typeof productCategories)[number]["id"]) {
-    if (category === "campaigns") return copy.home.campaignsTitle;
-    if (category === "experience") return copy.menu.experience;
-    if (category === "intelligence") return copy.menu.intelligence;
-    return copy.home.linksTitle;
-  }
+  useEffect(() => {
+    function closeMenusOnOutsidePress(event: PointerEvent) {
+      const target = event.target;
+      if (!(target instanceof Node)) return;
+      const isInDesktopMenu = desktopMenuRefs.current.some((menu) =>
+        menu?.contains(target),
+      );
+      if (!isInDesktopMenu) setDesktopMenu(null);
+      if (
+        !mobileNavRef.current?.contains(target) &&
+        !menuToggleRef.current?.contains(target)
+      ) {
+        setMobileOpenedAt(null);
+      }
+    }
 
-  function openDesktopMenu(event: React.MouseEvent<HTMLDetailsElement>) {
+    function closeMenusOnEscape(event: KeyboardEvent) {
+      if (event.key !== "Escape") return;
+      setDesktopMenu(null);
+      setMobileOpenedAt(null);
+      menuToggleRef.current?.focus();
+    }
+
+    document.addEventListener("pointerdown", closeMenusOnOutsidePress);
+    document.addEventListener("keydown", closeMenusOnEscape);
+    return () => {
+      document.removeEventListener("pointerdown", closeMenusOnOutsidePress);
+      document.removeEventListener("keydown", closeMenusOnEscape);
+    };
+  }, []);
+
+  function openDesktopMenu(
+    event: React.MouseEvent<HTMLDetailsElement>,
+    menu: "products" | "solutions" | "resources",
+  ) {
     if (window.matchMedia("(hover: hover)").matches) {
-      event.currentTarget.open = true;
+      setDesktopMenu(menu);
     }
   }
 
@@ -77,8 +122,27 @@ export function Header() {
       window.matchMedia("(hover: hover)").matches &&
       !event.currentTarget.matches(":focus-within")
     ) {
-      event.currentTarget.open = false;
+      setDesktopMenu(null);
     }
+  }
+
+  function trackProductNavigation(
+    product: string,
+    category: string,
+    source: "menu" | "free-tools" | "featured",
+    location: "desktop" | "mobile",
+  ) {
+    const context = { product, category, source, location };
+    if (source === "free-tools") {
+      analytics.track("navigation_free_tool_clicked", context);
+      return;
+    }
+    if (source === "featured") {
+      analytics.track("navigation_link_in_bio_clicked", context);
+      return;
+    }
+    analytics.track("navigation_product_category_clicked", context);
+    analytics.track("navigation_product_clicked", context);
   }
 
   if (
@@ -99,48 +163,136 @@ export function Header() {
 
         <nav className="desktop-nav" aria-label="Navegação principal">
           <details
+            ref={(element) => {
+              desktopMenuRefs.current[0] = element;
+            }}
             className="header-menu"
-            onMouseEnter={openDesktopMenu}
+            open={desktopMenu === "products"}
+            onMouseEnter={(event) => openDesktopMenu(event, "products")}
             onMouseLeave={closeDesktopMenu}
             onToggle={(event) => {
-              if (event.currentTarget.open)
+              if (event.currentTarget.open) {
+                setDesktopMenu("products");
                 analytics.track("product_menu_opened");
+                analytics.track("navigation_product_menu_opened", {
+                  source: "header",
+                  location: "desktop",
+                });
+              } else {
+                setDesktopMenu(null);
+              }
             }}
           >
             <summary>{copy.nav.products}</summary>
             <div className="mega-menu mega-menu-products">
-              <div className="mega-menu-intro">
-                <span>{copy.menu.productsLabel}</span>
-                <strong>{copy.menu.productsTitle}</strong>
-                <Link className="mega-menu-all" href="/produtos">
-                  {copy.menu.allProducts}
-                </Link>
+              {linkInBio && (
+                <section className="mega-menu-featured">
+                  <span>Em destaque</span>
+                  <strong>{linkInBio.name}</strong>
+                  <p>{linkInBio.description}</p>
+                  <Link
+                    className="mega-menu-featured-cta"
+                    href={`/produtos/${linkInBio.slug}`}
+                    onClick={() =>
+                      trackProductNavigation(
+                        linkInBio.slug,
+                        linkInBio.category,
+                        "featured",
+                        "desktop",
+                      )
+                    }
+                  >
+                    Criar meu Link in Bio
+                  </Link>
+                </section>
+              )}
+              <div className="mega-menu-groups mega-menu-product-groups">
+                {productMenuCategories.map((category) => (
+                  <section key={category.id}>
+                    <strong>{category.name}</strong>
+                    <p>{category.description}</p>
+                    {getProductsForMenuCategory(category).map((product) => (
+                      <Link
+                        key={product.slug}
+                        href={`/produtos/${product.slug}`}
+                        onClick={() =>
+                          trackProductNavigation(
+                            product.slug,
+                            category.id,
+                            "menu",
+                            "desktop",
+                          )
+                        }
+                      >
+                        <b>{product.name}</b>
+                        <span>{product.description}</span>
+                      </Link>
+                    ))}
+                  </section>
+                ))}
               </div>
-              <div className="mega-menu-groups">
-                {productCategories.map((category) => {
-                  const categoryProducts = getProductsByCategory(category.id);
-                  if (!categoryProducts.length) return null;
-                  return (
-                    <section key={category.id}>
-                      <strong>{categoryLabel(category.id)}</strong>
-                      {categoryProducts.map((product) => (
-                        <Link
-                          key={product.slug}
-                          href={`/produtos/${product.slug}`}
-                        >
-                          {product.name}
-                        </Link>
-                      ))}
-                    </section>
-                  );
-                })}
-              </div>
+              <section className="mega-menu-free-tools">
+                <div>
+                  <span>Ferramentas gratuitas</span>
+                  <strong>Comece agora. Sem cadastro para experimentar.</strong>
+                </div>
+                <div>
+                  {freeTools.map((product) => (
+                    <Link
+                      key={product.slug}
+                      href={product.toolHref}
+                      onClick={() =>
+                        trackProductNavigation(
+                          product.slug,
+                          product.category,
+                          "free-tools",
+                          "desktop",
+                        )
+                      }
+                    >
+                      {product.name}
+                    </Link>
+                  ))}
+                  <Link className="mega-menu-all" href="/produtos">
+                    Experimentar grátis
+                  </Link>
+                </div>
+              </section>
             </div>
           </details>
           <details
+            ref={(element) => {
+              desktopMenuRefs.current[1] = element;
+            }}
             className="header-menu"
-            onMouseEnter={openDesktopMenu}
+            open={desktopMenu === "solutions"}
+            onMouseEnter={(event) => openDesktopMenu(event, "solutions")}
             onMouseLeave={closeDesktopMenu}
+            onToggle={(event) =>
+              setDesktopMenu(event.currentTarget.open ? "solutions" : null)
+            }
+          >
+            <summary>{copy.nav.solutions}</summary>
+            <div className="mega-menu mega-menu-simple">
+              {solutionLinks.map((link) => (
+                <Link key={link.label} href={link.href}>
+                  <strong>{link.label}</strong>
+                  <span>{link.description}</span>
+                </Link>
+              ))}
+            </div>
+          </details>
+          <details
+            ref={(element) => {
+              desktopMenuRefs.current[2] = element;
+            }}
+            className="header-menu"
+            open={desktopMenu === "resources"}
+            onMouseEnter={(event) => openDesktopMenu(event, "resources")}
+            onMouseLeave={closeDesktopMenu}
+            onToggle={(event) =>
+              setDesktopMenu(event.currentTarget.open ? "resources" : null)
+            }
           >
             <summary>{copy.nav.resources}</summary>
             <div className="mega-menu mega-menu-simple">
@@ -158,21 +310,6 @@ export function Header() {
           <Link className="header-link" href="/precos">
             {copy.nav.pricing}
           </Link>
-          <details
-            className="header-menu"
-            onMouseEnter={openDesktopMenu}
-            onMouseLeave={closeDesktopMenu}
-          >
-            <summary>{copy.nav.solutions}</summary>
-            <div className="mega-menu mega-menu-simple">
-              {solutionLinks.map((link) => (
-                <Link key={link.label} href={link.href}>
-                  <strong>{link.label}</strong>
-                  <span>{link.description}</span>
-                </Link>
-              ))}
-            </div>
-          </details>
         </nav>
 
         <div className="header-actions">
@@ -193,15 +330,27 @@ export function Header() {
           </div>
           <Link
             className="header-login"
-            href="/entrar"
-            onClick={() => analytics.track("login_clicked")}
+            href="/entrar?next=/conta"
+            onClick={() => {
+              analytics.track("login_clicked");
+              analytics.track("navigation_cta_clicked", {
+                source: "header",
+                location: "login",
+              });
+            }}
           >
             {copy.nav.signIn}
           </Link>
           <Link
             className="button button-small header-cta"
-            href="/cadastro"
-            onClick={() => analytics.track("signup_clicked")}
+            href="/cadastro?next=/conta"
+            onClick={() => {
+              analytics.track("signup_clicked");
+              analytics.track("navigation_cta_clicked", {
+                source: "header",
+                location: "desktop",
+              });
+            }}
           >
             <span className="cta-long">{copy.nav.startFree}</span>
             <span className="cta-short">{copy.nav.startFree}</span>
@@ -209,13 +358,20 @@ export function Header() {
         </div>
 
         <button
+          ref={menuToggleRef}
           type="button"
           className="menu-toggle"
-          aria-expanded={open}
+          aria-expanded={mobileOpen}
           aria-controls="mobile-nav"
-          onClick={() => setOpenedAt(open ? null : pathname)}
+          onClick={() =>
+            setMobileOpenedAt((openedAt) =>
+              openedAt === pathname ? null : pathname,
+            )
+          }
         >
-          <span className="sr-only">{open ? "Fechar menu" : "Abrir menu"}</span>
+          <span className="sr-only">
+            {mobileOpen ? "Fechar menu" : "Abrir menu"}
+          </span>
           <span aria-hidden="true" className="menu-icon">
             <span />
             <span />
@@ -224,43 +380,68 @@ export function Header() {
         </button>
       </div>
 
-      <div id="mobile-nav" className="mobile-nav" hidden={!open}>
+      <div ref={mobileNavRef} id="mobile-nav" className="mobile-nav" hidden={!mobileOpen}>
         <nav className="shell" aria-label="Navegação do menu">
-          <Link href="/produtos" onClick={() => setOpenedAt(null)}>
+          <Link href="/produtos" onClick={() => setMobileOpenedAt(null)}>
             {copy.nav.products}
           </Link>
-          {productCategories.map((category) => (
+          {productMenuCategories.map((category) => (
             <details key={category.id} className="mobile-nav-group">
-              <summary>{categoryLabel(category.id)}</summary>
-              {getProductsByCategory(category.id).map((product) => (
+              <summary>{category.name}</summary>
+              {getProductsForMenuCategory(category).map((product) => (
                 <Link
                   key={product.slug}
                   href={`/produtos/${product.slug}`}
                   aria-current={
-                    pathname === `/produtos/${product.slug}`
-                      ? "page"
-                      : undefined
+                    pathname === `/produtos/${product.slug}` ? "page" : undefined
                   }
-                  onClick={() => setOpenedAt(null)}
+                  onClick={() => {
+                    trackProductNavigation(
+                      product.slug,
+                      category.id,
+                      "menu",
+                      "mobile",
+                    );
+                    setMobileOpenedAt(null);
+                  }}
                 >
                   {product.name}
                 </Link>
               ))}
             </details>
           ))}
-          <Link href="/precos" onClick={() => setOpenedAt(null)}>
+          <details className="mobile-nav-group">
+            <summary>{copy.nav.solutions}</summary>
+            {solutionLinks.map((link) => (
+              <Link key={link.label} href={link.href} onClick={() => setMobileOpenedAt(null)}>
+                {link.label}
+              </Link>
+            ))}
+          </details>
+          <details className="mobile-nav-group">
+            <summary>{copy.nav.resources}</summary>
+            {resourceLinks.map((link) => (
+              <Link key={link.href} href={link.href} onClick={() => setMobileOpenedAt(null)}>
+                {link.label}
+              </Link>
+            ))}
+          </details>
+          <Link href="/precos" onClick={() => setMobileOpenedAt(null)}>
             {copy.nav.pricing}
           </Link>
-          <Link href="/recursos" onClick={() => setOpenedAt(null)}>
-            {copy.nav.resources}
-          </Link>
-          <Link href="/entrar" onClick={() => setOpenedAt(null)}>
+          <Link href="/entrar?next=/conta" onClick={() => setMobileOpenedAt(null)}>
             {copy.nav.signIn}
           </Link>
           <Link
             className="button"
-            href="/cadastro"
-            onClick={() => setOpenedAt(null)}
+            href="/cadastro?next=/conta"
+            onClick={() => {
+              analytics.track("navigation_cta_clicked", {
+                source: "header",
+                location: "mobile",
+              });
+              setMobileOpenedAt(null);
+            }}
           >
             {copy.nav.startFree}
           </Link>

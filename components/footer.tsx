@@ -12,7 +12,7 @@ export function Footer() {
         [copy.footer.exploreProducts, "/produtos"],
         ["Short Links", "/produtos/short-links"],
         [copy.footer.campaigns, "/produtos/campanhas"],
-        ["Smart Pages", "/produtos/smart-pages"],
+        ["Link in Bio", "/produtos/link-in-bio"],
       ],
     },
     {
@@ -21,15 +21,15 @@ export function Footer() {
         ["QR Code", "/gerar-qrcode"],
         ["UTM Builder", "/gerar-utm"],
         ["Short Links", "/encurtar"],
-        ["Link Analyzer", "/analisar-link"],
-        ["Link Cleaner", "/limpar-link"],
+        ["Analisar Link", "/analisar-link"],
+        ["Limpar Link", "/limpar-link"],
       ],
     },
     {
       title: copy.footer.forYou,
       links: [
         [copy.menu.marketing, "/produtos/campanhas"],
-        [copy.menu.creators, "/produtos/smart-pages"],
+        [copy.menu.creators, "/produtos/link-in-bio"],
         [copy.menu.agencies, "/produtos/campanhas"],
         [copy.menu.smallBusiness, "/produtos/whatsapp"],
       ],

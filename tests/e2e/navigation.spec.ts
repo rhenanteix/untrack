@@ -43,16 +43,16 @@ test("cada destino do menu mobile abre a ferramenta correta", async ({
 }) => {
   for (const [category, link, path, heading] of [
     [
-      "Links",
-      "Link Cleaner",
-      "/produtos/link-cleaner",
-      "Compartilhe links sem o ruído do tracking.",
+      "Criar & compartilhar",
+      "Link in Bio",
+      "/produtos/link-in-bio",
+      "Uma página para tudo o que você quer compartilhar.",
     ],
     [
-      "Campanhas",
-      "QR Code",
-      "/produtos/qr-code",
-      "Crie QR Codes que você consegue acompanhar.",
+      "Inteligência",
+      "Analisar Link",
+      "/produtos/analisar-link",
+      "Entenda um link antes de compartilhar.",
     ],
   ] as const) {
     await page.goto("/");
@@ -65,4 +65,39 @@ test("cada destino do menu mobile abre a ferramenta correta", async ({
     await expect(page).toHaveURL(new RegExp(`${path}$`));
     await expect(page.getByRole("heading", { level: 1 })).toHaveText(heading);
   }
+});
+
+test("mega menu agrupa produtos e fecha com Escape", async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await page.goto("/");
+
+  const productMenu = page.locator(".desktop-nav .header-menu").first();
+  await productMenu.locator("summary").click();
+
+  await expect(productMenu).toHaveAttribute("open", "");
+  await expect(productMenu.getByText("Criar & compartilhar")).toBeVisible();
+  await expect(productMenu.getByText("Inteligência")).toBeVisible();
+  await expect(productMenu.getByText("Ferramentas gratuitas")).toBeVisible();
+  await expect(productMenu.getByText("Em destaque")).toBeVisible();
+
+  await page.keyboard.press("Escape");
+  await expect(productMenu).not.toHaveAttribute("open", "");
+});
+
+test("CTA público encaminha cadastro e produtos canônicos", async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await page.goto("/");
+
+  await expect(page.locator(".header-cta")).toHaveAttribute(
+    "href",
+    "/cadastro?next=/conta",
+  );
+
+  const productMenu = page.locator(".desktop-nav .header-menu").first();
+  await productMenu.locator("summary").click();
+  await productMenu
+    .getByRole("link", { name: "Criar meu Link in Bio" })
+    .click();
+
+  await expect(page).toHaveURL(/\/produtos\/link-in-bio$/);
 });

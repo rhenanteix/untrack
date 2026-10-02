@@ -8,6 +8,7 @@ import { FormEvent, useState } from "react";
 import Link from "next/link";
 import { CopyButton } from "@/components/copy-button";
 import { analytics } from "@/lib/client/analytics";
+import { ToolCrossSell } from "@/components/tool-cross-sell";
 
 const fields = [
   ["source", "Origem (utm_source)", "google"],
@@ -165,6 +166,13 @@ export function UtmBuilder() {
               Gerar QR Code
             </Link>
           </div>
+          <ToolCrossSell
+            product="utm-builder"
+            title="Quer organizar esta URL dentro de uma campanha?"
+            description="Crie uma campanha para reunir canais, links e resultados no mesmo lugar."
+            label="Criar campanha"
+            href="/cadastro?next=/untrack/campaigns"
+          />
         </section>
       )}
     </div>

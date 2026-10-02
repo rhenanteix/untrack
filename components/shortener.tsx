@@ -7,6 +7,7 @@ import {
   GuestSignupPrompt,
 } from "@/components/guest-access-notice";
 import { analytics } from "@/lib/client/analytics";
+import { ToolCrossSell } from "@/components/tool-cross-sell";
 import type { ShortLinkView } from "@/modules/short-links/types";
 
 export function Shortener({ initialUrl = "" }: { initialUrl?: string }) {
@@ -132,6 +133,13 @@ export function Shortener({ initialUrl = "" }: { initialUrl?: string }) {
               Ver página pública
             </Link>
           </div>
+          <ToolCrossSell
+            product="short-links"
+            title="Quer acompanhar os cliques deste link?"
+            description="Veja os resultados da sua conta e conecte o link às próximas campanhas."
+            label="Ver analytics"
+            href="/cadastro?next=/conta"
+          />
         </section>
       )}
     </div>

@@ -3,7 +3,11 @@
 import type { ComponentProps, ReactNode } from "react";
 import { useEffect } from "react";
 import Link from "next/link";
-import { analytics, type AnalyticsEventName } from "@/lib/client/analytics";
+import {
+  analytics,
+  type AnalyticsContext,
+  type AnalyticsEventName,
+} from "@/lib/client/analytics";
 
 export function CommercialPageTracker({
   event,
@@ -19,11 +23,13 @@ export function CommercialPageTracker({
 export function CommercialLink({
   children,
   events,
+  analyticsContext,
   onClick,
   ...props
 }: Omit<ComponentProps<typeof Link>, "onClick" | "children"> & {
   children: ReactNode;
   events: readonly AnalyticsEventName[];
+  analyticsContext?: AnalyticsContext;
   onClick?: ComponentProps<typeof Link>["onClick"];
 }) {
   return (
@@ -32,7 +38,7 @@ export function CommercialLink({
       onClick={(event) => {
         onClick?.(event);
         if (!event.defaultPrevented)
-          events.forEach((name) => analytics.track(name));
+          events.forEach((name) => analytics.track(name, analyticsContext));
       }}
     >
       {children}

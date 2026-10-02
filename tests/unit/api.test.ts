@@ -107,6 +107,7 @@ describe("coleta de analytics", () => {
     expect(response.status).toBe(204);
     expect(track).toHaveBeenCalledExactlyOnceWith("link_copied", {
       path: "/limpar-link",
+      authenticated: false,
     });
   });
 

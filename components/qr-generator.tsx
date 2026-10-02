@@ -8,6 +8,7 @@ import { FormEvent, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { CopyButton } from "@/components/copy-button";
 import { analytics } from "@/lib/client/analytics";
+import { ToolCrossSell } from "@/components/tool-cross-sell";
 
 const qrColors = [
   { value: "#172A3A", label: "Marinho" },
@@ -342,6 +343,13 @@ export function QrGenerator() {
                 </button>
               )}
             </div>
+            <ToolCrossSell
+              product="qr-code"
+              title="Quer acompanhar os acessos deste QR Code?"
+              description="Crie uma conta para conectar seus links e acompanhar o que acontece depois do scan."
+              label="Criar conta e acompanhar"
+              href="/cadastro?next=/conta"
+            />
           </div>
           {/* A data URL comes from our own QR API and never contains user HTML. */}
           {/* eslint-disable-next-line @next/next/no-img-element */}

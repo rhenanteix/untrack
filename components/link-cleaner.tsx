@@ -8,6 +8,7 @@ import { FormEvent, useEffect, useState } from "react";
 import Link from "next/link";
 import { CopyButton } from "@/components/copy-button";
 import { analytics } from "@/lib/client/analytics";
+import { ToolCrossSell } from "@/components/tool-cross-sell";
 import {
   addHistory,
   HistoryItem,
@@ -320,6 +321,13 @@ export function LinkCleaner() {
               tone="preserved"
             />
           </div>
+          <ToolCrossSell
+            product="limpar-link"
+            title="Quer entender melhor este link?"
+            description="Analise o destino, redirects, parâmetros e sinais técnicos antes de compartilhar."
+            label="Analisar link"
+            href="/analisar-link"
+          />
         </section>
       )}
       {history.length > 0 && (
