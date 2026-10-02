@@ -52,22 +52,25 @@ interface SmartPageSummary {
 
 interface SmartPageBlock {
   id: string;
-  type: "link";
+  type: "link" | "product";
   position: number;
   settings: {
-    title: string;
+    title?: string;
     destinationUrl?: string;
-    openInNewTab: boolean;
+    openInNewTab?: boolean;
+    buttonLabel?: string;
   };
   visible: boolean;
   analyticsEnabled: boolean;
-  linkId: string | null;
+  linkId?: string | null;
   link: {
     slug: string;
     domainKey: string;
     isActive: boolean;
     expiresAt: string | null;
   } | null;
+  productId?: string | null;
+  product?: { id: string; name: string } | null;
 }
 
 interface SmartPageDetail extends SmartPageSummary {
@@ -82,6 +85,12 @@ interface ManagedLink {
   title: string;
   slug: string;
   destinationUrl: string;
+}
+
+interface ProductOption {
+  id: string;
+  name: string;
+  status: "draft" | "active" | "archived";
 }
 
 interface SmartPageMetrics {
@@ -137,7 +146,11 @@ function SmartPagePreview({ page }: { page: SmartPageDetail }) {
         ))}
       >
         {visible.map((block) => (
-          <span key={block.id}>{block.settings.title}</span>
+          <span key={block.id}>
+            {block.type === "product"
+              ? block.product?.name ?? "Produto indisponível"
+              : block.settings.title}
+          </span>
         ))}
         {!visible.length && <p>Adicione seu primeiro link.</p>}
       </PageDesign>
@@ -148,6 +161,7 @@ function SmartPagePreview({ page }: { page: SmartPageDetail }) {
 export function SmartPagesDashboard({
   initial,
   managedLinks,
+  products: initialProducts,
   canEdit = true,
   canUnpublish = canEdit,
   readOnlyReason = "Você tem acesso de leitura. Peça a um editor ou administrador para alterar páginas.",
@@ -155,6 +169,7 @@ export function SmartPagesDashboard({
 }: {
   initial: { items: SmartPageSummary[]; page: number; hasMore: boolean };
   managedLinks: ManagedLink[];
+  products: ProductOption[];
   canEdit?: boolean;
   canUnpublish?: boolean;
   readOnlyReason?: string;
@@ -173,6 +188,7 @@ export function SmartPagesDashboard({
     [metricsUpdated, setMetricsUpdated] = useState<string | null>(null),
     [metricsRevision, setMetricsRevision] = useState(0);
   const [pages, setPages] = useState(initial.items);
+  const [products, setProducts] = useState(initialProducts);
   const [selected, setSelected] = useState<SmartPageDetail | null>(null);
   const [editorTab, setEditorTab] = useState<"editor" | "preview">("editor");
   const [metrics, setMetrics] = useState<SmartPageMetrics | null>(null);
@@ -455,6 +471,55 @@ export function SmartPagesDashboard({
     });
   }
 
+  async function createProduct(event: FormEvent<HTMLFormElement>) {
+    setActiveForm("create-product");
+    event.preventDefault();
+    const form = event.currentTarget;
+    const data = new FormData(form);
+    await action.run(async () => {
+      const price = Number(data.get("price"));
+      const product = await apiRequest<ProductOption>("/api/products", {
+        method: "POST",
+        body: JSON.stringify({
+          name: data.get("name"),
+          slug: data.get("slug"),
+          type: data.get("type"),
+          status: data.get("status"),
+          priceInCents: Math.round(price * 100),
+        }),
+      });
+      setProducts((current) => [product, ...current]);
+      form.reset();
+      action.setNotice("Produto criado. Adicione-o à sua página quando quiser.");
+    });
+  }
+
+  async function addProductBlock(event: FormEvent<HTMLFormElement>) {
+    setActiveForm("add-product");
+    event.preventDefault();
+    if (!selected) return;
+    const form = event.currentTarget;
+    const data = new FormData(form);
+    await action.run(async () => {
+      const block = await apiRequest<SmartPageBlock>(
+        `/api/smart-pages/${selected.id}/blocks`,
+        {
+          method: "POST",
+          body: JSON.stringify({
+            type: "product",
+            productId: data.get("productId"),
+            settings: { buttonLabel: data.get("buttonLabel") || "Ver produto" },
+          }),
+        },
+      );
+      setSelected((current) =>
+        current ? { ...current, blocks: [...current.blocks, block] } : current,
+      );
+      form.reset();
+      action.setNotice("Produto adicionado à página.");
+    });
+  }
+
   async function saveBlock(
     event: FormEvent<HTMLFormElement>,
     block: SmartPageBlock,
@@ -498,6 +563,43 @@ export function SmartPagesDashboard({
         return next;
       });
       action.setNotice("Link atualizado.");
+    });
+  }
+
+  async function saveProductBlock(
+    event: FormEvent<HTMLFormElement>,
+    block: SmartPageBlock,
+  ) {
+    event.preventDefault();
+    if (!selected || !block.productId) return;
+    setActiveForm(block.id);
+    const data = new FormData(event.currentTarget);
+    await action.run(async () => {
+      const updated = await apiRequest<SmartPageBlock>(
+        `/api/smart-pages/${selected.id}/blocks/${block.id}`,
+        {
+          method: "PATCH",
+          body: JSON.stringify({
+            type: "product",
+            productId: block.productId,
+            visible: data.get("visible") === "on",
+            analyticsEnabled: data.get("analyticsEnabled") === "on",
+            settings: { buttonLabel: data.get("buttonLabel") },
+          }),
+        },
+      );
+      setSelected((current) =>
+        current
+          ? {
+              ...current,
+              blocks: current.blocks.map((item) =>
+                item.id === updated.id ? updated : item,
+              ),
+            }
+          : current,
+      );
+      setDirtyBlocks((ids) => ids.filter((id) => id !== block.id));
+      action.setNotice("Produto atualizado.");
     });
   }
 
@@ -1179,8 +1281,206 @@ export function SmartPagesDashboard({
                         Adicionar link
                       </button>
                     </SmartForm>
+                    <details className="sp-advanced">
+                      <summary>Produtos</summary>
+                      <SmartForm
+                        onSubmit={createProduct}
+                        failure={
+                          activeForm === "create-product"
+                            ? action.failure
+                            : null
+                        }
+                      >
+                        <SmartField>
+                          Nome do produto
+                          <input required name="name" maxLength={120} />
+                        </SmartField>
+                        <SmartField>
+                          Endereço do produto
+                          <input
+                            required
+                            name="slug"
+                            minLength={3}
+                            maxLength={140}
+                            pattern="[a-z0-9]+(?:-[a-z0-9]+)*"
+                          />
+                        </SmartField>
+                        <SmartField>
+                          Tipo
+                          <select name="type" defaultValue="digital">
+                            <option value="digital">Produto digital</option>
+                            <option value="physical">Produto físico</option>
+                            <option value="course">Curso</option>
+                            <option value="booking">Agendamento</option>
+                            <option value="session">Sessão</option>
+                            <option value="mentorship">Mentoria</option>
+                            <option value="coaching">Coaching</option>
+                            <option value="bundle">Bundle</option>
+                            <option value="event">Evento</option>
+                            <option value="subscription">Assinatura</option>
+                          </select>
+                        </SmartField>
+                        <SmartField>
+                          Preço (R$)
+                          <input
+                            required
+                            name="price"
+                            type="number"
+                            min="0"
+                            max="9999999.99"
+                            step="0.01"
+                          />
+                        </SmartField>
+                        <SmartField>
+                          Status
+                          <select name="status" defaultValue="draft">
+                            <option value="draft">Rascunho</option>
+                            <option value="active">Ativo</option>
+                          </select>
+                        </SmartField>
+                        <button className="button button-secondary" disabled={action.busy}>
+                          Criar produto
+                        </button>
+                      </SmartForm>
+                      <SmartForm
+                        onSubmit={addProductBlock}
+                        failure={
+                          activeForm === "add-product" ? action.failure : null
+                        }
+                      >
+                        <SmartField>
+                          Produto
+                          <select required name="productId" defaultValue="">
+                            <option value="" disabled>
+                              Selecione um produto
+                            </option>
+                            {products
+                              .filter((product) => product.status !== "archived")
+                              .map((product) => (
+                                <option key={product.id} value={product.id}>
+                                  {product.name}
+                                  {product.status === "draft" ? " (rascunho)" : ""}
+                                </option>
+                              ))}
+                          </select>
+                        </SmartField>
+                        <SmartField>
+                          Texto do botão
+                          <input
+                            name="buttonLabel"
+                            maxLength={40}
+                            defaultValue="Ver produto"
+                          />
+                        </SmartField>
+                        <button
+                          className="button button-secondary"
+                          disabled={action.busy || !products.some((product) => product.status !== "archived")}
+                        >
+                          Adicionar produto
+                        </button>
+                      </SmartForm>
+                    </details>
                     <ol className="smart-page-block-list">
-                      {selected.blocks.map((block, index) => (
+                      {selected.blocks.map((block, index) =>
+                        block.type === "product" ? (
+                          <li key={`${block.id}:${block.productId}`}>
+                            <details className="sp-link-card">
+                              <summary>
+                                <strong>
+                                  {block.product?.name ??
+                                    "Produto indisponível"}
+                                </strong>
+                                <span>
+                                  {block.visible ? "Visível" : "Oculto"} · Produto{" "}
+                                  {index + 1}
+                                </span>
+                              </summary>
+                              {block.productId ? (
+                                <SmartForm
+                                  failure={
+                                    activeForm === block.id
+                                      ? action.failure
+                                      : null
+                                  }
+                                  onSubmit={(event) =>
+                                    saveProductBlock(event, block)
+                                  }
+                                >
+                                  <SmartField>
+                                    Texto do botão
+                                    <input
+                                      required
+                                      name="buttonLabel"
+                                      maxLength={40}
+                                      defaultValue={
+                                        block.settings.buttonLabel ?? "Ver produto"
+                                      }
+                                    />
+                                  </SmartField>
+                                  <div className="smart-page-block-options">
+                                    <SmartField className="smart-page-check">
+                                      <input
+                                        type="checkbox"
+                                        name="visible"
+                                        defaultChecked={block.visible}
+                                      />{" "}
+                                      Visível
+                                    </SmartField>
+                                    <SmartField className="smart-page-check">
+                                      <input
+                                        type="checkbox"
+                                        name="analyticsEnabled"
+                                        defaultChecked={block.analyticsEnabled}
+                                      />{" "}
+                                      Medir cliques
+                                    </SmartField>
+                                  </div>
+                                  <div className="action-row">
+                                    <button
+                                      className="button button-secondary"
+                                      disabled={action.busy}
+                                    >
+                                      Salvar
+                                    </button>
+                                    <button
+                                      type="button"
+                                      className="button button-quiet"
+                                      disabled={action.busy || index === 0}
+                                      onClick={() =>
+                                        void moveBlock(block.id, -1)
+                                      }
+                                    >
+                                      Mover acima
+                                    </button>
+                                    <button
+                                      type="button"
+                                      className="button button-quiet"
+                                      disabled={
+                                        action.busy ||
+                                        index === selected.blocks.length - 1
+                                      }
+                                      onClick={() =>
+                                        void moveBlock(block.id, 1)
+                                      }
+                                    >
+                                      Mover abaixo
+                                    </button>
+                                    <button
+                                      type="button"
+                                      className="button button-quiet danger-text"
+                                      disabled={action.busy}
+                                      onClick={() => void deleteBlock(block.id)}
+                                    >
+                                      Excluir
+                                    </button>
+                                  </div>
+                                </SmartForm>
+                              ) : (
+                                <p>O produto associado não está mais disponível.</p>
+                              )}
+                            </details>
+                          </li>
+                        ) : (
                         <li
                           key={`${block.id}:${block.settings.title}:${block.visible}:${block.linkId}`}
                         >
@@ -1308,7 +1608,8 @@ export function SmartPagesDashboard({
                             </SmartForm>
                           </details>
                         </li>
-                      ))}
+                        ),
+                      )}
                     </ol>
                   </fieldset>
                 </section>

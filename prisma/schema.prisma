@@ -8,6 +8,25 @@ enum SmartPageStatus {
   published
 }
 
+enum ProductStatus {
+  draft
+  active
+  archived
+}
+
+enum ProductType {
+  physical
+  digital
+  course
+  booking
+  session
+  mentorship
+  coaching
+  bundle
+  event
+  subscription
+}
+
 enum ProjectStatus {
   active
   archived
@@ -164,6 +183,30 @@ model SmartPage {
   @@index([status, publishedAt])
 }
 
+model Product {
+  id           String        @id @default(cuid())
+  workspaceId  String
+  name         String        @db.VarChar(120)
+  slug         String        @db.VarChar(140)
+  description  String        @default("") @db.VarChar(5000)
+  type         ProductType
+  status       ProductStatus @default(draft)
+  priceInCents Int
+  currency     String        @default("BRL") @db.VarChar(3)
+  images       Json          @default("[]")
+  metadata     Json          @default("{}")
+  visible      Boolean       @default(true)
+  startAt      DateTime?
+  endAt        DateTime?
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  workspace    Workspace     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  blocks       SmartPageBlock[]
+
+  @@unique([workspaceId, slug])
+  @@index([workspaceId, status, updatedAt])
+}
+
 model SmartPageBlock {
   id               String     @id @default(cuid())
   smartPageId      String
@@ -173,15 +216,18 @@ model SmartPageBlock {
   visible          Boolean    @default(true)
   analyticsEnabled Boolean    @default(true)
   linkId           String?
+  productId        String?
   createdAt        DateTime   @default(now())
   updatedAt        DateTime   @updatedAt
   smartPage        SmartPage  @relation(fields: [smartPageId], references: [id], onDelete: Cascade)
   link             ShortLink? @relation(fields: [linkId], references: [id], onDelete: SetNull)
+  product          Product?   @relation(fields: [productId], references: [id], onDelete: SetNull)
   analyticsEvents  AnalyticsEvent[]
 
   @@unique([smartPageId, position])
   @@index([smartPageId, position])
   @@index([linkId])
+  @@index([productId])
 }
 
 model RateLimit {
@@ -300,6 +346,7 @@ model Workspace {
   favorites Favorite[]
   recentResources RecentResource[]
   whatsappLinks WhatsappLink[]
+  products Product[]
 }
 
 model Project {

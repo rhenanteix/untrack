@@ -59,6 +59,26 @@ describe("smart page schemas", () => {
       }).success,
     ).toBe(false);
   });
+
+  it("requires a workspace product for product blocks", () => {
+    expect(
+      smartPageBlockInputSchema.parse({
+        type: "product",
+        productId: "product_123",
+        settings: {},
+      }),
+    ).toMatchObject({
+      visible: true,
+      analyticsEnabled: true,
+      settings: { buttonLabel: "Ver produto" },
+    });
+    expect(
+      smartPageBlockInputSchema.safeParse({
+        type: "product",
+        settings: {},
+      }).success,
+    ).toBe(false);
+  });
 });
 
 describe("smart page entitlements", () => {

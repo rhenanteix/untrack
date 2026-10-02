@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { themeIds } from "./themes";
+import { productBlockSettingsSchema } from "@/modules/products/schemas";
 import { webUrlSchema } from "@/modules/validation/url-validation";
 
 const reservedSlugs = new Set(["new", "api", "admin"]);
@@ -139,7 +140,7 @@ export const linkBlockSettingsSchema = z
   })
   .strict();
 
-export const smartPageBlockInputSchema = z
+const linkSmartPageBlockInputSchema = z
   .object({
     type: z.literal("link"),
     settings: linkBlockSettingsSchema,
@@ -147,9 +148,26 @@ export const smartPageBlockInputSchema = z
     analyticsEnabled: z.boolean().default(true),
     linkId: z.string().min(1).max(200).nullable().optional(),
   })
-  .strict()
+  .strict();
+
+const productSmartPageBlockInputSchema = z
+  .object({
+    type: z.literal("product"),
+    settings: productBlockSettingsSchema,
+    visible: z.boolean().default(true),
+    analyticsEnabled: z.boolean().default(true),
+    productId: z.string().min(1).max(200),
+  })
+  .strict();
+
+export const smartPageBlockInputSchema = z
+  .union([linkSmartPageBlockInputSchema, productSmartPageBlockInputSchema])
   .superRefine((value, context) => {
-    if (!value.linkId && !value.settings.destinationUrl) {
+    if (
+      value.type === "link" &&
+      !value.linkId &&
+      !value.settings.destinationUrl
+    ) {
       context.addIssue({
         code: "custom",
         path: ["settings", "destinationUrl"],

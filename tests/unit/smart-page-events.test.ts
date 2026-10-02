@@ -74,4 +74,42 @@ describe("smart page analytics events", () => {
     ).resolves.toBe(false);
     expect(findFirst).not.toHaveBeenCalled();
   });
+
+  it("records product events only for product blocks on the published page", async () => {
+    const create = vi.fn().mockResolvedValue({});
+    const findFirst = vi.fn().mockResolvedValue({ id: "block_1" });
+    vi.mocked(getPrisma).mockReturnValue({
+      smartPage: {
+        findFirst: vi
+          .fn()
+          .mockResolvedValue({ id: "page_1", workspaceId: "workspace_1" }),
+      },
+      smartPageBlock: { findFirst },
+      analyticsEvent: { create },
+    } as unknown as ReturnType<typeof getPrisma>);
+
+    await expect(
+      recordPublicSmartPageEvent(
+        {
+          event: "link_in_bio_product_click",
+          slug: "minha-pagina",
+          blockId: "block_1",
+          visitorId: "d75f415d-9dbd-4a68-b6c2-975f32ed5b4c",
+        },
+        new Headers({ "user-agent": "Mozilla Desktop" }),
+      ),
+    ).resolves.toBe(true);
+
+    expect(findFirst).toHaveBeenCalledWith({
+      where: expect.objectContaining({
+        id: "block_1",
+        smartPageId: "page_1",
+        type: "product",
+      }),
+      select: { id: true },
+    });
+    expect(create).toHaveBeenCalledWith({
+      data: expect.objectContaining({ name: "link_in_bio_product_click" }),
+    });
+  });
 });

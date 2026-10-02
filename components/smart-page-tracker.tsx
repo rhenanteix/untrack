@@ -16,8 +16,15 @@ function sessionVisitorId() {
   }
 }
 
+type SmartPageEvent =
+  | "smart_page_view"
+  | "smart_block_view"
+  | "smart_block_clicked"
+  | "link_in_bio_product_view"
+  | "link_in_bio_product_click";
+
 function track(
-  event: "smart_page_view" | "smart_block_view" | "smart_block_clicked",
+  event: SmartPageEvent,
   slug: string,
   blockId?: string,
 ) {
@@ -36,16 +43,22 @@ function track(
 
 export function SmartPageTracker({
   slug,
-  blockIds,
+  blocks,
 }: {
   slug: string;
-  blockIds: string[];
+  blocks: { id: string; type: "link" | "product" }[];
 }) {
   useEffect(() => {
     void track("smart_page_view", slug);
-    for (const blockId of blockIds)
-      void track("smart_block_view", slug, blockId);
-  }, [blockIds, slug]);
+    for (const block of blocks)
+      void track(
+        block.type === "product"
+          ? "link_in_bio_product_view"
+          : "smart_block_view",
+        slug,
+        block.id,
+      );
+  }, [blocks, slug]);
 
   return null;
 }
@@ -55,12 +68,14 @@ export function SmartPageLink({
   blockId,
   href,
   openInNewTab,
+  event = "smart_block_clicked",
   children,
 }: {
   slug: string;
   blockId: string;
   href: string;
   openInNewTab: boolean;
+  event?: "smart_block_clicked" | "link_in_bio_product_click";
   children: React.ReactNode;
 }) {
   return (
@@ -70,10 +85,23 @@ export function SmartPageLink({
       target={openInNewTab ? "_blank" : undefined}
       rel={openInNewTab ? "noreferrer" : undefined}
       onClick={() => {
-        void track("smart_block_clicked", slug, blockId);
+        void track(event, slug, blockId);
       }}
     >
       {children}
     </a>
   );
+}
+
+export function SmartPageProductTracker({
+  slug,
+  blockId,
+}: {
+  slug: string;
+  blockId: string;
+}) {
+  useEffect(() => {
+    void track("link_in_bio_product_view", slug, blockId);
+  }, [blockId, slug]);
+  return null;
 }

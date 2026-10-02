@@ -4,6 +4,7 @@ import { ApiError } from "@/lib/api-response";
 import { track } from "@/lib/analytics";
 import { PAGE_SIZE } from "@/lib/pagination";
 import { getPrisma } from "@/lib/prisma";
+import { productBlockSettingsSchema } from "@/modules/products/schemas";
 import {
   audit,
   releaseQuota,
@@ -27,6 +28,21 @@ const publicBlockInclude = {
       domainKey: true,
       isActive: true,
       expiresAt: true,
+    },
+  },
+  product: {
+    select: {
+      id: true,
+      name: true,
+      slug: true,
+      description: true,
+      priceInCents: true,
+      currency: true,
+      images: true,
+      status: true,
+      visible: true,
+      startAt: true,
+      endAt: true,
     },
   },
 } as const;
@@ -243,20 +259,33 @@ async function checkedBlockInput(
   actor: Actor,
   input: SmartPageBlockInput,
 ) {
-  if (!input.linkId) return input;
-  const link = await tx.shortLink.findFirst({
-    where: {
-      id: input.linkId,
-      workspaceId: actor.workspaceId,
-      distribution: "digital",
-    },
-  });
-  if (!link) {
-    throw new ApiError(
-      404,
-      "LINK_NOT_FOUND",
-      "O link selecionado não pertence a este workspace.",
-    );
+  if (input.type === "link" && input.linkId) {
+    const link = await tx.shortLink.findFirst({
+      where: {
+        id: input.linkId,
+        workspaceId: actor.workspaceId,
+        distribution: "digital",
+      },
+    });
+    if (!link) {
+      throw new ApiError(
+        404,
+        "LINK_NOT_FOUND",
+        "O link selecionado não pertence a este workspace.",
+      );
+    }
+  }
+  if (input.type === "product") {
+    const product = await tx.product.findFirst({
+      where: { id: input.productId, workspaceId: actor.workspaceId },
+    });
+    if (!product) {
+      throw new ApiError(
+        404,
+        "PRODUCT_NOT_FOUND",
+        "O produto selecionado não pertence a este workspace.",
+      );
+    }
   }
   return input;
 }
@@ -291,7 +320,8 @@ export async function addSmartPageBlock(
         settings: json(validInput.settings),
         visible: validInput.visible,
         analyticsEnabled: validInput.analyticsEnabled,
-        linkId: validInput.linkId ?? null,
+        linkId: validInput.type === "link" ? validInput.linkId ?? null : null,
+        productId: validInput.type === "product" ? validInput.productId : null,
       },
       include: publicBlockInclude,
     });
@@ -332,7 +362,8 @@ export async function updateSmartPageBlock(
         settings: json(validInput.settings),
         visible: validInput.visible,
         analyticsEnabled: validInput.analyticsEnabled,
-        linkId: validInput.linkId ?? null,
+        linkId: validInput.type === "link" ? validInput.linkId ?? null : null,
+        productId: validInput.type === "product" ? validInput.productId : null,
       },
       include: publicBlockInclude,
     });
@@ -427,6 +458,25 @@ export async function publicSmartPage(slug: string) {
   });
 }
 
+export async function publicSmartPageProduct(slug: string, productId: string) {
+  return getPrisma().smartPage.findFirst({
+    where: {
+      slug,
+      status: "published",
+      blocks: {
+        some: { productId, type: "product", visible: true },
+      },
+    },
+    include: {
+      blocks: {
+        where: { productId, type: "product", visible: true },
+        include: publicBlockInclude,
+        take: 1,
+      },
+    },
+  });
+}
+
 export async function smartPageMetrics(actor: Actor, id: string, days: number) {
   const page = await getPrisma().smartPage.findFirst({
     where: { id, workspaceId: actor.workspaceId },
@@ -451,7 +501,7 @@ export async function smartPageMetrics(actor: Actor, id: string, days: number) {
   };
   const clickWhere = {
     smartPageId: page.id,
-    name: "smart_block_clicked",
+    name: { in: ["smart_block_clicked", "link_in_bio_product_click"] },
     day: { gte: start },
   };
   const db = getPrisma();
@@ -489,12 +539,16 @@ export async function smartPageMetrics(actor: Actor, id: string, days: number) {
   );
   const blocks = await db.smartPageBlock.findMany({
     where: { id: { in: blockIds }, smartPageId: page.id },
-    select: { id: true, settings: true },
+    select: { id: true, settings: true, product: { select: { name: true } } },
   });
   const blockTitles = new Map(
     blocks.map((block) => [
       block.id,
-      linkBlockSettingsSchema.safeParse(block.settings).data?.title ?? "Link",
+      linkBlockSettingsSchema.safeParse(block.settings).data?.title ??
+        block.product?.name ??
+        productBlockSettingsSchema.safeParse(block.settings).data
+          ?.buttonLabel ??
+        "Bloco",
     ]),
   );
   return {

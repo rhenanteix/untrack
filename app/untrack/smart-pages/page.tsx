@@ -23,7 +23,7 @@ async function loadPageData(
 ) {
   try {
     const actor = await actorFor(userId, requestHeaders);
-    const [initial, managedLinks, workspace] = await Promise.all([
+    const [initial, managedLinks, products, workspace] = await Promise.all([
       listSmartPages(actor, filters.page, filters.search),
       getPrisma().shortLink.findMany({
         where: { workspaceId: actor.workspaceId, distribution: "digital" },
@@ -39,12 +39,18 @@ async function loadPageData(
           expiresAt: true,
         },
       }),
+      getPrisma().product.findMany({
+        where: { workspaceId: actor.workspaceId },
+        orderBy: { updatedAt: "desc" },
+        take: 100,
+        select: { id: true, name: true, status: true },
+      }),
       getPrisma().workspace.findUniqueOrThrow({
         where: { id: actor.workspaceId },
         select: { plan: true },
       }),
     ]);
-    return { ok: true as const, actor, initial, managedLinks, workspace };
+    return { ok: true as const, actor, initial, managedLinks, products, workspace };
   } catch (error) {
     const failure = workspaceLoadError(error);
     if (!["WORKSPACE_FORBIDDEN", "INVALID_WORKSPACE"].includes(failure.code))
@@ -73,7 +79,7 @@ export default async function SmartPagesPage({
   if (!session) redirect("/entrar?next=/untrack/smart-pages");
   const data = await loadPageData(requestHeaders, session.user.id, filters);
   if (!data.ok) return <WorkspaceLoadError {...data.error} />;
-  const { actor, initial, managedLinks, workspace } = data;
+  const { actor, initial, managedLinks, products, workspace } = data;
   const premium = hasSmartPages(workspace.plan);
   return (
     <>
@@ -126,6 +132,7 @@ export default async function SmartPagesPage({
           ...link,
           expiresAt: link.expiresAt?.toISOString() ?? null,
         }))}
+        products={products}
       />
     </>
   );

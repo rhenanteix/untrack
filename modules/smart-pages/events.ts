@@ -6,6 +6,8 @@ export const publicSmartPageEventNames = [
   "smart_page_view",
   "smart_block_view",
   "smart_block_clicked",
+  "link_in_bio_product_view",
+  "link_in_bio_product_click",
 ] as const;
 
 export type PublicSmartPageEventName =
@@ -37,6 +39,7 @@ export async function recordPublicSmartPageEvent(
   if (!page) return false;
 
   const isBlockEvent = input.event !== "smart_page_view";
+  const isProductEvent = input.event.startsWith("link_in_bio_product_");
   let blockId: string | null = null;
   if (isBlockEvent) {
     if (!input.blockId) return false;
@@ -46,6 +49,7 @@ export async function recordPublicSmartPageEvent(
         smartPageId: page.id,
         visible: true,
         analyticsEnabled: true,
+        ...(isProductEvent ? { type: "product" } : {}),
       },
       select: { id: true },
     });
