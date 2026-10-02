@@ -1,3 +1,7 @@
-import { AssetLibrary } from "@/components/untrack/asset-library";
-export const metadata={title:"Campanhas"};
-export default function CampaignsPage(){return <AssetLibrary kind="campaigns"/>;}
+import { CampaignsList } from "@/components/untrack/campaigns-list";
+
+export const metadata = { title: "Campanhas" };
+
+export default function CampaignsPage() {
+  return <CampaignsList />;
+}

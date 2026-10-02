@@ -262,6 +262,7 @@ model ShortLink {
   clicks         LinkClick[]
   smartPageBlocks SmartPageBlock[]
   whatsappLink   WhatsappLink? @relation("WhatsappSmartLink")
+  campaignAssets CampaignAsset[]
 
   @@unique([domainKey, slug])
   @@unique([id, workspaceId])
@@ -323,6 +324,7 @@ model Workspace {
   members WorkspaceMember[]
   clients Client[]
   campaigns Campaign[]
+  campaignAssets CampaignAsset[]
   usage WorkspaceUsage[]
   audits AuditLog[]
   links ShortLink[]
@@ -539,6 +541,10 @@ model Campaign {
   clientId String?
   responsibleId String?
   objective String? @db.VarChar(1000)
+  objectiveType String? @db.VarChar(40)
+  primaryDestinationType String? @db.VarChar(40)
+  primaryDestinationId String? @db.VarChar(255)
+  primaryDestinationUrl String? @db.VarChar(4096)
   startDate DateTime?
   endDate DateTime?
   status String @default("draft") @db.VarChar(20)
@@ -554,6 +560,7 @@ model Campaign {
   shortLinks ShortLink[]
   qrs QrAsset[]
   channels CampaignChannel[]
+  assets CampaignAsset[]
   checklistItems CampaignChecklist[]
   monitoringChecks CampaignMonitorCheck[]
   incidents CampaignIncident[]
@@ -590,11 +597,44 @@ model CampaignChannel {
   updatedAt DateTime @updatedAt
   workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   campaign Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  assets CampaignAsset[]
   monitorChecks CampaignMonitorCheck[]
   incidents CampaignIncident[]
   @@unique([id, workspaceId])
   @@index([workspaceId, campaignId])
   @@index([campaignId])
+}
+
+model CampaignAsset {
+  id String @id @default(cuid())
+  workspaceId String
+  campaignId String
+  channelId String
+  name String @db.VarChar(120)
+  assetType String @db.VarChar(80)
+  destinationType String @db.VarChar(40)
+  destinationId String? @db.VarChar(255)
+  destinationUrl String? @db.VarChar(4096)
+  linkId String?
+  qrId String?
+  whatsappLinkId String?
+  status String @default("active") @db.VarChar(20)
+  metadata Json @default("{}")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  campaign Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  channel CampaignChannel @relation(fields: [channelId], references: [id], onDelete: Cascade)
+  link ShortLink? @relation(fields: [linkId], references: [id], onDelete: SetNull)
+  qr QrAsset? @relation(fields: [qrId], references: [id], onDelete: SetNull)
+  whatsappLink WhatsappLink? @relation(fields: [whatsappLinkId], references: [id], onDelete: SetNull)
+
+  @@unique([id, workspaceId])
+  @@index([workspaceId, campaignId])
+  @@index([campaignId, channelId])
+  @@index([linkId])
+  @@index([qrId])
+  @@index([whatsappLinkId])
 }
 
 model WhatsappLink {
@@ -613,6 +653,7 @@ model WhatsappLink {
   workspace      Workspace          @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   campaign       Campaign?          @relation(fields: [campaignId], references: [id], onDelete: SetNull)
   smartLink      ShortLink?         @relation("WhatsappSmartLink", fields: [smartLinkId], references: [id], onDelete: SetNull)
+  campaignAssets CampaignAsset[]
 
   @@index([workspaceId, status, updatedAt])
   @@index([workspaceId, phoneNumber, campaignId])
@@ -754,6 +795,7 @@ model QrAsset {
   workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   campaign Campaign? @relation(fields: [campaignId, workspaceId], references: [id, workspaceId])
   redirect ShortLink? @relation(fields: [redirectId], references: [id], onDelete: Restrict)
+  campaignAssets CampaignAsset[]
   @@index([workspaceId, createdAt])
 }
 

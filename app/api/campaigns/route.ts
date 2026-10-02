@@ -11,8 +11,11 @@ import {
   listCampaigns,
   getCampaign,
   createCampaign,
+  createCampaignFromBuilder,
+  createCampaignAsset,
   updateCampaign,
   deleteCampaign,
+  createChannel,
 } from "@/modules/campaigns/service";
 import {
   updateChannel,
@@ -30,6 +33,9 @@ import {
 import { testNotification } from "@/modules/campaigns/notifications";
 import {
   createCampaignSchema,
+  campaignBuilderSchema,
+  createCampaignAssetSchema,
+  createChannelSchema,
   updateCampaignSchema,
   updateChannelSchema,
   campaignKitInputSchema,
@@ -90,6 +96,28 @@ export async function POST(request: Request) {
         .strict()
         .parse(raw);
       result = await saveKit(actor, input.campaignId, input.proposal);
+    } else if (action === "builder") {
+      result = await createCampaignFromBuilder(
+        actor,
+        campaignBuilderSchema.parse(raw),
+      );
+    } else if (action === "channel") {
+      const envelope = z
+        .object({ campaignId: z.string() })
+        .passthrough()
+        .parse(raw);
+      const { campaignId, ...data } = envelope;
+      result = await createChannel(
+        actor,
+        campaignId,
+        createChannelSchema.parse(data),
+      );
+    } else if (action === "asset") {
+      const input = z
+        .object({ campaignId: z.string(), data: createCampaignAssetSchema })
+        .strict()
+        .parse(raw);
+      result = await createCampaignAsset(actor, input.campaignId, input.data);
     } else if (action === "checklist-run") {
       const input = z.object({ campaignId: z.string() }).strict().parse(raw);
       result = await runChecklist(actor, input.campaignId);
