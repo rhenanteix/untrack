@@ -153,8 +153,8 @@ export default async function PublicSmartPage({
                 <a
                   key={social.network}
                   href={social.url}
-                  target="_blank"
-                  rel="noreferrer"
+                  target={social.network === "email" ? undefined : "_blank"}
+                  rel={social.network === "email" ? undefined : "noreferrer"}
                 >
                   {social.network}
                 </a>

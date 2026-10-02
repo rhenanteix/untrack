@@ -83,21 +83,38 @@ export const smartPageThemeSchema = z
 
 export const socialLinksSchema = z
   .array(
-    z
-      .object({
-        network: z.enum([
-          "instagram",
-          "tiktok",
-          "youtube",
-          "linkedin",
-          "x",
-          "facebook",
-          "whatsapp",
-          "website",
-        ]),
-        url: webUrlSchema,
-      })
-      .strict(),
+    z.union([
+      z
+        .object({
+          network: z.enum([
+            "instagram",
+            "tiktok",
+            "youtube",
+            "linkedin",
+            "x",
+            "facebook",
+            "whatsapp",
+            "website",
+          ]),
+          url: webUrlSchema,
+        })
+        .strict(),
+      z
+        .object({
+          network: z.literal("email"),
+          url: z
+            .string()
+            .trim()
+            .refine(
+              (value) =>
+                value.startsWith("mailto:") &&
+                z.string().email().safeParse(value.slice("mailto:".length))
+                  .success,
+              "Informe um e-mail válido.",
+            ),
+        })
+        .strict(),
+    ]),
   )
   .max(8)
   .superRefine((links, context) => {

@@ -1,9 +1,11 @@
 "use client";
 
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { usePublicLanguage } from "@/components/public-language-provider";
 
 export function Footer() {
+  const pathname = usePathname();
   const { copy } = usePublicLanguage();
   const groups = [
     {
@@ -47,6 +49,7 @@ export function Footer() {
       ],
     },
   ];
+  if (pathname.startsWith("/untrack/smart-pages")) return null;
   return (
     <footer className="site-footer">
       <div className="shell footer-inner">

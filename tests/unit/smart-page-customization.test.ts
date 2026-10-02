@@ -1,7 +1,10 @@
 import { describe, expect, it } from "vitest";
 import sharp from "sharp";
 import { optimizeImage, MAX_IMAGE_BYTES } from "@/modules/smart-pages/images";
-import { smartPageThemeSchema } from "@/modules/smart-pages/schemas";
+import {
+  smartPageThemeSchema,
+  socialLinksSchema,
+} from "@/modules/smart-pages/schemas";
 import {
   requireSmartPages,
   SMART_PAGES_PRODUCT,
@@ -62,6 +65,18 @@ describe("Smart Page customization", () => {
         backgroundVideoUrl: "https://cdn.example/wallpaper.mp4",
       }),
     ).toMatchObject({ wallpaper: "video" });
+  });
+  it("accepts a mailto contact without allowing it for other social networks", () => {
+    expect(
+      socialLinksSchema.safeParse([
+        { network: "email", url: "mailto:ana@example.com" },
+      ]).success,
+    ).toBe(true);
+    expect(
+      socialLinksSchema.safeParse([
+        { network: "instagram", url: "mailto:ana@example.com" },
+      ]).success,
+    ).toBe(false);
   });
   it("requires paid entitlement without enabling charges", () => {
     expect(() => requireSmartPages("free")).toThrow();

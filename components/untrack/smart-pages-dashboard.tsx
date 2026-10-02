@@ -1,7 +1,9 @@
 "use client";
+import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 
 import { useEffect, useRef, useState, type FormEvent } from "react";
+import type { IconType } from "react-icons";
 import {
   HiOutlineChartBarSquare,
   HiOutlineEye,
@@ -10,6 +12,17 @@ import {
   HiOutlineShare,
   HiOutlineUserCircle,
 } from "react-icons/hi2";
+import {
+  FaEnvelope,
+  FaFacebookF,
+  FaGlobe,
+  FaInstagram,
+  FaLinkedinIn,
+  FaTiktok,
+  FaWhatsapp,
+  FaXTwitter,
+  FaYoutube,
+} from "react-icons/fa6";
 import { BlockDestinationFields } from "@/components/smart-pages/block-destination-fields";
 import { AppearanceControls } from "@/components/smart-pages/appearance-controls";
 import { ImageUpload } from "@/components/smart-pages/image-upload";
@@ -30,17 +43,69 @@ type SocialNetwork =
   | "x"
   | "facebook"
   | "whatsapp"
-  | "website";
+  | "website"
+  | "email";
 
-const socialNetworks: { value: SocialNetwork; label: string }[] = [
-  { value: "instagram", label: "Instagram" },
-  { value: "tiktok", label: "TikTok" },
-  { value: "youtube", label: "YouTube" },
-  { value: "linkedin", label: "LinkedIn" },
-  { value: "x", label: "X" },
-  { value: "facebook", label: "Facebook" },
-  { value: "whatsapp", label: "WhatsApp" },
-  { value: "website", label: "Site" },
+const socialNetworks: {
+  value: SocialNetwork;
+  label: string;
+  placeholder: string;
+  Icon: IconType;
+}[] = [
+  {
+    value: "instagram",
+    label: "Instagram",
+    placeholder: "https://instagram.com/seuperfil",
+    Icon: FaInstagram,
+  },
+  {
+    value: "tiktok",
+    label: "TikTok",
+    placeholder: "https://tiktok.com/@seuperfil",
+    Icon: FaTiktok,
+  },
+  {
+    value: "youtube",
+    label: "YouTube",
+    placeholder: "https://youtube.com/@seucanal",
+    Icon: FaYoutube,
+  },
+  {
+    value: "linkedin",
+    label: "LinkedIn",
+    placeholder: "https://linkedin.com/in/seuperfil",
+    Icon: FaLinkedinIn,
+  },
+  {
+    value: "x",
+    label: "X",
+    placeholder: "https://x.com/seuperfil",
+    Icon: FaXTwitter,
+  },
+  {
+    value: "facebook",
+    label: "Facebook",
+    placeholder: "https://facebook.com/seuperfil",
+    Icon: FaFacebookF,
+  },
+  {
+    value: "whatsapp",
+    label: "WhatsApp",
+    placeholder: "https://wa.me/5511999999999",
+    Icon: FaWhatsapp,
+  },
+  {
+    value: "website",
+    label: "Site",
+    placeholder: "https://seusite.com",
+    Icon: FaGlobe,
+  },
+  {
+    value: "email",
+    label: "E-mail",
+    placeholder: "voce@exemplo.com",
+    Icon: FaEnvelope,
+  },
 ];
 
 interface SmartPageSummary {
@@ -116,16 +181,15 @@ function collectSocialLinks(
   data: FormData,
   order: { network: SocialNetwork; url: string }[],
 ) {
-  const networks = [
-    ...new Set([
-      ...order.map((s) => s.network),
-      ...socialNetworks.map((s) => s.value),
-    ]),
-  ];
-  return networks.flatMap((network) => {
-    const url = String(data.get(`social-${network}`) ?? "").trim();
-    return url ? [{ network, url }] : [];
-  });
+  const values = new Map(order.map((social) => [social.network, social.url]));
+  for (const { value: network } of socialNetworks) {
+    const field = `social-${network}`;
+    if (!data.has(field)) continue;
+    const url = String(data.get(field) ?? "").trim();
+    if (url) values.set(network, url);
+    else values.delete(network);
+  }
+  return [...values].map(([network, url]) => ({ network, url }));
 }
 
 function publicUrl(slug: string) {
@@ -216,6 +280,9 @@ export function SmartPagesDashboard({
   const [listPage, setListPage] = useState(initial.page);
   const [hasMore, setHasMore] = useState(initial.hasMore);
   const [showCreate, setShowCreate] = useState(params.get("create") === "1");
+  const [socialPickerOpen, setSocialPickerOpen] = useState(false);
+  const [activeSocialNetwork, setActiveSocialNetwork] =
+    useState<SocialNetwork | null>(null);
   const [profileDraft, setProfileDraft] = useState<Partial<SmartPageSummary>>(
     {},
   );
@@ -223,6 +290,16 @@ export function SmartPagesDashboard({
   const [dirtyBlocks, setDirtyBlocks] = useState<string[]>([]);
   const editorRef = useRef<HTMLHeadingElement>(null);
   const hasUnsaved = dirty || dirtyBlocks.length > 0 || newBlockDraft !== null;
+  const draftSocialLinks =
+    profileDraft.socialLinks ?? selected?.socialLinks ?? [];
+  const activeSocial = socialNetworks.find(
+    (network) => network.value === activeSocialNetwork,
+  );
+  const activeSocialUrl = activeSocial
+    ? (draftSocialLinks.find(
+        (social) => social.network === activeSocial.value,
+      )?.url ?? "")
+    : "";
   useEffect(() => {
     if (!hasUnsaved) return;
     const warn = (event: BeforeUnloadEvent) => {
@@ -260,6 +337,8 @@ export function SmartPagesDashboard({
         setNewBlockDraft(null);
         setEditorSection("profile");
         setEditorTab("editor");
+        setSocialPickerOpen(false);
+        setActiveSocialNetwork(null);
         setShowCreate(false);
       })
       .catch((error) => {
@@ -363,6 +442,21 @@ export function SmartPagesDashboard({
         profileDraft.socialLinks ?? selected?.socialLinks ?? [],
       ),
     });
+  }
+
+  function updateSocialLink(network: SocialNetwork, value: string) {
+    const url =
+      network === "email" && value
+        ? `mailto:${value.replace(/^mailto:/i, "").trim()}`
+        : value;
+    setProfileDraft((current) => {
+      const socialLinks = current.socialLinks ?? selected?.socialLinks ?? [];
+      const next = socialLinks.filter((social) => social.network !== network);
+      if (url) next.push({ network, url });
+      return { ...current, socialLinks: next };
+    });
+    setDirty(true);
+    action.setNotice("");
   }
 
   async function selectPage(id: string) {
@@ -682,22 +776,36 @@ export function SmartPagesDashboard({
 
   return (
     <section
-      className={`smart-pages-dashboard ${editId ? "is-editing" : "is-library"}`}
+      className={`smart-pages-dashboard sp-studio ${editId ? "is-editing" : "is-library"}`}
     >
+      <div className="sp-studio-topbar">
+        <div className="sp-studio-product">
+          <Link href="/conta" className="sp-studio-brand" aria-label="Voltar para a conta">
+            <span aria-hidden="true">↗</span>
+            <strong>untrack</strong>
+          </Link>
+          <span className="sp-studio-divider" aria-hidden="true" />
+          <strong>Smart Pages</strong>
+        </div>
+        {editId && (
+          <button
+            type="button"
+            className="button button-secondary"
+            onClick={backToLibrary}
+          >
+            Todas as páginas
+          </button>
+        )}
+      </div>
       <div className="dashboard-heading">
         <div>
-          <span className="eyebrow">Untrack</span>
-          <h1>Smart Pages</h1>
+          <span className="eyebrow">SEU LINK EM BIO</span>
+          <h1>{editId ? "Edite sua presença." : "Suas páginas, em um só lugar."}</h1>
           <p className="muted">
             Crie sua presença pública, organize seus links e acompanhe o que
             funciona.
           </p>
         </div>
-        {editId && (
-          <button className="button button-secondary" onClick={backToLibrary}>
-            ← Biblioteca de páginas
-          </button>
-        )}
         {canEdit && !editId && (
           <button
             className="button"
@@ -1143,62 +1251,122 @@ export function SmartPagesDashboard({
                           defaultValue={selected.slug}
                         />
                       </SmartField>
-                      <details className="smart-page-social-details">
-                        <summary>Redes sociais (opcional)</summary>
-                        <fieldset className="smart-page-social-inputs">
-                          <legend>Redes sociais</legend>
-                          {socialNetworks.map((network) => (
-                            <SmartField key={network.value}>
-                              {network.label}
+                      <section
+                        className="sp-social-composer"
+                        aria-labelledby="smart-page-social-heading"
+                      >
+                        <div className="sp-social-heading">
+                          <div>
+                            <span>CONEXÕES</span>
+                            <h3 id="smart-page-social-heading">
+                              Redes e e-mail
+                            </h3>
+                          </div>
+                          <button
+                            type="button"
+                            className="button button-secondary"
+                            onClick={() => setSocialPickerOpen((open) => !open)}
+                            aria-expanded={socialPickerOpen}
+                            aria-controls="smart-page-social-picker"
+                          >
+                            Adicionar
+                          </button>
+                        </div>
+                        {socialPickerOpen && (
+                          <div
+                            id="smart-page-social-picker"
+                            className="sp-social-picker"
+                            role="group"
+                            aria-label="Escolha uma rede ou e-mail"
+                          >
+                            <p>Onde as pessoas podem te encontrar?</p>
+                            <div>
+                              {socialNetworks.map(({ value, label, Icon }) => (
+                                <button
+                                  type="button"
+                                  key={value}
+                                  aria-label={`Adicionar ${label}`}
+                                  onClick={() => {
+                                    setActiveSocialNetwork(value);
+                                    setSocialPickerOpen(false);
+                                  }}
+                                >
+                                  <Icon aria-hidden="true" />
+                                  <span>{label}</span>
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                        {activeSocial && (
+                          <div className="sp-social-input">
+                            <span className="sp-social-input-icon" aria-hidden="true">
+                              <activeSocial.Icon />
+                            </span>
+                            <SmartField>
+                              {activeSocial.label}
                               <input
-                                type="url"
-                                name={`social-${network.value}`}
-                                placeholder="https://"
-                                defaultValue={
-                                  selected.socialLinks.find(
-                                    (social) =>
-                                      social.network === network.value,
-                                  )?.url ?? ""
+                                type={
+                                  activeSocial.value === "email"
+                                    ? "email"
+                                    : "url"
+                                }
+                                name={`social-${activeSocial.value}`}
+                                value={
+                                  activeSocial.value === "email"
+                                    ? activeSocialUrl.replace(/^mailto:/i, "")
+                                    : activeSocialUrl
+                                }
+                                placeholder={activeSocial.placeholder}
+                                onChange={(event) =>
+                                  updateSocialLink(
+                                    activeSocial.value,
+                                    event.target.value,
+                                  )
                                 }
                               />
                             </SmartField>
-                          ))}
-                        </fieldset>
-                        <ol className="sp-section-order">
-                          {(
-                            profileDraft.socialLinks ?? selected.socialLinks
-                          ).map((social, index, array) => (
-                            <li key={social.network}>
-                              <strong>{social.network}</strong>
-                              {([-1, 1] as const).map((direction) => (
-                                <button
-                                  type="button"
-                                  key={direction}
-                                  aria-label={`${direction === -1 ? "Subir" : "Descer"} rede ${social.network}`}
-                                  disabled={
-                                    index + direction < 0 ||
-                                    index + direction >= array.length
-                                  }
-                                  onClick={() => {
-                                    const next = [...array];
-                                    [next[index], next[index + direction]] = [
-                                      next[index + direction],
-                                      next[index],
-                                    ];
-                                    setProfileDraft((current) => ({
-                                      ...current,
-                                      socialLinks: next,
-                                    }));
-                                    setDirty(true);
-                                  }}
-                                >
-                                  {direction === -1 ? "↑" : "↓"}
-                                </button>
-                              ))}
-                            </li>
-                          ))}
-                        </ol>
-                      </details>
+                            <button
+                              type="button"
+                              className="button button-quiet"
+                              onClick={() => {
+                                updateSocialLink(activeSocial.value, "");
+                                setActiveSocialNetwork(null);
+                              }}
+                            >
+                              Remover
+                            </button>
+                          </div>
+                        )}
+                        {draftSocialLinks.length ? (
+                          <ul className="sp-social-list">
+                            {draftSocialLinks.map((social) => {
+                              const network = socialNetworks.find(
+                                (item) => item.value === social.network,
+                              );
+                              if (!network) return null;
+                              const Icon = network.Icon;
+                              return (
+                                <li key={social.network}>
+                                  <button
+                                    type="button"
+                                    onClick={() =>
+                                      setActiveSocialNetwork(social.network)
+                                    }
+                                  >
+                                    <Icon aria-hidden="true" />
+                                    <span>{network.label}</span>
+                                  </button>
+                                </li>
+                              );
+                            })}
+                          </ul>
+                        ) : (
+                          <p className="sp-social-empty">
+                            Adicione suas redes e um e-mail para abrir caminhos de contato.
+                          </p>
+                        )}
+                      </section>
                     </div>
                     <div
                       id="sp-panel-appearance"

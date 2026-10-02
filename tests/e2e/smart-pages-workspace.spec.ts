@@ -385,10 +385,13 @@ test("server conflicts and invalid social URLs point to the correct form field",
     await expect(
       page.getByRole("heading", { name: "Perfil profissional", exact: true }),
     ).toBeVisible();
-    await page.getByText("Redes sociais (opcional)", { exact: true }).click();
-    const linkedin = page.locator('input[name="social-linkedin"]');
+    const socialComposer = page.locator(".sp-social-composer");
+    await socialComposer.getByRole("button", { name: "Adicionar" }).click();
+    await socialComposer
+      .getByRole("button", { name: "Adicionar LinkedIn" })
+      .click();
+    const linkedin = socialComposer.locator('input[name="social-linkedin"]');
     await linkedin.fill("ftp://example.com/profile");
-    await page.getByText("Redes sociais (opcional)", { exact: true }).click();
     await page.getByRole("tab", { name: "Aparência", exact: true }).click();
     await page
       .getByRole("button", { name: "Salvar perfil", exact: true })

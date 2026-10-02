@@ -7,7 +7,9 @@ export function AuthenticatedFrame({
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
-  return pathname === "/conta" ||
+  return pathname.startsWith("/untrack/smart-pages") ? (
+    children
+  ) : pathname === "/conta" ||
     pathname.startsWith("/conta/") ||
     pathname === "/untrack" ||
     pathname.startsWith("/untrack/") ? (
