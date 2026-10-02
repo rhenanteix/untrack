@@ -51,6 +51,12 @@ export type SmartPageTheme = {
   backgroundVideoUrl?: string;
   sections?: ("avatar" | "title" | "description" | "links" | "socials")[];
   hiddenSections?: ("avatar" | "description" | "socials")[];
+  socialStyle?: "icons" | "icon-text" | "text";
+  socialShape?: "circle" | "square" | "rounded" | "minimal";
+  socialSize?: "small" | "medium" | "large";
+  socialSpacing?: "compact" | "normal" | "wide";
+  socialColor?: "auto" | "theme" | "brand" | "custom";
+  socialCustomColor?: string;
 };
 export const themes: {
   id: ThemePreset;

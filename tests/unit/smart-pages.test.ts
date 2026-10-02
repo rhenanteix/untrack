@@ -79,6 +79,62 @@ describe("smart page schemas", () => {
       }).success,
     ).toBe(false);
   });
+
+  it("accepts settings-only blocks and rejects unsafe media destinations", () => {
+    const blocks = [
+      { type: "title", settings: { text: "Novidades" } },
+      { type: "text", settings: { content: "Conteúdo novo toda semana." } },
+      { type: "divider", settings: {} },
+      {
+        type: "image",
+        settings: { imageUrl: "https://cdn.example/image.webp" },
+      },
+      { type: "video", settings: { url: "https://youtu.be/dQw4w9WgXcQ" } },
+      {
+        type: "spotify",
+        settings: { url: "https://open.spotify.com/track/abc" },
+      },
+      {
+        type: "file",
+        settings: { url: "https://cdn.example/guide.pdf", title: "Guia" },
+      },
+      { type: "qr", settings: { destinationUrl: "https://example.com" } },
+      { type: "whatsapp", settings: { number: "+55 11 99999-9999" } },
+      { type: "email", settings: { address: "ola@example.com" } },
+      { type: "phone", settings: { number: "+55 11 99999-9999" } },
+      {
+        type: "event",
+        settings: {
+          title: "Aula ao vivo",
+          destinationUrl: "https://example.com/event",
+        },
+      },
+      {
+        type: "appointment",
+        settings: { destinationUrl: "https://cal.com/example" },
+      },
+    ];
+    for (const block of blocks)
+      expect(smartPageBlockInputSchema.safeParse(block).success).toBe(true);
+    expect(
+      smartPageBlockInputSchema.safeParse({
+        type: "video",
+        settings: { url: "https://example.com/video" },
+      }).success,
+    ).toBe(false);
+    expect(
+      smartPageBlockInputSchema.safeParse({
+        type: "video",
+        settings: { url: "https://evilyoutube.com/watch?v=dQw4w9WgXcQ" },
+      }).success,
+    ).toBe(false);
+    expect(
+      smartPageBlockInputSchema.safeParse({
+        type: "spotify",
+        settings: { url: "https://open.spotify.com/artist/artist-id" },
+      }).success,
+    ).toBe(false);
+  });
 });
 
 describe("smart page entitlements", () => {

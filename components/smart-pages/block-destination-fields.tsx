@@ -1,7 +1,7 @@
 "use client";
 
 import { useId, useState, useEffect, useRef } from "react";
-import { SmartField } from "./smart-form";
+import { SmartField, SmartSelect } from "./smart-form";
 
 export function BlockDestinationFields({
   links,
@@ -64,19 +64,18 @@ export function BlockDestinationFields({
       ) : (
         <SmartField hint="Usa um link deste workspace e acompanha futuras alterações do destino.">
           Link gerenciado
-          <select
+          <SmartSelect
             required
             name="linkId"
             value={linkId}
-            onChange={(event) => setLinkId(event.target.value)}
-          >
-            <option value="">Selecione um link</option>
-            {links.map((link) => (
-              <option key={link.id} value={link.id}>
-                {link.title || link.slug}
-              </option>
-            ))}
-          </select>
+            placeholder="Selecione um link"
+            onValueChange={setLinkId}
+            options={links.map((link) => ({
+              value: link.id,
+              label: link.title || link.slug,
+              description: `/${link.slug}`,
+            }))}
+          />
         </SmartField>
       )}
       {mode === "managed" && links.length === 0 && (

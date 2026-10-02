@@ -6,6 +6,7 @@ import {
   HiOutlinePhoto,
   HiOutlineRectangleGroup,
   HiOutlineSwatch,
+  HiOutlineUserGroup,
   HiOutlineViewColumns,
 } from "react-icons/hi2";
 import { themes, type SmartPageTheme } from "@/modules/smart-pages/themes";
@@ -75,6 +76,12 @@ const appearanceCategories = [
     label: "Botões",
     description: "Estilo, cantos e ritmo",
     Icon: HiOutlineRectangleGroup,
+  },
+  {
+    id: "socials",
+    label: "Redes sociais",
+    description: "Ícones, formato e presença",
+    Icon: HiOutlineUserGroup,
   },
   {
     id: "background",
@@ -279,6 +286,136 @@ export function AppearanceControls({
               onChange={(event) => change({ spacing: Number(event.target.value) })}
             />
           </label>
+        </>
+      );
+    }
+
+    if (activeCategory === "socials") {
+      return (
+        <>
+          <div className="sp-design-heading">
+            <span>Redes sociais</span>
+            <p>Defina como suas conexões aparecem na página pública.</p>
+          </div>
+          <div className="sp-visual-field">
+            <span>Estilo</span>
+            <div className="sp-segmented-control" role="group" aria-label="Estilo das redes sociais">
+              {(
+                [
+                  ["icons", "Ícones"],
+                  ["icon-text", "Ícone + texto"],
+                  ["text", "Texto"],
+                ] as const
+              ).map(([value, label]) => (
+                <button
+                  type="button"
+                  key={value}
+                  aria-pressed={(theme.socialStyle ?? "icons") === value}
+                  onClick={() => change({ socialStyle: value })}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="sp-visual-field">
+            <span>Formato</span>
+            <div className="sp-segmented-control" role="group" aria-label="Formato dos ícones sociais">
+              {(
+                [
+                  ["circle", "Circular"],
+                  ["square", "Quadrado"],
+                  ["rounded", "Arredondado"],
+                  ["minimal", "Minimal"],
+                ] as const
+              ).map(([value, label]) => (
+                <button
+                  type="button"
+                  key={value}
+                  aria-pressed={(theme.socialShape ?? "circle") === value}
+                  onClick={() => change({ socialShape: value })}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="sp-visual-field">
+            <span>Tamanho</span>
+            <div className="sp-segmented-control" role="group" aria-label="Tamanho dos ícones sociais">
+              {(
+                [
+                  ["small", "P"],
+                  ["medium", "M"],
+                  ["large", "G"],
+                ] as const
+              ).map(([value, label]) => (
+                <button
+                  type="button"
+                  key={value}
+                  aria-pressed={(theme.socialSize ?? "medium") === value}
+                  onClick={() => change({ socialSize: value })}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="sp-visual-field">
+            <span>Espaçamento</span>
+            <div className="sp-segmented-control" role="group" aria-label="Espaçamento das redes sociais">
+              {(
+                [
+                  ["compact", "Compacto"],
+                  ["normal", "Normal"],
+                  ["wide", "Amplo"],
+                ] as const
+              ).map(([value, label]) => (
+                <button
+                  type="button"
+                  key={value}
+                  aria-pressed={(theme.socialSpacing ?? "normal") === value}
+                  onClick={() => change({ socialSpacing: value })}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="sp-visual-field">
+            <span>Cor</span>
+            <div className="sp-segmented-control" role="group" aria-label="Cor dos ícones sociais">
+              {(
+                [
+                  ["auto", "Automática"],
+                  ["theme", "Do tema"],
+                  ["brand", "Da marca"],
+                  ["custom", "Personalizada"],
+                ] as const
+              ).map(([value, label]) => (
+                <button
+                  type="button"
+                  key={value}
+                  aria-pressed={(theme.socialColor ?? "auto") === value}
+                  onClick={() => change({ socialColor: value })}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
+          {theme.socialColor === "custom" && (
+            <label className="sp-external-media-field">
+              Cor personalizada
+              <input
+                type="color"
+                value={theme.socialCustomColor ?? "#183f35"}
+                onChange={(event) =>
+                  change({ socialCustomColor: event.target.value })
+                }
+              />
+            </label>
+          )}
         </>
       );
     }

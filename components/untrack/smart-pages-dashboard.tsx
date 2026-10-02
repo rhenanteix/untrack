@@ -2,14 +2,27 @@
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 
-import { useEffect, useRef, useState, type FormEvent } from "react";
+import {
+  useEffect,
+  useRef,
+  useState,
+  type CSSProperties,
+  type FormEvent,
+} from "react";
 import type { IconType } from "react-icons";
 import {
   HiOutlineArrowLeft,
+  HiOutlineArrowPath,
+  HiOutlineBars3,
   HiOutlineChartBarSquare,
+  HiOutlineComputerDesktop,
+  HiOutlineDevicePhoneMobile,
+  HiOutlineEllipsisHorizontal,
   HiOutlineEye,
   HiOutlineLink,
+  HiOutlineMinus,
   HiOutlinePaintBrush,
+  HiOutlinePlus,
   HiOutlineShare,
   HiOutlineUserCircle,
 } from "react-icons/hi2";
@@ -30,7 +43,11 @@ import { ContentList } from "@/components/smart-pages/editor/content-list";
 import type { SmartPageContentBlock } from "@/components/smart-pages/editor/content-block";
 import { SmartPagePreview } from "@/components/smart-pages/editor/smart-page-preview";
 import { ImageUpload } from "@/components/smart-pages/image-upload";
-import { SmartForm, SmartField } from "@/components/smart-pages/smart-form";
+import {
+  SmartForm,
+  SmartField,
+  SmartSelect,
+} from "@/components/smart-pages/smart-form";
 import { CopyButton } from "@/components/copy-button";
 import { ActionStatus, apiRequest, useAction } from "./shared";
 
@@ -48,6 +65,12 @@ type SocialNetwork =
   | "whatsapp"
   | "website"
   | "email";
+
+type SocialLink = {
+  network: SocialNetwork;
+  url: string;
+  label?: string;
+};
 
 const socialNetworks: {
   value: SocialNetwork;
@@ -118,7 +141,7 @@ interface SmartPageSummary {
   description: string;
   avatarUrl: string | null;
   theme: SmartPageTheme;
-  socialLinks: { network: SocialNetwork; url: string }[];
+  socialLinks: SocialLink[];
   status: PageStatus;
   publishedAt: string | null;
   createdAt: string;
@@ -161,21 +184,35 @@ interface SmartPageMetrics {
 
 function collectSocialLinks(
   data: FormData,
-  order: { network: SocialNetwork; url: string }[],
+  order: SocialLink[],
 ) {
-  const values = new Map(order.map((social) => [social.network, social.url]));
+  const values = new Map(order.map((social) => [social.network, social]));
   for (const { value: network } of socialNetworks) {
     const field = `social-${network}`;
     if (!data.has(field)) continue;
     const url = String(data.get(field) ?? "").trim();
-    if (url) values.set(network, url);
+    if (url)
+      values.set(network, {
+        network,
+        url,
+        label: values.get(network)?.label,
+      });
     else values.delete(network);
   }
-  return [...values].map(([network, url]) => ({ network, url }));
+  return [...values.values()];
 }
 
 function publicUrl(slug: string) {
   return `/page/${encodeURIComponent(slug)}`;
+}
+
+function brazilianCurrencyToNumber(value: FormDataEntryValue | null) {
+  const source = String(value ?? "").trim();
+  if (!source) return Number.NaN;
+  const normalized = source.includes(",")
+    ? source.replace(/\./g, "").replace(",", ".")
+    : source;
+  return Number(normalized);
 }
 
 export function SmartPagesDashboard({
@@ -211,6 +248,10 @@ export function SmartPagesDashboard({
   const [products, setProducts] = useState(initialProducts);
   const [selected, setSelected] = useState<SmartPageDetail | null>(null);
   const [editorTab, setEditorTab] = useState<"editor" | "preview">("editor");
+  const [previewDevice, setPreviewDevice] = useState<"phone" | "desktop">(
+    "phone",
+  );
+  const [previewZoom, setPreviewZoom] = useState(0.9);
   const [metrics, setMetrics] = useState<SmartPageMetrics | null>(null);
   const action = useAction();
   const [blockDrafts, setBlockDrafts] = useState<
@@ -218,6 +259,7 @@ export function SmartPagesDashboard({
   >({});
   const [activeForm, setActiveForm] = useState("");
   const [contentModalOpen, setContentModalOpen] = useState(false);
+  const [toolbarMenuOpen, setToolbarMenuOpen] = useState(false);
   const [editorSection, setEditorSection] = useState("profile");
   const [appearanceTab, setAppearanceTab] = useState<
     "themes" | "customize"
@@ -231,6 +273,8 @@ export function SmartPagesDashboard({
   const [showCreate, setShowCreate] = useState(params.get("create") === "1");
   const [socialPickerOpen, setSocialPickerOpen] = useState(false);
   const [activeSocialNetwork, setActiveSocialNetwork] =
+    useState<SocialNetwork | null>(null);
+  const [draggedSocialNetwork, setDraggedSocialNetwork] =
     useState<SocialNetwork | null>(null);
   const [profileDraft, setProfileDraft] = useState<Partial<SmartPageSummary>>(
     {},
@@ -260,6 +304,11 @@ export function SmartPagesDashboard({
     ? (draftSocialLinks.find(
         (social) => social.network === activeSocial.value,
       )?.url ?? "")
+    : "";
+  const activeSocialLabel = activeSocial
+    ? (draftSocialLinks.find(
+        (social) => social.network === activeSocial.value,
+      )?.label ?? "")
     : "";
   useEffect(() => {
     if (!hasUnsaved) return;
@@ -538,6 +587,7 @@ export function SmartPagesDashboard({
       !event.target.name
     )
       return;
+    if (event.target.name.startsWith("social-label-")) return;
     const data = new FormData(event.currentTarget);
     setProfileDraft({
       slug: String(data.get("slug") ?? ""),
@@ -561,9 +611,47 @@ export function SmartPagesDashboard({
     setProfileDraft((current) => {
       const socialLinks = current.socialLinks ?? selected?.socialLinks ?? [];
       const next = socialLinks.filter((social) => social.network !== network);
-      if (url) next.push({ network, url });
+      const existing = socialLinks.find(
+        (social) => social.network === network,
+      );
+      if (url) next.push({ network, url, label: existing?.label });
       return { ...current, socialLinks: next };
     });
+    markProfileDirty();
+  }
+
+  function updateSocialLabel(network: SocialNetwork, value: string) {
+    const label = value.trim();
+    setProfileDraft((current) => {
+      const socialLinks = current.socialLinks ?? selected?.socialLinks ?? [];
+      return {
+        ...current,
+        socialLinks: socialLinks.map((social) =>
+          social.network === network
+            ? { ...social, label: label || undefined }
+            : social,
+        ),
+      };
+    });
+    markProfileDirty();
+  }
+
+  function reorderSocialLinks(target: SocialNetwork) {
+    if (!draggedSocialNetwork || draggedSocialNetwork === target) return;
+    setProfileDraft((current) => {
+      const socialLinks = [
+        ...(current.socialLinks ?? selected?.socialLinks ?? []),
+      ];
+      const from = socialLinks.findIndex(
+        (social) => social.network === draggedSocialNetwork,
+      );
+      const to = socialLinks.findIndex((social) => social.network === target);
+      if (from < 0 || to < 0) return current;
+      const [moved] = socialLinks.splice(from, 1);
+      socialLinks.splice(to, 0, moved);
+      return { ...current, socialLinks };
+    });
+    setDraggedSocialNetwork(null);
     markProfileDirty();
   }
 
@@ -654,21 +742,42 @@ export function SmartPagesDashboard({
     const form = event.currentTarget;
     const data = new FormData(form);
     await action.run(async () => {
-      const price = Number(data.get("price"));
+      const price = brazilianCurrencyToNumber(data.get("price"));
+      if (!Number.isFinite(price) || price < 0)
+        throw new Error("Informe um preço válido.");
       const product = await apiRequest<ProductOption>("/api/products", {
         method: "POST",
         body: JSON.stringify({
           name: data.get("name"),
           slug: data.get("slug"),
+          description: data.get("description"),
           type: data.get("type"),
           status: data.get("status"),
           priceInCents: Math.round(price * 100),
         }),
       });
+      if (selected) {
+        const block = await apiRequest<SmartPageBlock>(
+          `/api/smart-pages/${selected.id}/blocks`,
+          {
+            method: "POST",
+            body: JSON.stringify({
+              type: "product",
+              productId: product.id,
+              settings: { buttonLabel: "Ver produto" },
+            }),
+          },
+        );
+        setSelected((current) =>
+          current
+            ? { ...current, blocks: [...current.blocks, block] }
+            : current,
+        );
+      }
       setProducts((current) => [product, ...current]);
       form.reset();
       setContentModalOpen(false);
-      action.setNotice("Produto criado. Adicione-o à sua página quando quiser.");
+      action.setNotice("Produto criado e adicionado à página.");
     });
   }
 
@@ -696,6 +805,28 @@ export function SmartPagesDashboard({
       form.reset();
       setContentModalOpen(false);
       action.setNotice("Produto adicionado à página.");
+    });
+  }
+
+  async function addSettingsBlock(
+    type: Exclude<SmartPageBlock["type"], "link" | "product">,
+    settings: Record<string, string>,
+  ) {
+    setActiveForm(`add-${type}`);
+    if (!selected) return;
+    await action.run(async () => {
+      const block = await apiRequest<SmartPageBlock>(
+        `/api/smart-pages/${selected.id}/blocks`,
+        {
+          method: "POST",
+          body: JSON.stringify({ type, settings }),
+        },
+      );
+      setSelected((current) =>
+        current ? { ...current, blocks: [...current.blocks, block] } : current,
+      );
+      setContentModalOpen(false);
+      action.setNotice("Conteúdo adicionado à página.");
     });
   }
 
@@ -733,6 +864,41 @@ export function SmartPagesDashboard({
       );
       setDirtyBlocks((ids) => ids.filter((id) => id !== block.id));
       action.setNotice("Produto atualizado.");
+    });
+  }
+
+  async function saveSettingsBlock(
+    event: FormEvent<HTMLFormElement>,
+    block: SmartPageBlock,
+    settings: SmartPageBlock["settings"],
+  ) {
+    event.preventDefault();
+    if (!selected) return;
+    setActiveForm(block.id);
+    await action.run(async () => {
+      const updated = await apiRequest<SmartPageBlock>(
+        `/api/smart-pages/${selected.id}/blocks/${block.id}`,
+        {
+          method: "PATCH",
+          body: JSON.stringify({
+            type: block.type,
+            visible: block.visible,
+            analyticsEnabled: block.analyticsEnabled,
+            settings,
+          }),
+        },
+      );
+      setSelected((current) =>
+        current
+          ? {
+              ...current,
+              blocks: current.blocks.map((item) =>
+                item.id === updated.id ? updated : item,
+              ),
+            }
+          : current,
+      );
+      action.setNotice("Conteúdo atualizado.");
     });
   }
 
@@ -897,38 +1063,46 @@ export function SmartPagesDashboard({
       <div className="sp-studio-topbar">
         {editId ? (
           <>
-            <button
-              type="button"
-              className="sp-studio-back"
-              onClick={backToLibrary}
-            >
-              <HiOutlineArrowLeft aria-hidden="true" />
-              Smart Pages
-            </button>
-            {selected && (
-              <>
+            <div className="sp-studio-navigation">
+              <button
+                type="button"
+                className="sp-studio-back"
+                onClick={backToLibrary}
+              >
+                <HiOutlineArrowLeft aria-hidden="true" />
+                Smart Pages
+              </button>
+              {selected && (
                 <div className="sp-studio-page-meta">
                   <strong>{selected.title}</strong>
                   <span>untrack.app/page/{selected.slug}</span>
                 </div>
-                <span
-                  className={
-                    selected.status === "published"
-                      ? "success-badge"
-                      : "inactive-badge"
-                  }
-                >
-                  {selected.status === "published" ? "Publicada" : "Rascunho"}
-                </span>
-                <span className="sp-studio-save-status" role="status">
-                  {autosaveState === "saving"
-                    ? "Salvando…"
-                    : autosaveState === "error"
-                      ? "Erro ao salvar"
-                      : hasUnsaved
-                        ? "Alterações pendentes"
-                        : "✓ Salvo"}
-                </span>
+              )}
+            </div>
+            {selected && (
+              <>
+                <div className="sp-studio-status">
+                  <span
+                    className={
+                      selected.status === "published"
+                        ? "success-badge"
+                        : "inactive-badge"
+                    }
+                  >
+                    {selected.status === "published"
+                      ? "Publicada"
+                      : "Rascunho"}
+                  </span>
+                  <span className="sp-studio-save-status" role="status">
+                    {autosaveState === "saving"
+                      ? "Salvando…"
+                      : autosaveState === "error"
+                        ? "Erro ao salvar"
+                        : hasUnsaved
+                          ? "Alterações pendentes"
+                          : "✓ Salvo"}
+                  </span>
+                </div>
                 <div className="sp-studio-toolbar-actions">
                   {selected.status === "published" && (
                     <a
@@ -937,6 +1111,7 @@ export function SmartPagesDashboard({
                       target="_blank"
                       rel="noreferrer"
                     >
+                      <HiOutlineEye aria-hidden="true" />
                       Visualizar
                     </a>
                   )}
@@ -946,23 +1121,45 @@ export function SmartPagesDashboard({
                       label="Compartilhar"
                     />
                   )}
-                  <button
-                    className="button"
-                    disabled={
-                      action.busy ||
-                      !(selected.status === "published"
-                        ? canUnpublish
-                        : canEdit) ||
-                      hasUnsaved
-                    }
-                    onClick={() =>
-                      void setPublished(selected.status !== "published")
-                    }
-                  >
-                    {selected.status === "published"
-                      ? "Despublicar"
-                      : "Publicar"}
-                  </button>
+                  {selected.status === "published" ? (
+                    <div className="sp-studio-overflow">
+                      <button
+                        type="button"
+                        className="button button-secondary sp-studio-overflow-trigger"
+                        aria-label="Mais ações da página"
+                        aria-expanded={toolbarMenuOpen}
+                        aria-haspopup="menu"
+                        disabled={action.busy}
+                        onClick={() => setToolbarMenuOpen((open) => !open)}
+                      >
+                        <HiOutlineEllipsisHorizontal aria-hidden="true" />
+                      </button>
+                      {toolbarMenuOpen && (
+                        <div className="sp-studio-overflow-menu" role="menu">
+                          <button
+                            type="button"
+                            role="menuitem"
+                            className="sp-studio-danger-action"
+                            disabled={action.busy || !canUnpublish || hasUnsaved}
+                            onClick={() => {
+                              setToolbarMenuOpen(false);
+                              void setPublished(false);
+                            }}
+                          >
+                            Despublicar página
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <button
+                      className="button"
+                      disabled={action.busy || !canEdit || hasUnsaved}
+                      onClick={() => void setPublished(true)}
+                    >
+                      Publicar
+                    </button>
+                  )}
                 </div>
               </>
             )}
@@ -1489,29 +1686,47 @@ export function SmartPagesDashboard({
                             <span className="sp-social-input-icon" aria-hidden="true">
                               <activeSocial.Icon />
                             </span>
-                            <SmartField>
-                              {activeSocial.label}
-                              <input
-                                type={
-                                  activeSocial.value === "email"
-                                    ? "email"
-                                    : "url"
-                                }
-                                name={`social-${activeSocial.value}`}
-                                value={
-                                  activeSocial.value === "email"
-                                    ? activeSocialUrl.replace(/^mailto:/i, "")
-                                    : activeSocialUrl
-                                }
-                                placeholder={activeSocial.placeholder}
-                                onChange={(event) =>
-                                  updateSocialLink(
-                                    activeSocial.value,
-                                    event.target.value,
-                                  )
-                                }
-                              />
-                            </SmartField>
+                            <div className="sp-social-fields">
+                              <SmartField>
+                                {activeSocial.label}
+                                <input
+                                  type={
+                                    activeSocial.value === "email"
+                                      ? "email"
+                                      : "url"
+                                  }
+                                  name={`social-${activeSocial.value}`}
+                                  value={
+                                    activeSocial.value === "email"
+                                      ? activeSocialUrl.replace(/^mailto:/i, "")
+                                      : activeSocialUrl
+                                  }
+                                  placeholder={activeSocial.placeholder}
+                                  onChange={(event) =>
+                                    updateSocialLink(
+                                      activeSocial.value,
+                                      event.target.value,
+                                    )
+                                  }
+                                />
+                              </SmartField>
+                              <SmartField hint="Usado nos modos com texto.">
+                                Texto exibido
+                                <input
+                                  name={`social-label-${activeSocial.value}`}
+                                  maxLength={40}
+                                  disabled={!activeSocialUrl}
+                                  value={activeSocialLabel}
+                                  placeholder={activeSocial.label}
+                                  onChange={(event) =>
+                                    updateSocialLabel(
+                                      activeSocial.value,
+                                      event.target.value,
+                                    )
+                                  }
+                                />
+                              </SmartField>
+                            </div>
                             <button
                               type="button"
                               className="button button-quiet"
@@ -1533,7 +1748,27 @@ export function SmartPagesDashboard({
                               if (!network) return null;
                               const Icon = network.Icon;
                               return (
-                                <li key={social.network}>
+                                <li
+                                  key={social.network}
+                                  draggable={canEdit && !action.busy}
+                                  className={
+                                    draggedSocialNetwork === social.network
+                                      ? "is-dragging"
+                                      : undefined
+                                  }
+                                  onDragStart={() =>
+                                    setDraggedSocialNetwork(social.network)
+                                  }
+                                  onDragEnd={() => setDraggedSocialNetwork(null)}
+                                  onDragOver={(event) => event.preventDefault()}
+                                  onDrop={() => reorderSocialLinks(social.network)}
+                                >
+                                  <span
+                                    className="sp-social-drag-handle"
+                                    aria-hidden="true"
+                                  >
+                                    <HiOutlineBars3 />
+                                  </span>
                                   <button
                                     type="button"
                                     onClick={() =>
@@ -1541,7 +1776,7 @@ export function SmartPagesDashboard({
                                     }
                                   >
                                     <Icon aria-hidden="true" />
-                                    <span>{network.label}</span>
+                                    <span>{social.label || network.label}</span>
                                   </button>
                                 </li>
                               );
@@ -1662,6 +1897,9 @@ export function SmartPagesDashboard({
                     onSaveProduct={(event, block) =>
                       void saveProductBlock(event, block)
                     }
+                    onSaveBlock={(event, block, settings) =>
+                      void saveSettingsBlock(event, block, settings)
+                    }
                     onToggle={(block) => void toggleBlock(block)}
                     onDelete={(block) => void deleteBlock(block.id)}
                     onReorder={(blockIds) => void reorderBlocks(blockIds)}
@@ -1689,6 +1927,19 @@ export function SmartPagesDashboard({
                   onAddLink={addBlock}
                   onAddProduct={addProductBlock}
                   onCreateProduct={createProduct}
+                  onAddSettingsBlock={(type, settings) =>
+                    void addSettingsBlock(type, settings)
+                  }
+                  onOpenSocials={(network) => {
+                    setEditorSection("profile");
+                    const match = socialNetworks.find(
+                      (item) =>
+                        item.label.toLocaleLowerCase("pt-BR") ===
+                        network?.toLocaleLowerCase("pt-BR"),
+                    );
+                    if (match) setActiveSocialNetwork(match.value);
+                    else setSocialPickerOpen(true);
+                  }}
                 />
                 <section
                   id="sp-panel-analytics"
@@ -1700,38 +1951,46 @@ export function SmartPagesDashboard({
                   <div className="smart-page-metrics-heading">
                     <div>
                       <h3 id="smart-page-analytics-heading">Resultados</h3>
-                      <label>
+                      <div className="sp-metrics-period">
                         Período
-                        <select
-                          value={metricsDays}
-                          onChange={(e) =>
-                            setMetricsDays(Number(e.target.value))
-                          }
-                        >
-                          <option value={7}>Últimos 7 dias</option>
-                          <option value={30}>Últimos 30 dias</option>
-                          <option value={90}>Últimos 90 dias</option>
-                        </select>
-                      </label>
+                        <SmartSelect
+                          name="metricsPeriod"
+                          value={String(metricsDays)}
+                          onValueChange={(value) => setMetricsDays(Number(value))}
+                          options={[
+                            { value: "7", label: "Últimos 7 dias" },
+                            { value: "30", label: "Últimos 30 dias" },
+                            { value: "90", label: "Últimos 90 dias" },
+                          ]}
+                        />
+                      </div>
                     </div>
-                    <button
-                      type="button"
-                      className="button button-secondary"
-                      disabled={metricsLoading}
-                      onClick={() => setMetricsRevision((v) => v + 1)}
-                    >
-                      Atualizar métricas
-                    </button>
+                    <div className="sp-metrics-refresh">
+                      <span role="status">
+                        {metricsUpdated
+                          ? `Atualizado às ${metricsUpdated}`
+                          : "Atualiza ao abrir"}
+                      </span>
+                      <button
+                        type="button"
+                        aria-label="Atualizar métricas"
+                        title="Atualizar métricas"
+                        disabled={metricsLoading}
+                        onClick={() => setMetricsRevision((v) => v + 1)}
+                      >
+                        <HiOutlineArrowPath aria-hidden="true" />
+                      </button>
+                    </div>
                   </div>
-                  <p className="sp-field-hint">
-                    {metricsUpdated
-                      ? `Última atualização: ${metricsUpdated}. `
-                      : ""}
-                    CTR é a razão entre cliques e visualizações. Visitantes
-                    únicos usam um identificador do navegador por sessão; não
-                    representam pessoas identificadas. Amostras pequenas não
-                    indicam tendência.
-                  </p>
+                  <details className="sp-metrics-methodology">
+                    <summary>Como calculamos as métricas?</summary>
+                    <p>
+                      CTR é a razão entre cliques e visualizações. Visitantes
+                      únicos usam um identificador do navegador por sessão; não
+                      representam pessoas identificadas. Amostras pequenas não
+                      indicam tendência.
+                    </p>
+                  </details>
                   {metricsLoading ? (
                     <p role="status">Carregando resultados…</p>
                   ) : metricsError ? (
@@ -1745,23 +2004,18 @@ export function SmartPagesDashboard({
                     <p>Aguardando dados.</p>
                   ) : (
                     <>
-                      <div className="stats-grid smart-page-stats">
-                        <div>
-                          <strong>{metrics.views}</strong>
-                          <span>Visualizações</span>
-                        </div>
-                        <div>
-                          <strong>{metrics.uniqueVisitors}</strong>
-                          <span>Visitantes únicos</span>
-                        </div>
-                        <div>
-                          <strong>{metrics.clicks}</strong>
-                          <span>Cliques</span>
-                        </div>
-                        <div>
-                          <strong>{metrics.ctr}%</strong>
-                          <span>CTR</span>
-                        </div>
+                      <div className="sp-metric-cards">
+                        {[
+                          ["Visualizações", metrics.views],
+                          ["Visitantes únicos", metrics.uniqueVisitors],
+                          ["Cliques", metrics.clicks],
+                          ["CTR", `${metrics.ctr}%`],
+                        ].map(([label, value]) => (
+                          <article key={label}>
+                            <span>{label}</span>
+                            <strong>{value}</strong>
+                          </article>
+                        ))}
                       </div>
                       <div className="smart-page-metric-lists">
                         <div>
@@ -1842,12 +2096,73 @@ export function SmartPagesDashboard({
                       </CopyButton>
                     </div>
                   </div>
+                  <div className="sp-preview-controls">
+                    <div
+                      className="sp-preview-device-toggle"
+                      role="group"
+                      aria-label="Dispositivo da prévia"
+                    >
+                      <button
+                        type="button"
+                        aria-pressed={previewDevice === "phone"}
+                        aria-label="Visualizar em celular"
+                        title="Celular"
+                        onClick={() => setPreviewDevice("phone")}
+                      >
+                        <HiOutlineDevicePhoneMobile aria-hidden="true" />
+                      </button>
+                      <button
+                        type="button"
+                        aria-pressed={previewDevice === "desktop"}
+                        aria-label="Visualizar em desktop"
+                        title="Desktop"
+                        onClick={() => setPreviewDevice("desktop")}
+                      >
+                        <HiOutlineComputerDesktop aria-hidden="true" />
+                      </button>
+                    </div>
+                    <div className="sp-preview-zoom" aria-label="Zoom da prévia">
+                      <button
+                        type="button"
+                        aria-label="Diminuir zoom"
+                        title="Diminuir zoom"
+                        disabled={previewZoom <= 0.8}
+                        onClick={() =>
+                          setPreviewZoom((current) =>
+                            Math.max(0.8, Number((current - 0.1).toFixed(1))),
+                          )
+                        }
+                      >
+                        <HiOutlineMinus aria-hidden="true" />
+                      </button>
+                      <span>{Math.round(previewZoom * 100)}%</span>
+                      <button
+                        type="button"
+                        aria-label="Aumentar zoom"
+                        title="Aumentar zoom"
+                        disabled={previewZoom >= 1}
+                        onClick={() =>
+                          setPreviewZoom((current) =>
+                            Math.min(1, Number((current + 0.1).toFixed(1))),
+                          )
+                        }
+                      >
+                        <HiOutlinePlus aria-hidden="true" />
+                      </button>
+                    </div>
+                  </div>
                   <p className="muted">
                     {dirty
                       ? "A prévia acompanha suas alterações. Salve para publicar."
                       : "Pronta para compartilhar com seu público."}
                   </p>
-                  <div className="smart-page-device">
+                  <div
+                    className="smart-page-device"
+                    data-device={previewDevice}
+                    style={
+                      { "--sp-preview-zoom": previewZoom } as CSSProperties
+                    }
+                  >
                     <div className="smart-page-device-bar" aria-hidden="true">
                       <i />
                       <span />

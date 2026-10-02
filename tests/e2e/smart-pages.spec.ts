@@ -102,3 +102,110 @@ test("cria, publica, abre e mede uma Smart Page", async ({
     await other.close();
   }
 });
+
+test("publica blocos ricos e mantém o layout responsivo", async ({
+  page,
+  context,
+  baseURL,
+}, testInfo) => {
+  await register(page, baseURL!);
+  const slug = `blocos-${randomUUID().slice(0, 8)}`;
+  await page.goto("/untrack/smart-pages");
+  await page.getByRole("button", { name: /Nova página/ }).click();
+  await page.getByLabel("Nome ou marca").fill("Ateliê de Conteúdo");
+  await page.locator('.smart-page-create input[name="slug"]').fill(slug);
+  await page.getByRole("button", { name: "Criar página" }).click();
+
+  await page.getByRole("tab", { name: "Links", exact: true }).click();
+  await page.getByRole("button", { name: /Adicionar/ }).click();
+  const picker = page.getByRole("dialog", { name: "Adicionar conteúdo" });
+  await picker.getByPlaceholder("Cole um link ou pesquise...").fill("Título");
+  await picker.getByRole("button", { name: /Título Destaque/ }).click();
+  await picker.getByLabel("Título").fill("Agenda aberta");
+  await picker.getByRole("button", { name: "Adicionar título" }).click();
+  await expect(page.getByText("Conteúdo adicionado à página.")).toBeVisible();
+
+  const pages = await context.request.get("/api/smart-pages");
+  const created = (await pages.json()).items.find(
+    (item: { slug: string }) => item.slug === slug,
+  );
+  expect(created).toBeTruthy();
+  const addBlock = async (type: string, settings: Record<string, string>) => {
+    const response = await context.request.post(
+      `/api/smart-pages/${created.id}/blocks`,
+      {
+        headers: { origin: baseURL! },
+        data: { type, settings },
+      },
+    );
+    expect(await response.text()).toBeTruthy();
+    expect(response.status()).toBe(201);
+  };
+  await addBlock("text", {
+    content: "Conteúdo novo toda semana.",
+    alignment: "left",
+  });
+  await addBlock("image", {
+    imageUrl: "https://images.example.com/capa.webp",
+    alt: "Capa do boletim",
+  });
+  await addBlock("video", {
+    url: "https://youtu.be/dQw4w9WgXcQ",
+    title: "Vídeo de boas-vindas",
+  });
+  await addBlock("spotify", {
+    url: "https://open.spotify.com/track/4PTG3Z6ehGkBFwjybzWkR8",
+    title: "Playlist da semana",
+  });
+  await addBlock("qr", {
+    destinationUrl: "https://example.com/agenda",
+    title: "Escaneie para agendar",
+  });
+  await addBlock("whatsapp", {
+    number: "+55 11 99999-9999",
+    label: "Falar no WhatsApp",
+    message: "Olá! Quero saber mais.",
+  });
+  await addBlock("event", {
+    title: "Aula ao vivo",
+    date: "12 de outubro, 19h",
+    destinationUrl: "https://example.com/aula",
+  });
+  const published = await context.request.post(
+    `/api/smart-pages/${created.id}/publish`,
+    { headers: { origin: baseURL! }, data: { published: true } },
+  );
+  expect(published.status()).toBe(200);
+
+  await page.goto(`/page/${slug}`);
+  await expect(
+    page.getByRole("heading", { name: "Ateliê de Conteúdo" }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "Agenda aberta" }),
+  ).toBeVisible();
+  await expect(page.getByText("Conteúdo novo toda semana.")).toBeVisible();
+  await expect(page.locator(".richEmbed")).toHaveCount(2);
+  await expect(
+    page.getByRole("link", { name: "Falar no WhatsApp" }),
+  ).toHaveAttribute(
+    "href",
+    "https://wa.me/5511999999999?text=Ol%C3%A1!%20Quero%20saber%20mais.",
+  );
+  await expect(
+    page.getByRole("img", { name: "QR Code: Escaneie para agendar" }),
+  ).toBeVisible();
+
+  for (const width of [1440, 1024, 768, 390, 375]) {
+    await page.setViewportSize({ width, height: 900 });
+    expect(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth <= window.innerWidth,
+      ),
+    ).toBe(true);
+    await page.screenshot({
+      path: testInfo.outputPath(`smart-page-rich-${width}.png`),
+      fullPage: true,
+    });
+  }
+});

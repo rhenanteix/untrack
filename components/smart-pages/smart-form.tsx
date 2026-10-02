@@ -15,7 +15,158 @@ import {
 } from "react";
 import { ApiRequestError } from "@/lib/client/api";
 import { smartPageSlugSchema } from "@/modules/smart-pages/schemas";
+
 const Errors = createContext<Record<string, string>>({});
+
+export type SmartSelectOption = {
+  value: string;
+  label: string;
+  description?: string;
+};
+
+export function SmartSelect({
+  name,
+  options,
+  value,
+  defaultValue = "",
+  placeholder = "Selecione uma opção",
+  disabled = false,
+  required = false,
+  onValueChange,
+}: {
+  name: string;
+  options: SmartSelectOption[];
+  value?: string;
+  defaultValue?: string;
+  placeholder?: string;
+  disabled?: boolean;
+  required?: boolean;
+  onValueChange?: (value: string) => void;
+}) {
+  const [uncontrolledValue, setUncontrolledValue] = useState(defaultValue);
+  const [open, setOpen] = useState(false);
+  const selectRef = useRef<HTMLDivElement>(null);
+  const selectedValue = value ?? uncontrolledValue;
+  const selected = options.find((option) => option.value === selectedValue);
+
+  useEffect(() => {
+    if (!open) return;
+    const close = (event: MouseEvent) => {
+      if (!selectRef.current?.contains(event.target as Node)) setOpen(false);
+    };
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setOpen(false);
+    };
+    window.addEventListener("mousedown", close);
+    window.addEventListener("keydown", closeOnEscape);
+    return () => {
+      window.removeEventListener("mousedown", close);
+      window.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [open]);
+
+  function choose(nextValue: string) {
+    if (value === undefined) setUncontrolledValue(nextValue);
+    onValueChange?.(nextValue);
+    setOpen(false);
+  }
+
+  return (
+    <div ref={selectRef} className="sp-select">
+      <input type="hidden" name={name} value={selectedValue} required={required} />
+      <button
+        type="button"
+        className="sp-select-trigger"
+        aria-expanded={open}
+        aria-haspopup="listbox"
+        disabled={disabled}
+        onClick={() => setOpen((current) => !current)}
+      >
+        <span className={selected ? undefined : "sp-select-placeholder"}>
+          {selected?.label ?? placeholder}
+        </span>
+        <span className="sp-select-chevron" aria-hidden="true" />
+      </button>
+      {open && (
+        <div className="sp-select-menu" role="listbox">
+          {options.map((option) => (
+            <button
+              key={option.value}
+              type="button"
+              role="option"
+              aria-selected={option.value === selectedValue}
+              onClick={() => choose(option.value)}
+            >
+              <span>
+                <strong>{option.label}</strong>
+                {option.description && <small>{option.description}</small>}
+              </span>
+              {option.value === selectedValue && (
+                <span className="sp-select-check" aria-hidden="true">
+                  ✓
+                </span>
+              )}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function currencyNumber(value: string | number | undefined) {
+  if (typeof value === "number") return value;
+  if (!value) return 0;
+  const source = value.replace(/R\$\s?/g, "").trim();
+  const normalized = source.includes(",")
+    ? source.replace(/\./g, "").replace(",", ".")
+    : source;
+  return Number(normalized) || 0;
+}
+
+function formatCurrency(value: string | number | undefined) {
+  return new Intl.NumberFormat("pt-BR", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(currencyNumber(value));
+}
+
+export function CurrencyInput({
+  name,
+  defaultValue,
+  disabled = false,
+  required = false,
+}: {
+  name: string;
+  defaultValue?: string | number;
+  disabled?: boolean;
+  required?: boolean;
+}) {
+  const [value, setValue] = useState(
+    defaultValue === undefined ? "" : formatCurrency(defaultValue),
+  );
+
+  return (
+    <span className="sp-currency-input">
+      <span aria-hidden="true">R$</span>
+      <input
+        required={required}
+        disabled={disabled}
+        name={name}
+        type="text"
+        inputMode="decimal"
+        autoComplete="off"
+        placeholder="0,00"
+        value={value}
+        onChange={(event) => setValue(event.target.value)}
+        onBlur={() => {
+          if (value.trim()) setValue(formatCurrency(value));
+        }}
+      />
+    </span>
+  );
+}
+
 export function fieldMessages(
   error: Error | null,
   form: HTMLFormElement,

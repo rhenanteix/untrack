@@ -23,11 +23,7 @@ type SmartPageEvent =
   | "link_in_bio_product_view"
   | "link_in_bio_product_click";
 
-function track(
-  event: SmartPageEvent,
-  slug: string,
-  blockId?: string,
-) {
+function track(event: SmartPageEvent, slug: string, blockId?: string) {
   return fetch("/api/smart-pages/events", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -46,7 +42,7 @@ export function SmartPageTracker({
   blocks,
 }: {
   slug: string;
-  blocks: { id: string; type: "link" | "product" }[];
+  blocks: { id: string; type: string }[];
 }) {
   useEffect(() => {
     void track("smart_page_view", slug);
@@ -69,6 +65,7 @@ export function SmartPageLink({
   href,
   openInNewTab,
   event = "smart_block_clicked",
+  className = "smart-page-link",
   children,
 }: {
   slug: string;
@@ -76,11 +73,12 @@ export function SmartPageLink({
   href: string;
   openInNewTab: boolean;
   event?: "smart_block_clicked" | "link_in_bio_product_click";
+  className?: string;
   children: React.ReactNode;
 }) {
   return (
     <a
-      className="smart-page-link"
+      className={className}
       href={href}
       target={openInNewTab ? "_blank" : undefined}
       rel={openInNewTab ? "noreferrer" : undefined}

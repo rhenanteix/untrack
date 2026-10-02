@@ -1,7 +1,19 @@
 import { PageDesign } from "@/components/smart-pages/page-design";
+import {
+  isRichBlockType,
+  parseRichBlockSettings,
+  richBlockHref,
+  spotifyEmbedUrl,
+  type RichBlockSettings,
+  type RichBlockType,
+  youtubeEmbedUrl,
+} from "@/components/smart-pages/rich-block";
+import { PageSocialLinks } from "@/components/smart-pages/social-links";
+import styles from "@/components/smart-pages/themes.module.css";
 import type { Metadata } from "next";
 import { cache } from "react";
 import { notFound } from "next/navigation";
+import QRCode from "qrcode";
 import {
   SmartPageLink,
   SmartPageTracker,
@@ -36,6 +48,12 @@ type PublicBlock =
       name: string;
       buttonLabel: string;
       href: string;
+    }
+  | {
+      type: RichBlockType;
+      id: string;
+      analyticsEnabled: boolean;
+      settings: RichBlockSettings;
     };
 
 function publicHref(
@@ -46,6 +64,166 @@ function publicHref(
   if (link.domainKey === "platform")
     return `/s/${encodeURIComponent(link.slug)}`;
   return `https://${link.domainKey}/s/${encodeURIComponent(link.slug)}`;
+}
+
+function RichAction({
+  block,
+  slug,
+  href,
+  children,
+  openInNewTab = false,
+  media = false,
+}: {
+  block: Extract<PublicBlock, { settings: RichBlockSettings }>;
+  slug: string;
+  href: string;
+  children: React.ReactNode;
+  openInNewTab?: boolean;
+  media?: boolean;
+}) {
+  return (
+    <SmartPageLink
+      slug={slug}
+      blockId={block.id}
+      href={href}
+      openInNewTab={openInNewTab}
+      className={
+        media
+          ? `${styles.richAction} ${styles.richMediaAction}`
+          : styles.richAction
+      }
+    >
+      {children}
+    </SmartPageLink>
+  );
+}
+
+async function renderRichBlock(
+  block: Extract<PublicBlock, { settings: RichBlockSettings }>,
+  slug: string,
+) {
+  const { settings } = block;
+  if (block.type === "title") {
+    const Tag = settings.level === "h3" ? "h3" : "h2";
+    return (
+      <Tag
+        key={block.id}
+        className={styles.richTitle}
+        data-alignment={settings.alignment ?? "center"}
+      >
+        {settings.text}
+      </Tag>
+    );
+  }
+  if (block.type === "text")
+    return (
+      <p
+        key={block.id}
+        className={styles.richText}
+        data-alignment={settings.alignment ?? "center"}
+      >
+        {settings.content}
+      </p>
+    );
+  if (block.type === "divider")
+    return (
+      <hr
+        key={block.id}
+        className={styles.richDivider}
+        data-style={settings.style}
+      />
+    );
+  if (block.type === "image") {
+    const image = (
+      // eslint-disable-next-line @next/next/no-img-element
+      <img
+        className={styles.richImage}
+        src={settings.imageUrl}
+        alt={settings.alt}
+      />
+    );
+    const href = richBlockHref(block.type, settings);
+    return href ? (
+      <RichAction
+        key={block.id}
+        block={block}
+        slug={slug}
+        href={href}
+        openInNewTab
+        media
+      >
+        {image}
+      </RichAction>
+    ) : (
+      <div key={block.id} className={styles.richMedia}>
+        {image}
+      </div>
+    );
+  }
+  if (block.type === "video") {
+    const src = youtubeEmbedUrl(settings.url);
+    return src ? (
+      <div key={block.id} className={styles.richEmbed}>
+        <iframe
+          src={src}
+          title={settings.title}
+          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+          allowFullScreen
+        />
+      </div>
+    ) : null;
+  }
+  if (block.type === "spotify") {
+    const src = spotifyEmbedUrl(settings.url);
+    return src ? (
+      <div
+        key={block.id}
+        className={`${styles.richEmbed} ${styles.richSpotify}`}
+      >
+        <iframe
+          src={src}
+          title={settings.title}
+          allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
+        />
+      </div>
+    ) : null;
+  }
+  if (block.type === "qr") {
+    const dataUrl = await QRCode.toDataURL(settings.destinationUrl, {
+      errorCorrectionLevel: "M",
+      margin: 1,
+      width: 300,
+    });
+    return (
+      <div key={block.id} className={styles.richQr}>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={dataUrl} alt={`QR Code: ${settings.title}`} />
+        <span>{settings.title}</span>
+      </div>
+    );
+  }
+  const href = richBlockHref(block.type, settings);
+  if (!href) return null;
+  const label =
+    block.type === "file" ||
+    block.type === "event" ||
+    block.type === "appointment"
+      ? settings.title
+      : settings.label;
+  return (
+    <RichAction
+      key={block.id}
+      block={block}
+      slug={slug}
+      href={href}
+      openInNewTab={["file", "event", "appointment"].includes(block.type)}
+    >
+      <span>{label}</span>
+      {block.type === "event" && settings.date && (
+        <small>{settings.date}</small>
+      )}
+    </RichAction>
+  );
 }
 
 export async function generateMetadata({
@@ -136,8 +314,49 @@ export default async function PublicSmartPage({
         },
       ];
     }
+    if (isRichBlockType(block.type)) {
+      const settings = parseRichBlockSettings(block.type, block.settings);
+      return settings
+        ? [
+            {
+              type: block.type,
+              id: block.id,
+              analyticsEnabled: block.analyticsEnabled,
+              settings,
+            },
+          ]
+        : [];
+    }
     return [];
   });
+  const renderedBlocks = await Promise.all(
+    blocks.map((block) =>
+      block.type === "link" ? (
+        <SmartPageLink
+          key={block.id}
+          slug={page.slug}
+          blockId={block.id}
+          href={block.href}
+          openInNewTab={block.openInNewTab}
+        >
+          {block.title}
+        </SmartPageLink>
+      ) : block.type === "product" ? (
+        <SmartPageLink
+          key={block.id}
+          slug={page.slug}
+          blockId={block.id}
+          href={block.href}
+          openInNewTab={false}
+          event="link_in_bio_product_click"
+        >
+          {block.name} - {block.buttonLabel}
+        </SmartPageLink>
+      ) : (
+        renderRichBlock(block, page.slug)
+      ),
+    ),
+  );
 
   return (
     <section className="smart-page-public">
@@ -148,46 +367,18 @@ export default async function PublicSmartPage({
         theme={theme}
         socials={
           socialLinks.length ? (
-            <nav aria-label={`Redes de ${page.title}`}>
-              {socialLinks.map((social) => (
-                <a
-                  key={social.network}
-                  href={social.url}
-                  target={social.network === "email" ? undefined : "_blank"}
-                  rel={social.network === "email" ? undefined : "noreferrer"}
-                >
-                  {social.network}
-                </a>
-              ))}
-            </nav>
+            <PageSocialLinks
+              links={socialLinks}
+              theme={theme}
+              label={`Redes de ${page.title}`}
+            />
           ) : undefined
         }
       >
-        {blocks.map((block) =>
-          block.type === "link" ? (
-            <SmartPageLink
-              key={block.id}
-              slug={page.slug}
-              blockId={block.id}
-              href={block.href}
-              openInNewTab={block.openInNewTab}
-            >
-              {block.title}
-            </SmartPageLink>
-          ) : (
-            <SmartPageLink
-              key={block.id}
-              slug={page.slug}
-              blockId={block.id}
-              href={block.href}
-              openInNewTab={false}
-              event="link_in_bio_product_click"
-            >
-              {block.name} - {block.buttonLabel}
-            </SmartPageLink>
-          ),
+        {renderedBlocks}
+        {!renderedBlocks.filter(Boolean).length && (
+          <p>Nenhum conteúdo disponível.</p>
         )}
-        {!blocks.length && <p>Nenhum link disponível.</p>}
       </PageDesign>
       <SmartPageTracker
         slug={page.slug}

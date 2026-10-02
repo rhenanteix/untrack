@@ -26,6 +26,12 @@ describe("Smart Page customization", () => {
       sections: ["title", "avatar", "links", "description", "socials"],
       hiddenSections: ["description"],
       buttonRadius: 20,
+      socialStyle: "icons",
+      socialShape: "rounded",
+      socialSize: "large",
+      socialSpacing: "wide",
+      socialColor: "custom",
+      socialCustomColor: "#123456",
     };
     expect(smartPageThemeSchema.parse(theme)).toEqual(theme);
   });
@@ -75,6 +81,26 @@ describe("Smart Page customization", () => {
     expect(
       socialLinksSchema.safeParse([
         { network: "instagram", url: "mailto:ana@example.com" },
+      ]).success,
+    ).toBe(false);
+  });
+  it("keeps optional social link labels within a safe display limit", () => {
+    expect(
+      socialLinksSchema.parse([
+        {
+          network: "instagram",
+          url: "https://instagram.com/ana",
+          label: "Me acompanhe",
+        },
+      ]),
+    ).toMatchObject([{ label: "Me acompanhe" }]);
+    expect(
+      socialLinksSchema.safeParse([
+        {
+          network: "instagram",
+          url: "https://instagram.com/ana",
+          label: "a".repeat(41),
+        },
       ]).success,
     ).toBe(false);
   });
