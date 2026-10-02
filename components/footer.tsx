@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { BrandLogo } from "@/components/brand-logo";
 import { usePublicLanguage } from "@/components/public-language-provider";
 
 export function Footer() {
@@ -49,7 +50,12 @@ export function Footer() {
       ],
     },
   ];
-  if (pathname.startsWith("/untrack/smart-pages") || pathname.startsWith("/c/"))
+  if (
+    pathname.startsWith("/untrack") ||
+    pathname.startsWith("/settings") ||
+    pathname.startsWith("/upgrade") ||
+    pathname.startsWith("/c/")
+  )
     return null;
   return (
     <footer className="site-footer">
@@ -60,7 +66,7 @@ export function Footer() {
             href="/"
             aria-label="LinkOr, início"
           >
-            <span aria-hidden="true" className="footer-logo" />
+            <BrandLogo tone="light" />
           </Link>
           <p>{copy.footer.description}</p>
           <Link className="footer-cta" href="/cadastro">

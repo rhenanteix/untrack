@@ -63,7 +63,19 @@ export const ANALYTICS_EVENTS = [
   "signup_prompt_shown",
   "signup_started",
   "signup_completed",
+  "onboarding_started",
+  "onboarding_completed",
+  "link_created",
+  "smart_card_created",
+  "qr_created",
+  "campaign_created",
+  "first_page_view",
+  "first_click",
   "upgrade_clicked",
+  "upgrade_viewed",
+  "premium_feature_clicked",
+  "checkout_started",
+  "subscription_started",
 ] as const;
 
 export type AnalyticsEventName = (typeof ANALYTICS_EVENTS)[number];
@@ -101,7 +113,10 @@ export const CLIENT_ANALYTICS_EVENTS = [
   "create_action_started",
   "signup_prompt_shown",
   "signup_started",
+  "signup_completed",
   "upgrade_clicked",
+  "upgrade_viewed",
+  "premium_feature_clicked",
 ] as const satisfies ReadonlyArray<AnalyticsEventName>;
 
 export const ANALYTICS_PATHS = [
@@ -130,6 +145,8 @@ export const ANALYTICS_PATHS = [
   "/untrack/smart-pages",
   "/untrack/link-health",
   "/untrack/usage",
+  "/upgrade",
+  "/onboarding",
   "/entrar",
   "/cadastro",
 ] as const;

@@ -9,7 +9,11 @@ import { socialLinksSchema } from "@/modules/smart-pages/schemas";
 
 const onboardingSchema = z
   .object({
-    goal: z.enum(["creator", "business", "personal", "professional"]),
+    firstAction: z.enum(["smartPage", "link", "qr", "smartCard"]),
+    goal: z
+      .enum(["creator", "business", "personal", "professional"])
+      .nullable()
+      .optional(),
     socialLinks: socialLinksSchema,
   })
   .strict();
@@ -24,7 +28,7 @@ export async function PATCH(request: Request) {
       where: { id: user.id },
       data: {
         onboarding: {
-          version: 1,
+          version: 2,
           completedAt: new Date().toISOString(),
           ...input,
         },

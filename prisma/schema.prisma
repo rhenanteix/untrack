@@ -469,13 +469,17 @@ enum WorkspaceRole {
 
 enum Plan {
   free
-  pro
-  business
+  premium
 }
 
 model Workspace {
   id String @id @default(cuid())
   name String @db.VarChar(120)
+  slug String? @unique @db.VarChar(80)
+  logoUrl String? @db.VarChar(4096)
+  timezone String @default("America/Sao_Paulo") @db.VarChar(80)
+  locale String @default("pt-BR") @db.VarChar(12)
+  notifications Json @default("{}")
   plan Plan @default(free)
   governance Json @default("{}")
   createdAt DateTime @default(now())

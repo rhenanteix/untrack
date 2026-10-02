@@ -57,18 +57,33 @@ export async function recordPublicSmartPageEvent(
     blockId = block.id;
   }
 
-  await db.analyticsEvent.create({
-    data: {
-      name: input.event,
-      metadata: { path: `/${input.slug}` },
-      workspaceId: page.workspaceId,
-      smartPageId: page.id,
-      smartPageBlockId: blockId,
-      day: visit.day,
-      visitorHash: visitorHash(input.visitorId),
-      referrer: visit.referrer,
-      device: visit.device,
-    },
+  const eventData = {
+    metadata: { path: `/${input.slug}` },
+    workspaceId: page.workspaceId,
+    smartPageId: page.id,
+    smartPageBlockId: blockId,
+    day: visit.day,
+    visitorHash: visitorHash(input.visitorId),
+    referrer: visit.referrer,
+    device: visit.device,
+  };
+  const firstEvent =
+    input.event === "smart_page_view"
+      ? "first_page_view"
+      : input.event === "smart_block_clicked" ||
+          input.event === "link_in_bio_product_click"
+        ? "first_click"
+        : null;
+  await db.$transaction(async (tx) => {
+    if (firstEvent)
+      await tx.$queryRaw`SELECT "id" FROM "Workspace" WHERE "id" = ${page.workspaceId} FOR UPDATE`;
+    await tx.analyticsEvent.create({ data: { name: input.event, ...eventData } });
+    if (!firstEvent) return;
+    const priorEvents = await tx.analyticsEvent.count({
+      where: { workspaceId: page.workspaceId, name: firstEvent },
+    });
+    if (!priorEvents)
+      await tx.analyticsEvent.create({ data: { name: firstEvent, ...eventData } });
   });
   return true;
 }

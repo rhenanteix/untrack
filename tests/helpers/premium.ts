@@ -14,6 +14,9 @@ export async function testDatabase<T>(
 }
 export async function grantTestPremium(workspaceId: string) {
   await testDatabase((db) =>
-    db.workspace.update({ where: { id: workspaceId }, data: { plan: "pro" } }),
+    db.workspace.update({
+      where: { id: workspaceId },
+      data: { plan: "premium" },
+    }),
   );
 }

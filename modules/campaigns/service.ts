@@ -396,7 +396,7 @@ export async function getCampaign(actor: Actor, id: string) {
 }
 
 export async function createCampaign(actor: Actor, input: CreateCampaignInput) {
-  return workspaceTransaction(actor, "write", async (tx, plan) => {
+  const campaign = await workspaceTransaction(actor, "write", async (tx, plan) => {
     const data = createCampaignSchema.parse(input);
     await assertCampaignInputReferences(tx, actor.workspaceId, data);
     await reserveQuota(tx, actor.workspaceId, plan, "campaigns");
@@ -409,6 +409,9 @@ export async function createCampaign(actor: Actor, input: CreateCampaignInput) {
     });
     return campaign;
   });
+  const { track } = await import("@/lib/analytics");
+  await track("campaign_created", { workspaceId: actor.workspaceId });
+  return campaign;
 }
 
 export async function createCampaignFromBuilder(

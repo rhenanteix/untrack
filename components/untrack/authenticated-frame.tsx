@@ -11,6 +11,8 @@ export function AuthenticatedFrame({
     children
   ) : pathname === "/conta" ||
     pathname.startsWith("/conta/") ||
+    pathname.startsWith("/settings/") ||
+    pathname.startsWith("/upgrade") ||
     pathname === "/untrack" ||
     pathname.startsWith("/untrack/") ? (
     <WorkspaceShell>{children}</WorkspaceShell>

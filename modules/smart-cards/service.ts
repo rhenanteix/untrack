@@ -1,6 +1,7 @@
 import { Prisma } from "@prisma/client";
 import { ApiError } from "@/lib/api-response";
 import { appUrl } from "@/lib/app-url";
+import { track } from "@/lib/analytics";
 import { getPrisma } from "@/lib/prisma";
 import { PAGE_SIZE } from "@/lib/pagination";
 import { createQrAsset } from "@/modules/untrack-qr/service";
@@ -8,6 +9,8 @@ import { renderVerifiedQr } from "@/modules/untrack-qr/render";
 import {
   assertReferences,
   audit,
+  releaseQuota,
+  reserveQuota,
   workspaceTransaction,
   type Actor,
 } from "@/modules/workspaces/context";
@@ -111,8 +114,9 @@ export async function createSmartCard(actor: Actor, raw: unknown) {
   const input = smartCardInputSchema.parse(raw);
   const { actions, campaignId, ...cardData } = input;
   try {
-    return await workspaceTransaction(actor, "write", async (tx) => {
+    const card = await workspaceTransaction(actor, "write", async (tx, plan) => {
       await assertReferences(tx, actor.workspaceId, { campaignId });
+      await reserveQuota(tx, actor.workspaceId, plan, "smartCards");
       const card = await tx.smartCard.create({
         data: {
           ...cardData,
@@ -131,6 +135,8 @@ export async function createSmartCard(actor: Actor, raw: unknown) {
       });
       return card;
     });
+    await track("smart_card_created", { workspaceId: actor.workspaceId });
+    return card;
   } catch (error) {
     return slugConflict(error);
   }
@@ -194,6 +200,7 @@ export async function deleteSmartCard(actor: Actor, id: string) {
     if (!card)
       throw new ApiError(404, "SMART_CARD_NOT_FOUND", "Cartão não encontrado.");
     await tx.smartCard.delete({ where: { id } });
+    await releaseQuota(tx, actor.workspaceId, "smartCards");
     await audit(tx, actor, "smartCard.deleted", id, { slug: card.slug });
   });
 }
@@ -376,22 +383,35 @@ export async function captureSmartCardContact(
       city: values.city ?? null,
       customFields: json(customFields),
     };
-    const saved = existing
-      ? await tx.audienceContact.update({
-          where: { id: existing.id },
-          data: {
-            ...Object.fromEntries(
-              Object.entries(data).filter(([, value]) => value !== null),
-            ),
-            customFields: json({
-              ...(existing.customFields as Record<string, unknown>),
-              ...customFields,
-            }),
-          },
-        })
-      : await tx.audienceContact.create({
-          data: { workspaceId: card.workspaceId, ...data },
-        });
+    let saved;
+    if (existing) {
+      saved = await tx.audienceContact.update({
+        where: { id: existing.id },
+        data: {
+          ...Object.fromEntries(
+            Object.entries(data).filter(([, value]) => value !== null),
+          ),
+          customFields: json({
+            ...(existing.customFields as Record<string, unknown>),
+            ...customFields,
+          }),
+        },
+      });
+    } else {
+      const workspace = await tx.workspace.findUniqueOrThrow({
+        where: { id: card.workspaceId },
+        select: { plan: true },
+      });
+      await reserveQuota(
+        tx,
+        card.workspaceId,
+        workspace.plan,
+        "audienceContacts",
+      );
+      saved = await tx.audienceContact.create({
+        data: { workspaceId: card.workspaceId, ...data },
+      });
+    }
     const exchange = await tx.smartCardContactExchange.create({
       data: {
         workspaceId: card.workspaceId,

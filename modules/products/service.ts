@@ -2,7 +2,7 @@ import { Prisma } from "@prisma/client";
 import { ApiError } from "@/lib/api-response";
 import { PAGE_SIZE } from "@/lib/pagination";
 import { getPrisma } from "@/lib/prisma";
-import { requireSmartPages } from "@/modules/billing/plans";
+import { requirePremium } from "@/modules/billing/plans";
 import {
   audit,
   reserveQuota,
@@ -88,7 +88,7 @@ export async function createProduct(actor: Actor, raw: unknown) {
   const input = productInputSchema.parse(raw);
   try {
     return await workspaceTransaction(actor, "write", async (tx, plan) => {
-      requireSmartPages(plan);
+      requirePremium(plan);
       await reserveQuota(tx, actor.workspaceId, plan, "products");
       const product = await tx.product.create({
         data: { ...productData(input), workspaceId: actor.workspaceId },
@@ -109,7 +109,7 @@ export async function updateProduct(actor: Actor, id: string, raw: unknown) {
   const { images, metadata, ...productFields } = input;
   try {
     return await workspaceTransaction(actor, "write", async (tx, plan) => {
-      requireSmartPages(plan);
+      requirePremium(plan);
       const existing = await tx.product.findFirst({
         where: { id, workspaceId: actor.workspaceId },
       });

@@ -2,6 +2,7 @@ import { randomBytes } from "node:crypto";
 import { Prisma } from "@prisma/client";
 import { ApiError } from "@/lib/api-response";
 import { appUrl } from "@/lib/app-url";
+import { track } from "@/lib/analytics";
 import { getPrisma } from "@/lib/prisma";
 import { assertReferences, audit, releaseQuota, reserveQuota, workspaceTransaction, type Actor } from "@/modules/workspaces/context";
 import { managedLinkSchema, managedUpdateSchema } from "./schemas";
@@ -12,7 +13,7 @@ export async function createManagedLink(actor: Actor, raw: unknown) {
   if (input.expiresAt && new Date(input.expiresAt) <= new Date()) throw new ApiError(400, "INVALID_EXPIRATION", "A expiração deve estar no futuro.");
   for (let attempt = 0; attempt < 5; attempt++) {
     try {
-      return await workspaceTransaction(actor, "write", async (tx, plan) => {
+      const link = await workspaceTransaction(actor, "write", async (tx, plan) => {
         await assertReferences(tx, actor.workspaceId, { folderId: input.folderId, campaignId: input.campaignId });
         const domain = input.domainId ? await tx.customDomain.findFirst({ where: { id: input.domainId, workspaceId: actor.workspaceId, status: "active" } }) : null;
         if (input.domainId && !domain) throw new ApiError(422, "DOMAIN_NOT_ACTIVE", "Domínio não está ativo neste workspace.");
@@ -21,6 +22,8 @@ export async function createManagedLink(actor: Actor, raw: unknown) {
         await audit(tx, actor, "shortLink.created", link.id, { destinationUrl: link.destinationUrl, slug: link.slug });
         return link;
       });
+      await track("link_created", { workspaceId: actor.workspaceId });
+      return link;
     } catch (error) {
       if (!(error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002")) throw error;
       if (input.slug) throw new ApiError(409, "SLUG_EXISTS", "Este slug já existe nesse domínio.");

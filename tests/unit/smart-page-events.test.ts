@@ -19,6 +19,12 @@ afterEach(() => {
 describe("smart page analytics events", () => {
   it("records a page view with a hashed session and privacy-safe metadata", async () => {
     const create = vi.fn().mockResolvedValue({});
+    const transaction = vi.fn(async (work) =>
+      work({
+        $queryRaw: vi.fn(),
+        analyticsEvent: { create, count: vi.fn().mockResolvedValue(1) },
+      }),
+    );
     vi.mocked(getPrisma).mockReturnValue({
       smartPage: {
         findFirst: vi
@@ -26,6 +32,7 @@ describe("smart page analytics events", () => {
           .mockResolvedValue({ id: "page_1", workspaceId: "workspace_1" }),
       },
       analyticsEvent: { create },
+      $transaction: transaction,
     } as unknown as ReturnType<typeof getPrisma>);
 
     await expect(
@@ -78,6 +85,12 @@ describe("smart page analytics events", () => {
   it("records product events only for product blocks on the published page", async () => {
     const create = vi.fn().mockResolvedValue({});
     const findFirst = vi.fn().mockResolvedValue({ id: "block_1" });
+    const transaction = vi.fn(async (work) =>
+      work({
+        $queryRaw: vi.fn(),
+        analyticsEvent: { create, count: vi.fn().mockResolvedValue(1) },
+      }),
+    );
     vi.mocked(getPrisma).mockReturnValue({
       smartPage: {
         findFirst: vi
@@ -86,6 +99,7 @@ describe("smart page analytics events", () => {
       },
       smartPageBlock: { findFirst },
       analyticsEvent: { create },
+      $transaction: transaction,
     } as unknown as ReturnType<typeof getPrisma>);
 
     await expect(

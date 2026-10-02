@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { analytics } from "@/lib/client/analytics";
+import { BrandLogo } from "@/components/brand-logo";
 import { usePublicLanguage } from "@/components/public-language-provider";
 import { publicLocales } from "@/lib/public-i18n";
 import {
@@ -186,6 +187,8 @@ export function Header() {
   if (
     pathname.startsWith("/conta") ||
     pathname.startsWith("/untrack") ||
+    pathname.startsWith("/settings") ||
+    pathname.startsWith("/upgrade") ||
     pathname.startsWith("/c/") ||
     pathname.startsWith("/page/") ||
     isPublicSmartPagePath(pathname)
@@ -195,7 +198,7 @@ export function Header() {
     <header className="site-header">
       <div className="shell header-inner">
         <Link className="brand" href="/" aria-label="LinkOr, início">
-          <span aria-hidden="true" className="brand-logo" />
+          <BrandLogo />
         </Link>
 
         <nav className="desktop-nav" aria-label="Navegação principal">

@@ -6,7 +6,7 @@ import {
   socialLinksSchema,
 } from "@/modules/smart-pages/schemas";
 import {
-  requireSmartPages,
+  requirePremium,
   SMART_PAGES_PRODUCT,
 } from "@/modules/billing/plans";
 describe("Smart Page customization", () => {
@@ -104,11 +104,11 @@ describe("Smart Page customization", () => {
       ]).success,
     ).toBe(false);
   });
-  it("requires paid entitlement without enabling charges", () => {
-    expect(() => requireSmartPages("free")).toThrow();
-    expect(() => requireSmartPages("pro")).not.toThrow();
+  it("requires Premium only for advanced features without enabling charges", () => {
+    expect(() => requirePremium("free")).toThrow();
+    expect(() => requirePremium("premium")).not.toThrow();
     expect(SMART_PAGES_PRODUCT).toMatchObject({
-      priceInCents: 4590,
+      priceInCents: 2990,
       checkoutEnabled: false,
     });
   });

@@ -713,11 +713,42 @@ a {
   align-items: center;
   text-decoration: none;
 }
-.brand-logo {
+.brand-logo-asset {
+  --brand-logo-height: 36px;
+  --brand-logo-full-width: 147px;
+  --brand-logo-symbol-width: 28px;
+  display: inline-block;
+  flex: 0 0 auto;
+  height: var(--brand-logo-height);
+  overflow: hidden;
+  vertical-align: middle;
+}
+.brand-logo-asset--sm {
+  --brand-logo-height: 28px;
+  --brand-logo-full-width: 115px;
+  --brand-logo-symbol-width: 22px;
+}
+.brand-logo-asset--md {
+  --brand-logo-height: 36px;
+  --brand-logo-full-width: 147px;
+  --brand-logo-symbol-width: 28px;
+}
+.brand-logo-asset--lg {
+  --brand-logo-height: 44px;
+  --brand-logo-full-width: 180px;
+  --brand-logo-symbol-width: 34px;
+}
+.brand-logo-asset--full {
+  width: var(--brand-logo-full-width);
+}
+.brand-logo-asset--symbol {
+  width: var(--brand-logo-symbol-width);
+}
+.brand-logo-asset img {
   display: block;
-  width: 142px;
-  height: 36px;
-  background: url("/linkor-logo.svg") center / contain no-repeat;
+  width: auto;
+  height: var(--brand-logo-height);
+  max-width: none;
 }
 .header-inner nav,
 .footer-inner nav {
@@ -5240,12 +5271,6 @@ body:has(.product-shell) .site-footer {
   align-items: center;
   width: fit-content;
   text-decoration: none;
-}
-.footer-logo {
-  display: block;
-  width: 142px;
-  height: 36px;
-  background: url("/linkor-logo-light.svg") center / contain no-repeat;
 }
 .footer-intro p {
   margin: 0;

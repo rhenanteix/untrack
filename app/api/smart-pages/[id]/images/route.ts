@@ -8,7 +8,7 @@ import {
   workspaceTransaction,
   audit,
 } from "@/modules/workspaces/context";
-import { requireSmartPages } from "@/modules/billing/plans";
+import { requirePremium } from "@/modules/billing/plans";
 import { optimizeImage, readImageBody } from "@/modules/smart-pages/images";
 export const runtime = "nodejs";
 export async function POST(
@@ -25,7 +25,7 @@ export async function POST(
       actor,
       "write",
       async (tx, plan) => {
-        requireSmartPages(plan);
+        requirePremium(plan);
         const page = await tx.smartPage.findFirst({
           where: { id, workspaceId: actor.workspaceId },
         });

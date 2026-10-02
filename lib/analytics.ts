@@ -21,11 +21,13 @@ const consoleSink: AnalyticsSink = {
 const prismaSink: AnalyticsSink = {
   async track(event) {
     const { getPrisma } = await import("./prisma");
+    const { workspaceId, ...metadata } = event.metadata ?? {};
     await getPrisma().analyticsEvent.create({
       data: {
         name: event.name,
         occurredAt: event.occurredAt,
-        metadata: event.metadata ?? {},
+        metadata,
+        ...(typeof workspaceId === "string" ? { workspaceId } : {}),
       },
     });
   },

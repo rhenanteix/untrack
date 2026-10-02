@@ -1,4 +1,3 @@
-import { requireSmartPages } from "@/modules/billing/plans";
 import { Prisma } from "@prisma/client";
 import { ApiError } from "@/lib/api-response";
 import { track } from "@/lib/analytics";
@@ -143,7 +142,6 @@ export async function createSmartPage(actor: Actor, raw: unknown) {
       actor,
       "write",
       async (tx, plan) => {
-        requireSmartPages(plan);
         await reserveQuota(tx, actor.workspaceId, plan, "smartPages");
         const page = await tx.smartPage.create({
           data: { ...input, socialLinks, workspaceId: actor.workspaceId },
@@ -167,8 +165,7 @@ export async function updateSmartPage(actor: Actor, id: string, raw: unknown) {
     const page = await workspaceTransaction(
       actor,
       "write",
-      async (tx, plan) => {
-        requireSmartPages(plan);
+      async (tx) => {
         const existing = await tx.smartPage.findFirst({
           where: { id, workspaceId: actor.workspaceId },
         });
@@ -222,8 +219,7 @@ export async function setSmartPagePublished(
   id: string,
   published: boolean,
 ) {
-  const page = await workspaceTransaction(actor, "write", async (tx, plan) => {
-    if (published) requireSmartPages(plan);
+  const page = await workspaceTransaction(actor, "write", async (tx) => {
     const page = await tx.smartPage.findFirst({
       where: { id, workspaceId: actor.workspaceId },
     });
@@ -296,8 +292,7 @@ export async function addSmartPageBlock(
   raw: unknown,
 ) {
   const input = smartPageBlockInputSchema.parse(raw);
-  const block = await workspaceTransaction(actor, "write", async (tx, plan) => {
-    requireSmartPages(plan);
+  const block = await workspaceTransaction(actor, "write", async (tx) => {
     const page = await tx.smartPage.findFirst({
       where: { id: pageId, workspaceId: actor.workspaceId },
     });
@@ -342,8 +337,7 @@ export async function updateSmartPageBlock(
   raw: unknown,
 ) {
   const input = smartPageBlockInputSchema.parse(raw);
-  return workspaceTransaction(actor, "write", async (tx, plan) => {
-    requireSmartPages(plan);
+  return workspaceTransaction(actor, "write", async (tx) => {
     const block = await tx.smartPageBlock.findFirst({
       where: {
         id: blockId,
@@ -405,8 +399,7 @@ export async function reorderSmartPageBlocks(
   pageId: string,
   blockIds: string[],
 ) {
-  return workspaceTransaction(actor, "write", async (tx, plan) => {
-    requireSmartPages(plan);
+  return workspaceTransaction(actor, "write", async (tx) => {
     const blocks = await tx.smartPageBlock.findMany({
       where: {
         smartPageId: pageId,

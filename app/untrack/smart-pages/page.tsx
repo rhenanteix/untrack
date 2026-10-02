@@ -1,8 +1,8 @@
 import { libraryFilters } from "@/modules/workspaces/library-filters";
-import Link from "next/link";
-import { hasSmartPages, smartPagesPrice } from "@/modules/billing/plans";
+import { isPremium } from "@/modules/billing/plans";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
+import { PremiumGate } from "@/components/premium-gate";
 import { SmartPagesDashboard } from "@/components/untrack/smart-pages-dashboard";
 import { getPrisma } from "@/lib/prisma";
 import { sessionFromHeaders } from "@/lib/session";
@@ -80,39 +80,26 @@ export default async function SmartPagesPage({
   const data = await loadPageData(requestHeaders, session.user.id, filters);
   if (!data.ok) return <WorkspaceLoadError {...data.error} />;
   const { actor, initial, managedLinks, products, workspace } = data;
-  const premium = hasSmartPages(workspace.plan);
+  const premium = isPremium(workspace.plan);
   return (
     <>
       {!premium && (
         <section className="sp-premium-banner">
-          <span className="eyebrow">Smart Pages Premium</span>
-          <h1>Seu perfil merece um cartão à altura.</h1>
+          <span className="eyebrow">Personalização avançada</span>
+          <h1>Sua primeira Smart Page já está incluída.</h1>
           <p>
-            21 modelos, editor visual, foto personalizada e links para tudo o
-            que você faz.
+            Publique, compartilhe e acompanhe sua página. Imagens, produtos e
+            personalizações avançadas ficam disponíveis no Premium.
           </p>
-          <strong>{smartPagesPrice}</strong>
-          <p>
-            Preço previsto. Cobrança ainda não disponível. Nenhum pagamento será
-            solicitado agora.
-          </p>
-          <Link className="button button-secondary" href="/untrack/usage">
-            Ver plano e cotas
-          </Link>
-          <p>
-            Se você já possui páginas, elas continuam acessíveis. Criar ou
-            editar exige um workspace premium.
-          </p>
+          <PremiumGate
+            feature="Personalização avançada"
+            description="Adicione imagens próprias, produtos e recursos visuais avançados à sua Smart Page."
+          />
         </section>
       )}
       <SmartPagesDashboard
-        canEdit={premium && actor.role !== "viewer"}
+        canEdit={actor.role !== "viewer"}
         canUnpublish={actor.role !== "viewer"}
-        readOnlyReason={
-          !premium
-            ? "Seu plano permite consultar as páginas existentes. Criar e editar faz parte do Smart Pages Premium."
-            : undefined
-        }
         publicOrigin={appUrl().origin}
         initial={{
           ...initial,

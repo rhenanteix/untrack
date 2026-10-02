@@ -31,9 +31,11 @@ import {
   type ReactNode,
 } from "react";
 import { SignOutButton } from "@/components/sign-out-button";
+import { BrandLogo } from "@/components/brand-logo";
 import { authClient } from "@/lib/client/auth";
 import { analytics } from "@/lib/client/analytics";
 import { ActionStatus, apiRequest, useAction } from "./shared";
+import { CreateLauncher } from "./create-launcher";
 
 interface Membership {
   role: string;
@@ -79,9 +81,8 @@ const groups: NavigationGroup[] = [
 ];
 
 const planNames: Record<string, string> = {
-  free: "Gratuito",
-  pro: "Professional",
-  business: "Business",
+  free: "Plano Free",
+  premium: "Premium",
 };
 
 const WorkspaceContext = createContext<Membership | undefined>(undefined);
@@ -211,15 +212,14 @@ function UserMenu({ name, plan }: { name: string; plan: string }) {
         <FiMoreHorizontal aria-hidden="true" />
       </summary>
       <div className="workspace-user-popover">
-        <Link href="/conta/perfil">Perfil</Link>
-        <Link href="/conta/perfil">Conta</Link>
+        <Link href="/settings/account">Minha conta</Link>
         <Link
-          href="/untrack/usage"
+          href="/upgrade"
           onClick={() => analytics.track("upgrade_clicked")}
         >
-          Plano e cobrança
+          Meu plano
         </Link>
-        <Link href="/conta/perfil#preferencias">Preferências</Link>
+        <Link href="/settings/account#preferencias">Preferências</Link>
         <Link href="/ajuda">Ajuda</Link>
         <hr />
         <SignOutButton />
@@ -372,18 +372,10 @@ export function WorkspaceShell({ children }: { children: ReactNode }) {
             <FiMenu aria-hidden="true" />
           </button>
           <Link href="/conta" className="product-brand">
-            <FiLink aria-hidden="true" />
-            <strong>LinkOr</strong>
+            <BrandLogo size="sm" />
           </Link>
           {canWrite ? (
-            <Link
-              className="product-mobile-create"
-              href="/untrack/short-links?create=1"
-              aria-label="Criar link"
-              title="Criar link"
-            >
-              <FiPlus aria-hidden="true" />
-            </Link>
+            <CreateLauncher compact />
           ) : (
             <span className="product-mobile-spacer" aria-hidden="true" />
           )}
@@ -429,8 +421,7 @@ export function WorkspaceShell({ children }: { children: ReactNode }) {
         >
           <div className="product-sidebar-brand-row">
             <Link className="product-brand" href="/conta">
-              <FiLink aria-hidden="true" />
-              <strong>LinkOr</strong>
+              <BrandLogo variant={collapsed ? "symbol" : "full"} size="sm" />
             </Link>
             <button
               className="workspace-sidebar-collapse"
@@ -471,6 +462,7 @@ export function WorkspaceShell({ children }: { children: ReactNode }) {
               onCreate={createWorkspace}
             />
           )}
+          {canWrite ? <CreateLauncher /> : null}
           <nav className="product-nav" aria-label="Módulos do workspace">
             <div className="workspace-nav-group workspace-nav-overview">
               {renderItems([overviewItem])}
@@ -482,9 +474,17 @@ export function WorkspaceShell({ children }: { children: ReactNode }) {
               </div>
             ))}
           </nav>
+          {current?.workspace.plan === "free" ? (
+            <Link className="workspace-premium-card" href="/upgrade">
+              <strong>LinkOr Premium</strong>
+              <span>Analytics avançado, domínio próprio e muito mais.</span>
+              <b>R$29,90/mês</b>
+              <em>Conhecer Premium</em>
+            </Link>
+          ) : null}
           <Link
             className="workspace-settings-link workspace-nav-link"
-            href="/conta/perfil"
+            href="/settings/account"
             title={collapsed ? "Configurações" : undefined}
           >
             <FiSettings aria-hidden="true" />

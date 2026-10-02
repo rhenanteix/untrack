@@ -3,6 +3,7 @@ import { z } from "zod";
 import { webUrlSchema } from "@/modules/validation/url-validation";
 import { appUrl } from "@/lib/app-url";
 import { ApiError } from "@/lib/api-response";
+import { track } from "@/lib/analytics";
 import { audit, assertReferences, reserveQuota, workspaceTransaction, type Actor } from "@/modules/workspaces/context";
 import { renderVerifiedQr, visualSchema } from "./render";
 export const qrAssetSchema = z.object({ name: z.string().trim().min(1).max(120), url: webUrlSchema, mode: z.enum(["static", "dynamic"]), visual: visualSchema, campaignId: z.string().nullable().optional() }).strict();
@@ -24,6 +25,7 @@ export async function createQrAsset(actor: Actor, raw: unknown) {
     await audit(tx, actor, "qr.created", qr.id, { mode: qr.mode, redirectId, campaignId: qr.campaignId });
     return qr;
   });
+  await track("qr_created", { workspaceId: actor.workspaceId });
   return { qr, dataUrl: rendered.dataUrl, warnings: rendered.warnings, verified: true };
 }
 export async function assertQrOwnership(actor: Actor, id: string) {

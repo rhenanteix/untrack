@@ -2,7 +2,6 @@ import Link from "next/link";
 import {
   FiArrowRight,
   FiBarChart2,
-  FiChevronDown,
   FiEye,
   FiGrid,
   FiLink,
@@ -13,6 +12,8 @@ import {
   FiUsers,
 } from "react-icons/fi";
 import { WorkspaceCommandPalette } from "./workspace-command-palette";
+import { SetupChecklist } from "./setup-checklist";
+import { CreateLauncher } from "./create-launcher";
 
 const periods = [7, 30, 90] as const;
 
@@ -46,6 +47,7 @@ export type DashboardHomeProps = {
     links: number;
     campaigns: number;
     smartPages: number;
+    smartCards: number;
     publishedSmartPages: number;
     featuredSmartPage: SmartPageAsset;
   };
@@ -75,44 +77,6 @@ function sampleSeries(series: SeriesPoint[], limit = 7) {
   return [...indexes].map((index) => series[index]);
 }
 
-function CreateMenu() {
-  return (
-    <details className="dashboard-create-menu">
-      <summary className="button dashboard-create-trigger">
-        <FiPlus aria-hidden="true" />
-        Criar
-        <FiChevronDown aria-hidden="true" />
-      </summary>
-      <div className="dashboard-create-popover">
-        <Link href="/untrack/short-links?create=1">
-          <FiLink aria-hidden="true" />
-          Link
-        </Link>
-        <Link href="/untrack/smart-pages?create=1">
-          <FiGrid aria-hidden="true" />
-          Smart Page
-        </Link>
-        <Link href="/untrack/campaigns?create=1">
-          <FiTarget aria-hidden="true" />
-          Campanha
-        </Link>
-        <Link href="/untrack/qr">
-          <FiGrid aria-hidden="true" />
-          QR Code
-        </Link>
-        <Link href="/untrack/utm">
-          <FiBarChart2 aria-hidden="true" />
-          UTM
-        </Link>
-        <Link href="/untrack/whatsapp">
-          <FiLink aria-hidden="true" />
-          Link WhatsApp
-        </Link>
-      </div>
-    </details>
-  );
-}
-
 function DashboardHeader({
   canWrite,
   greeting,
@@ -128,7 +92,7 @@ function DashboardHeader({
       </div>
       <div className="dashboard-header-actions">
         <WorkspaceCommandPalette />
-        {canWrite ? <CreateMenu /> : null}
+        {canWrite ? <CreateLauncher /> : null}
       </div>
     </header>
   );
@@ -318,7 +282,14 @@ export function DashboardHome({
   performance,
   topLinks,
 }: DashboardHomeProps) {
-  const hasData = assets.links || assets.campaigns || assets.smartPages;
+  const hasData = assets.links || assets.campaigns || assets.smartPages || assets.smartCards;
+  const checklist = [
+    { label: "Criar sua conta", complete: true },
+    { label: "Criar primeiro link", complete: assets.links > 0 },
+    { label: "Criar sua Smart Page", complete: assets.smartPages > 0 },
+    { label: "Compartilhar sua página", complete: assets.publishedSmartPages > 0 },
+    { label: "Conseguir seu primeiro clique", complete: metrics.clicks > 0 },
+  ];
   if (!hasData) {
     return (
       <section className="workspace-page dashboard-home dashboard-home-empty">
@@ -327,6 +298,7 @@ export function DashboardHome({
           greeting={greeting}
           userName={userName}
         />
+        <SetupChecklist items={checklist} />
         <section className="dashboard-welcome" aria-labelledby="welcome-heading">
           <FiLink aria-hidden="true" />
           <div>
@@ -354,6 +326,7 @@ export function DashboardHome({
         greeting={greeting}
         userName={userName}
       />
+      <SetupChecklist items={checklist} />
 
       <section className="dashboard-section" aria-labelledby="assets-heading">
         <div className="dashboard-section-heading">
@@ -426,6 +399,18 @@ export function DashboardHome({
                 : "/untrack/campaigns?create=1"
             }
             action={assets.campaigns ? "Ver campanhas" : "Criar campanha"}
+          />
+          <AssetCard
+            icon={<FiUsers />}
+            title="Smart Cards"
+            status={plural(assets.smartCards, "cartão")}
+            description={
+              assets.smartCards
+                ? "Atualize e compartilhe seus cartões digitais."
+                : "Crie um cartão digital profissional para compartilhar."
+            }
+            href={assets.smartCards ? "/untrack/smart-cards" : "/untrack/smart-cards?create=1"}
+            action={assets.smartCards ? "Ver cartões" : "Criar Smart Card"}
           />
         </div>
       </section>

@@ -66,6 +66,7 @@ async function overview(userId: string, requestHeaders: Headers, days: Period) {
       campaigns,
       links,
       pages,
+      smartCards,
       publishedPages,
       featuredSmartPage,
       clicks,
@@ -78,6 +79,7 @@ async function overview(userId: string, requestHeaders: Headers, days: Period) {
       db.campaign.count({ where: { ...where, status: "active" } }),
       db.shortLink.count({ where: { ...where, isActive: true } }),
       db.smartPage.count({ where }),
+      db.smartCard.count({ where }),
       db.smartPage.count({ where: { ...where, status: "published" } }),
       db.smartPage.findFirst({
         where: { ...where, status: "published" },
@@ -127,6 +129,7 @@ async function overview(userId: string, requestHeaders: Headers, days: Period) {
       campaigns,
       links,
       pages,
+      smartCards,
       publishedPages,
       featuredSmartPage: featuredSmartPage
         ? {
@@ -185,6 +188,7 @@ export default async function AccountPage({
           links: data.links,
           campaigns: data.campaigns,
           smartPages: data.pages,
+          smartCards: data.smartCards,
           publishedSmartPages: data.publishedPages,
           featuredSmartPage: data.featuredSmartPage,
         }}

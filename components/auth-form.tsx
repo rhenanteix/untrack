@@ -3,7 +3,9 @@
 import { FormEvent, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { BrandLogo } from "@/components/brand-logo";
 import { authClient } from "@/lib/client/auth";
+import { analytics } from "@/lib/client/analytics";
 
 export function AuthForm({
   mode,
@@ -27,6 +29,7 @@ export function AuthForm({
         email: String(form.get("email")).trim().toLowerCase(),
         password: String(form.get("password")),
       };
+      if (register) analytics.track("signup_started");
       const result = register
         ? await authClient.signUp.email({
             ...credentials,
@@ -46,6 +49,7 @@ export function AuthForm({
                 : "E-mail ou senha incorretos.",
         );
       }
+      if (register) analytics.track("signup_completed");
       router.replace(register ? `/onboarding?next=${encodeURIComponent(returnTo)}` : returnTo);
       router.refresh();
     } catch (cause) {
@@ -61,6 +65,7 @@ export function AuthForm({
 
   return (
     <div className="auth-card tool-card">
+      <BrandLogo size="md" />
       <form onSubmit={submit} className="account-form">
         {register && (
           <label>
