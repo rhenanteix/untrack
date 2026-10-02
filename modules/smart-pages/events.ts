@@ -60,7 +60,7 @@ export async function recordPublicSmartPageEvent(
   await db.analyticsEvent.create({
     data: {
       name: input.event,
-      metadata: { path: `/page/${input.slug}` },
+      metadata: { path: `/${input.slug}` },
       workspaceId: page.workspaceId,
       smartPageId: page.id,
       smartPageBlockId: blockId,

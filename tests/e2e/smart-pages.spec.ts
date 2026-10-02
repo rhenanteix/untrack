@@ -54,11 +54,17 @@ test("cria, publica, abre e mede uma Smart Page", async ({
       response.url().endsWith("/api/smart-pages/events") &&
       Boolean(response.request().postData()?.includes("smart_page_view")),
   );
-  await page.goto(`/page/${slug}`);
+  await page.goto(`/${slug}`);
   await expect(
     page.getByRole("heading", { name: "Consultoria Aurora" }),
   ).toBeVisible();
   await pageEvent;
+
+  const legacyResponse = await context.request.get(`/page/${slug}`, {
+    maxRedirects: 0,
+  });
+  expect(legacyResponse.status()).toBe(308);
+  expect(legacyResponse.headers().location).toBe(`/${slug}`);
 
   const clickEvent = page.waitForResponse(
     (response) =>
@@ -177,7 +183,7 @@ test("publica blocos ricos e mantém o layout responsivo", async ({
   );
   expect(published.status()).toBe(200);
 
-  await page.goto(`/page/${slug}`);
+  await page.goto(`/${slug}`);
   await expect(
     page.getByRole("heading", { name: "Ateliê de Conteúdo" }),
   ).toBeVisible();

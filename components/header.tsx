@@ -19,6 +19,43 @@ const localeFlags = {
   es: "🇪🇸",
 } as const;
 
+const staticTopLevelRoutes = new Set([
+  "admin",
+  "ajuda",
+  "analisar-link",
+  "api",
+  "blog",
+  "cadastro",
+  "conta",
+  "contato",
+  "cookies",
+  "encurtar",
+  "entrar",
+  "gerar-qrcode",
+  "gerar-utm",
+  "l",
+  "limpar-link",
+  "link-health",
+  "new",
+  "onboarding",
+  "page",
+  "precos",
+  "privacidade",
+  "produtos",
+  "q",
+  "recursos",
+  "s",
+  "sobre",
+  "termos",
+  "untrack",
+  "w",
+]);
+
+function isPublicSmartPagePath(pathname: string) {
+  const segments = pathname.split("/").filter(Boolean);
+  return segments.length === 1 && !staticTopLevelRoutes.has(segments[0] ?? "");
+}
+
 export function Header() {
   const pathname = usePathname();
   const { locale, setLocale, copy } = usePublicLanguage();
@@ -148,7 +185,8 @@ export function Header() {
   if (
     pathname.startsWith("/conta") ||
     pathname.startsWith("/untrack") ||
-    pathname.startsWith("/page/")
+    pathname.startsWith("/page/") ||
+    isPublicSmartPagePath(pathname)
   )
     return null;
   return (
@@ -313,7 +351,11 @@ export function Header() {
         </nav>
 
         <div className="header-actions">
-          <div className="header-language" role="group" aria-label={copy.languageLabel}>
+          <div
+            className="header-language"
+            role="group"
+            aria-label={copy.languageLabel}
+          >
             {publicLocales.map((language) => (
               <button
                 key={language}
@@ -380,7 +422,12 @@ export function Header() {
         </button>
       </div>
 
-      <div ref={mobileNavRef} id="mobile-nav" className="mobile-nav" hidden={!mobileOpen}>
+      <div
+        ref={mobileNavRef}
+        id="mobile-nav"
+        className="mobile-nav"
+        hidden={!mobileOpen}
+      >
         <nav className="shell" aria-label="Navegação do menu">
           <Link href="/produtos" onClick={() => setMobileOpenedAt(null)}>
             {copy.nav.products}
@@ -393,7 +440,9 @@ export function Header() {
                   key={product.slug}
                   href={`/produtos/${product.slug}`}
                   aria-current={
-                    pathname === `/produtos/${product.slug}` ? "page" : undefined
+                    pathname === `/produtos/${product.slug}`
+                      ? "page"
+                      : undefined
                   }
                   onClick={() => {
                     trackProductNavigation(
@@ -413,7 +462,11 @@ export function Header() {
           <details className="mobile-nav-group">
             <summary>{copy.nav.solutions}</summary>
             {solutionLinks.map((link) => (
-              <Link key={link.label} href={link.href} onClick={() => setMobileOpenedAt(null)}>
+              <Link
+                key={link.label}
+                href={link.href}
+                onClick={() => setMobileOpenedAt(null)}
+              >
                 {link.label}
               </Link>
             ))}
@@ -421,7 +474,11 @@ export function Header() {
           <details className="mobile-nav-group">
             <summary>{copy.nav.resources}</summary>
             {resourceLinks.map((link) => (
-              <Link key={link.href} href={link.href} onClick={() => setMobileOpenedAt(null)}>
+              <Link
+                key={link.href}
+                href={link.href}
+                onClick={() => setMobileOpenedAt(null)}
+              >
                 {link.label}
               </Link>
             ))}
@@ -429,7 +486,10 @@ export function Header() {
           <Link href="/precos" onClick={() => setMobileOpenedAt(null)}>
             {copy.nav.pricing}
           </Link>
-          <Link href="/entrar?next=/conta" onClick={() => setMobileOpenedAt(null)}>
+          <Link
+            href="/entrar?next=/conta"
+            onClick={() => setMobileOpenedAt(null)}
+          >
             {copy.nav.signIn}
           </Link>
           <Link

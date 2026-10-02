@@ -29,7 +29,7 @@ export async function generateMetadata({
   const product = result?.blocks[0]?.product;
   if (!result || !product || !isProductPublic(product)) return {};
   const url = new URL(
-    `/page/${encodeURIComponent(slug)}/produto/${encodeURIComponent(productId)}`,
+    `/${encodeURIComponent(slug)}/produto/${encodeURIComponent(productId)}`,
     appUrl(),
   ).href;
   return {
@@ -68,7 +68,7 @@ export default async function PublicProductPage({
         theme={theme}
       >
         <p>{formatPrice(product.priceInCents, product.currency)}</p>
-        <a className="smart-page-link" href={`/page/${encodeURIComponent(slug)}`}>
+        <a className="smart-page-link" href={`/${encodeURIComponent(slug)}`}>
           Voltar para {result.title}
         </a>
       </PageDesign>

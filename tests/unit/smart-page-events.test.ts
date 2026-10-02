@@ -45,7 +45,7 @@ describe("smart page analytics events", () => {
     expect(create).toHaveBeenCalledWith({
       data: expect.objectContaining({
         name: "smart_page_view",
-        metadata: { path: "/page/minha-pagina" },
+        metadata: { path: "/minha-pagina" },
         workspaceId: "workspace_1",
         smartPageId: "page_1",
         smartPageBlockId: null,

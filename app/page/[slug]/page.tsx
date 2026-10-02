@@ -234,7 +234,7 @@ export async function generateMetadata({
   const { slug } = await params;
   const page = await findSmartPage(slug);
   if (!page) return {};
-  const url = new URL(`/page/${encodeURIComponent(page.slug)}`, appUrl()).href;
+  const url = new URL(`/${encodeURIComponent(page.slug)}`, appUrl()).href;
   return {
     title: { absolute: page.title },
     description: page.description || undefined,
@@ -310,7 +310,7 @@ export default async function PublicSmartPage({
           analyticsEnabled: block.analyticsEnabled,
           name: block.product.name,
           buttonLabel: settings.data.buttonLabel,
-          href: `/page/${encodeURIComponent(page.slug)}/produto/${encodeURIComponent(block.product.id)}`,
+          href: `/${encodeURIComponent(page.slug)}/produto/${encodeURIComponent(block.product.id)}`,
         },
       ];
     }

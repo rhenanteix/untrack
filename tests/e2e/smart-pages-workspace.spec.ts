@@ -80,7 +80,9 @@ test("Smart Pages loads, previews profile changes, saves and publishes", async (
   await page.getByRole("button", { name: "+ Adicionar", exact: true }).click();
   const addContent = page.getByRole("dialog", { name: "Adicionar conteúdo" });
   await addContent.getByRole("button", { name: /^Link/ }).click();
-  await addContent.locator('input[name="title"]').fill("Conheça nossos projetos");
+  await addContent
+    .locator('input[name="title"]')
+    .fill("Conheça nossos projetos");
   await addContent
     .locator('input[name="destinationUrl"]')
     .fill("https://example.com/portfolio");
@@ -335,7 +337,7 @@ test("field errors explain slug issues; career templates preserve and publish re
     ),
   ).toBe(true);
   const publicPage = await context.newPage();
-  await publicPage.goto(`/page/${slug}`);
+  await publicPage.goto(`/${slug}`);
   await expect(publicPage.locator('[data-theme="resume"]')).toBeVisible();
   await expect(
     publicPage.getByRole("heading", { name: "Ana Silva" }),
@@ -490,7 +492,7 @@ test("live card customization, upload isolation, reorder and downgrade", async (
     fullPage: true,
   });
   const publicPage = await visitor.newPage();
-  await publicPage.goto(`/page/${record.slug}`);
+  await publicPage.goto(`/${record.slug}`);
   await expect(publicPage.locator('[data-layout="card"]')).toBeVisible();
   await expect(
     publicPage.getByRole("heading", { name: "Meu novo cartão" }),

@@ -182,10 +182,7 @@ interface SmartPageMetrics {
   devices: { name: string; views: number }[];
 }
 
-function collectSocialLinks(
-  data: FormData,
-  order: SocialLink[],
-) {
+function collectSocialLinks(data: FormData, order: SocialLink[]) {
   const values = new Map(order.map((social) => [social.network, social]));
   for (const { value: network } of socialNetworks) {
     const field = `social-${network}`;
@@ -203,7 +200,7 @@ function collectSocialLinks(
 }
 
 function publicUrl(slug: string) {
-  return `/page/${encodeURIComponent(slug)}`;
+  return `/${encodeURIComponent(slug)}`;
 }
 
 function brazilianCurrencyToNumber(value: FormDataEntryValue | null) {
@@ -261,9 +258,9 @@ export function SmartPagesDashboard({
   const [contentModalOpen, setContentModalOpen] = useState(false);
   const [toolbarMenuOpen, setToolbarMenuOpen] = useState(false);
   const [editorSection, setEditorSection] = useState("profile");
-  const [appearanceTab, setAppearanceTab] = useState<
-    "themes" | "customize"
-  >("themes");
+  const [appearanceTab, setAppearanceTab] = useState<"themes" | "customize">(
+    "themes",
+  );
   const [search, setSearch] = useState(params.get("search") ?? "");
   const [appliedSearch, setAppliedSearch] = useState(
     params.get("search") ?? "",
@@ -301,14 +298,12 @@ export function SmartPagesDashboard({
     (network) => network.value === activeSocialNetwork,
   );
   const activeSocialUrl = activeSocial
-    ? (draftSocialLinks.find(
-        (social) => social.network === activeSocial.value,
-      )?.url ?? "")
+    ? (draftSocialLinks.find((social) => social.network === activeSocial.value)
+        ?.url ?? "")
     : "";
   const activeSocialLabel = activeSocial
-    ? (draftSocialLinks.find(
-        (social) => social.network === activeSocial.value,
-      )?.label ?? "")
+    ? (draftSocialLinks.find((social) => social.network === activeSocial.value)
+        ?.label ?? "")
     : "";
   useEffect(() => {
     if (!hasUnsaved) return;
@@ -370,9 +365,7 @@ export function SmartPagesDashboard({
               ? error
               : new Error("Não foi possível salvar o perfil.");
           setProfileSaveError(saveError);
-          setAutosaveError(
-            saveError.message,
-          );
+          setAutosaveError(saveError.message);
           setAutosaveState("error");
         })
         .finally(() => {
@@ -383,9 +376,7 @@ export function SmartPagesDashboard({
     return () => window.clearTimeout(timeout);
   }, [autosaveRevision, dirty, profileDraft, selected]);
   useEffect(() => {
-    const blockId = dirtyBlocks.find(
-      (id) => blockDrafts[id]?.type === "link",
-    );
+    const blockId = dirtyBlocks.find((id) => blockDrafts[id]?.type === "link");
     const draft = blockId ? blockDrafts[blockId] : null;
     if (
       !selected ||
@@ -442,7 +433,9 @@ export function SmartPagesDashboard({
           if (blockDraftVersions.current[blockId] !== version) return;
           failedBlockDraftVersions.current[blockId] = version;
           setAutosaveError(
-            error instanceof Error ? error.message : "Não foi possível salvar o conteúdo.",
+            error instanceof Error
+              ? error.message
+              : "Não foi possível salvar o conteúdo.",
           );
           setAutosaveState("error");
         })
@@ -611,9 +604,7 @@ export function SmartPagesDashboard({
     setProfileDraft((current) => {
       const socialLinks = current.socialLinks ?? selected?.socialLinks ?? [];
       const next = socialLinks.filter((social) => social.network !== network);
-      const existing = socialLinks.find(
-        (social) => social.network === network,
-      );
+      const existing = socialLinks.find((social) => social.network === network);
       if (url) next.push({ network, url, label: existing?.label });
       return { ...current, socialLinks: next };
     });
@@ -966,7 +957,8 @@ export function SmartPagesDashboard({
                     analyticsEnabled: block.analyticsEnabled,
                     settings: {
                       title: block.settings.title ?? "",
-                      destinationUrl: block.settings.destinationUrl || undefined,
+                      destinationUrl:
+                        block.settings.destinationUrl || undefined,
                       openInNewTab: block.settings.openInNewTab ?? true,
                     },
                   },
@@ -1005,9 +997,9 @@ export function SmartPagesDashboard({
   async function reorderBlocks(blockIds: string[]) {
     if (!selected || blockIds.length !== selected.blocks.length) return;
     const byId = new Map(selected.blocks.map((block) => [block.id, block]));
-    const blocks = blockIds.map((id) => byId.get(id)).filter(
-      (block): block is SmartPageBlock => Boolean(block),
-    );
+    const blocks = blockIds
+      .map((id) => byId.get(id))
+      .filter((block): block is SmartPageBlock => Boolean(block));
     if (blocks.length !== selected.blocks.length) return;
     const previous = selected.blocks;
     setSelected((current) => (current ? { ...current, blocks } : current));
@@ -1075,7 +1067,7 @@ export function SmartPagesDashboard({
               {selected && (
                 <div className="sp-studio-page-meta">
                   <strong>{selected.title}</strong>
-                  <span>untrack.app/page/{selected.slug}</span>
+                  <span>untrack.app/{selected.slug}</span>
                 </div>
               )}
             </div>
@@ -1089,9 +1081,7 @@ export function SmartPagesDashboard({
                         : "inactive-badge"
                     }
                   >
-                    {selected.status === "published"
-                      ? "Publicada"
-                      : "Rascunho"}
+                    {selected.status === "published" ? "Publicada" : "Rascunho"}
                   </span>
                   <span className="sp-studio-save-status" role="status">
                     {autosaveState === "saving"
@@ -1140,7 +1130,9 @@ export function SmartPagesDashboard({
                             type="button"
                             role="menuitem"
                             className="sp-studio-danger-action"
-                            disabled={action.busy || !canUnpublish || hasUnsaved}
+                            disabled={
+                              action.busy || !canUnpublish || hasUnsaved
+                            }
                             onClick={() => {
                               setToolbarMenuOpen(false);
                               void setPublished(false);
@@ -1166,7 +1158,11 @@ export function SmartPagesDashboard({
           </>
         ) : (
           <div className="sp-studio-product">
-            <Link href="/conta" className="sp-studio-brand" aria-label="Voltar para a conta">
+            <Link
+              href="/conta"
+              className="sp-studio-brand"
+              aria-label="Voltar para a conta"
+            >
               <span aria-hidden="true">↗</span>
               <strong>untrack</strong>
             </Link>
@@ -1178,7 +1174,9 @@ export function SmartPagesDashboard({
       <div className="dashboard-heading">
         <div>
           <span className="eyebrow">SEU LINK EM BIO</span>
-          <h1>{editId ? "Edite sua presença." : "Suas páginas, em um só lugar."}</h1>
+          <h1>
+            {editId ? "Edite sua presença." : "Suas páginas, em um só lugar."}
+          </h1>
           <p className="muted">
             Crie sua presença pública, organize seus links e acompanhe o que
             funciona.
@@ -1215,7 +1213,7 @@ export function SmartPagesDashboard({
                 Nome ou marca
                 <input required name="title" maxLength={120} />
               </SmartField>
-              <SmartField hint="Seu endereço público. Exemplo: ana-silva → /page/ana-silva. Não use espaços ou acentos.">
+              <SmartField hint="Seu endereço público. Exemplo: ana-silva → /ana-silva. Não use espaços ou acentos.">
                 Endereço da página
                 <input
                   required
@@ -1403,19 +1401,19 @@ export function SmartPagesDashboard({
                     <h2 ref={editorRef} tabIndex={-1}>
                       {selected.title}
                     </h2>
-                    <p className="sp-editor-url">untrack.app/page/{selected.slug}</p>
+                    <p className="sp-editor-url">untrack.app/{selected.slug}</p>
                     <p className="smart-page-save-status" role="status">
                       {action.busy
                         ? "Salvando…"
                         : autosaveState === "saving"
                           ? "Salvando…"
-                        : action.error
-                          ? "Erro ao salvar"
-                          : autosaveState === "error"
+                          : action.error
                             ? "Erro ao salvar"
-                          : hasUnsaved
-                            ? "Alterações pendentes"
-                            : "Salvo"}
+                            : autosaveState === "error"
+                              ? "Erro ao salvar"
+                              : hasUnsaved
+                                ? "Alterações pendentes"
+                                : "Salvo"}
                     </p>
                   </div>
                   <div className="action-row" hidden>
@@ -1683,7 +1681,10 @@ export function SmartPagesDashboard({
                         )}
                         {activeSocial && (
                           <div className="sp-social-input">
-                            <span className="sp-social-input-icon" aria-hidden="true">
+                            <span
+                              className="sp-social-input-icon"
+                              aria-hidden="true"
+                            >
                               <activeSocial.Icon />
                             </span>
                             <div className="sp-social-fields">
@@ -1759,9 +1760,13 @@ export function SmartPagesDashboard({
                                   onDragStart={() =>
                                     setDraggedSocialNetwork(social.network)
                                   }
-                                  onDragEnd={() => setDraggedSocialNetwork(null)}
+                                  onDragEnd={() =>
+                                    setDraggedSocialNetwork(null)
+                                  }
                                   onDragOver={(event) => event.preventDefault()}
-                                  onDrop={() => reorderSocialLinks(social.network)}
+                                  onDrop={() =>
+                                    reorderSocialLinks(social.network)
+                                  }
                                 >
                                   <span
                                     className="sp-social-drag-handle"
@@ -1784,7 +1789,8 @@ export function SmartPagesDashboard({
                           </ul>
                         ) : (
                           <p className="sp-social-empty">
-                            Adicione suas redes e um e-mail para abrir caminhos de contato.
+                            Adicione suas redes e um e-mail para abrir caminhos
+                            de contato.
                           </p>
                         )}
                       </section>
@@ -1795,7 +1801,10 @@ export function SmartPagesDashboard({
                       aria-labelledby="sp-tab-appearance"
                       hidden={editorSection !== "appearance"}
                     >
-                      <section className="sp-theme-studio" aria-label="Theme Studio">
+                      <section
+                        className="sp-theme-studio"
+                        aria-label="Theme Studio"
+                      >
                         <div
                           className="sp-theme-studio-tabs"
                           role="tablist"
@@ -1861,7 +1870,8 @@ export function SmartPagesDashboard({
                       <span>CONTEÚDO DA PÁGINA</span>
                       <h3 id="smart-page-content-heading">Monte sua página</h3>
                       <p className="muted">
-                        Arraste para reorganizar. Selecione um card para editar apenas o que precisar.
+                        Arraste para reorganizar. Selecione um card para editar
+                        apenas o que precisar.
                       </p>
                     </div>
                     <button
@@ -1956,7 +1966,9 @@ export function SmartPagesDashboard({
                         <SmartSelect
                           name="metricsPeriod"
                           value={String(metricsDays)}
-                          onValueChange={(value) => setMetricsDays(Number(value))}
+                          onValueChange={(value) =>
+                            setMetricsDays(Number(value))
+                          }
                           options={[
                             { value: "7", label: "Últimos 7 dias" },
                             { value: "30", label: "Últimos 30 dias" },
@@ -2073,113 +2085,111 @@ export function SmartPagesDashboard({
                     : "smart-page-preview-panel"
                 }
               >
-                  <div className="smart-page-preview-heading">
-                    <div>
-                      <span>PRÉVIA AO VIVO</span>
-                      <h2>Seu link em ação</h2>
-                    </div>
-                    <div className="smart-page-preview-actions">
-                      <a
-                        href={publicUrl(selected.slug)}
-                        target="_blank"
-                        rel="noreferrer"
-                        aria-label="Abrir prévia em nova aba"
-                        title="Abrir prévia em nova aba"
-                      >
-                        <HiOutlineEye aria-hidden="true" />
-                      </a>
-                      <CopyButton
-                        value={`${publicOrigin}${publicUrl(selected.slug)}`}
-                        label="Copiar endereço da página"
-                      >
-                        <HiOutlineShare aria-hidden="true" />
-                      </CopyButton>
-                    </div>
+                <div className="smart-page-preview-heading">
+                  <div>
+                    <span>PRÉVIA AO VIVO</span>
+                    <h2>Seu link em ação</h2>
                   </div>
-                  <div className="sp-preview-controls">
-                    <div
-                      className="sp-preview-device-toggle"
-                      role="group"
-                      aria-label="Dispositivo da prévia"
+                  <div className="smart-page-preview-actions">
+                    <a
+                      href={publicUrl(selected.slug)}
+                      target="_blank"
+                      rel="noreferrer"
+                      aria-label="Abrir prévia em nova aba"
+                      title="Abrir prévia em nova aba"
                     >
-                      <button
-                        type="button"
-                        aria-pressed={previewDevice === "phone"}
-                        aria-label="Visualizar em celular"
-                        title="Celular"
-                        onClick={() => setPreviewDevice("phone")}
-                      >
-                        <HiOutlineDevicePhoneMobile aria-hidden="true" />
-                      </button>
-                      <button
-                        type="button"
-                        aria-pressed={previewDevice === "desktop"}
-                        aria-label="Visualizar em desktop"
-                        title="Desktop"
-                        onClick={() => setPreviewDevice("desktop")}
-                      >
-                        <HiOutlineComputerDesktop aria-hidden="true" />
-                      </button>
-                    </div>
-                    <div className="sp-preview-zoom" aria-label="Zoom da prévia">
-                      <button
-                        type="button"
-                        aria-label="Diminuir zoom"
-                        title="Diminuir zoom"
-                        disabled={previewZoom <= 0.8}
-                        onClick={() =>
-                          setPreviewZoom((current) =>
-                            Math.max(0.8, Number((current - 0.1).toFixed(1))),
-                          )
-                        }
-                      >
-                        <HiOutlineMinus aria-hidden="true" />
-                      </button>
-                      <span>{Math.round(previewZoom * 100)}%</span>
-                      <button
-                        type="button"
-                        aria-label="Aumentar zoom"
-                        title="Aumentar zoom"
-                        disabled={previewZoom >= 1}
-                        onClick={() =>
-                          setPreviewZoom((current) =>
-                            Math.min(1, Number((current + 0.1).toFixed(1))),
-                          )
-                        }
-                      >
-                        <HiOutlinePlus aria-hidden="true" />
-                      </button>
-                    </div>
+                      <HiOutlineEye aria-hidden="true" />
+                    </a>
+                    <CopyButton
+                      value={`${publicOrigin}${publicUrl(selected.slug)}`}
+                      label="Copiar endereço da página"
+                    >
+                      <HiOutlineShare aria-hidden="true" />
+                    </CopyButton>
                   </div>
-                  <p className="muted">
-                    {dirty
-                      ? "A prévia acompanha suas alterações. Salve para publicar."
-                      : "Pronta para compartilhar com seu público."}
-                  </p>
+                </div>
+                <div className="sp-preview-controls">
                   <div
-                    className="smart-page-device"
-                    data-device={previewDevice}
-                    style={
-                      { "--sp-preview-zoom": previewZoom } as CSSProperties
-                    }
+                    className="sp-preview-device-toggle"
+                    role="group"
+                    aria-label="Dispositivo da prévia"
                   >
-                    <div className="smart-page-device-bar" aria-hidden="true">
-                      <i />
-                      <span />
-                      <b />
-                    </div>
-                    <SmartPagePreview
-                      page={{
-                        ...selected,
-                        ...profileDraft,
-                        blocks: [
-                          ...selected.blocks.map(
-                            (block) => blockDrafts[block.id] ?? block,
-                          ),
-                        ],
-                      }}
-                    />
+                    <button
+                      type="button"
+                      aria-pressed={previewDevice === "phone"}
+                      aria-label="Visualizar em celular"
+                      title="Celular"
+                      onClick={() => setPreviewDevice("phone")}
+                    >
+                      <HiOutlineDevicePhoneMobile aria-hidden="true" />
+                    </button>
+                    <button
+                      type="button"
+                      aria-pressed={previewDevice === "desktop"}
+                      aria-label="Visualizar em desktop"
+                      title="Desktop"
+                      onClick={() => setPreviewDevice("desktop")}
+                    >
+                      <HiOutlineComputerDesktop aria-hidden="true" />
+                    </button>
                   </div>
+                  <div className="sp-preview-zoom" aria-label="Zoom da prévia">
+                    <button
+                      type="button"
+                      aria-label="Diminuir zoom"
+                      title="Diminuir zoom"
+                      disabled={previewZoom <= 0.8}
+                      onClick={() =>
+                        setPreviewZoom((current) =>
+                          Math.max(0.8, Number((current - 0.1).toFixed(1))),
+                        )
+                      }
+                    >
+                      <HiOutlineMinus aria-hidden="true" />
+                    </button>
+                    <span>{Math.round(previewZoom * 100)}%</span>
+                    <button
+                      type="button"
+                      aria-label="Aumentar zoom"
+                      title="Aumentar zoom"
+                      disabled={previewZoom >= 1}
+                      onClick={() =>
+                        setPreviewZoom((current) =>
+                          Math.min(1, Number((current + 0.1).toFixed(1))),
+                        )
+                      }
+                    >
+                      <HiOutlinePlus aria-hidden="true" />
+                    </button>
+                  </div>
+                </div>
+                <p className="muted">
+                  {dirty
+                    ? "A prévia acompanha suas alterações. Salve para publicar."
+                    : "Pronta para compartilhar com seu público."}
+                </p>
+                <div
+                  className="smart-page-device"
+                  data-device={previewDevice}
+                  style={{ "--sp-preview-zoom": previewZoom } as CSSProperties}
+                >
+                  <div className="smart-page-device-bar" aria-hidden="true">
+                    <i />
+                    <span />
+                    <b />
+                  </div>
+                  <SmartPagePreview
+                    page={{
+                      ...selected,
+                      ...profileDraft,
+                      blocks: [
+                        ...selected.blocks.map(
+                          (block) => blockDrafts[block.id] ?? block,
+                        ),
+                      ],
+                    }}
+                  />
+                </div>
               </div>
             </>
           )}
