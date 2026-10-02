@@ -494,7 +494,15 @@ export async function smartPageMetrics(actor: Actor, id: string, days: number) {
   };
   const clickWhere = {
     smartPageId: page.id,
-    name: { in: ["smart_block_clicked", "link_in_bio_product_click"] },
+    name: {
+      in: [
+        "smart_block_clicked",
+        "link_in_bio_product_click",
+        "link_click",
+        "button_click",
+        "product_click",
+      ],
+    },
     day: { gte: start },
   };
   const db = getPrisma();

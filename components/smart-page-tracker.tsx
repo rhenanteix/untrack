@@ -1,40 +1,18 @@
 "use client";
 
 import { useEffect } from "react";
-
-const visitorKey = "arrume-meu-link:smart-page-session";
-
-function sessionVisitorId() {
-  try {
-    const saved = window.sessionStorage.getItem(visitorKey);
-    if (saved) return saved;
-    const id = crypto.randomUUID();
-    window.sessionStorage.setItem(visitorKey, id);
-    return id;
-  } catch {
-    return crypto.randomUUID();
-  }
-}
+import { analytics } from "@/lib/client/analytics";
 
 type SmartPageEvent =
   | "smart_page_view"
   | "smart_block_view"
   | "smart_block_clicked"
   | "link_in_bio_product_view"
-  | "link_in_bio_product_click";
+  | "link_in_bio_product_click"
+  | "social_click";
 
 function track(event: SmartPageEvent, slug: string, blockId?: string) {
-  return fetch("/api/smart-pages/events", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      event,
-      slug,
-      visitorId: sessionVisitorId(),
-      blockId,
-    }),
-    keepalive: true,
-  }).catch(() => undefined);
+  return analytics.trackSmartPage(event, slug, blockId);
 }
 
 export function SmartPageTracker({

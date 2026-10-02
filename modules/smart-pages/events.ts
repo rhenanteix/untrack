@@ -1,6 +1,8 @@
-import { createHash } from "node:crypto";
 import { getPrisma } from "@/lib/prisma";
-import { clickMetadata } from "@/modules/short-links/click-metadata";
+import {
+  recordAnalyticsEvent,
+  type RecordAnalyticsEventInput,
+} from "@/modules/analytics/service";
 
 export const publicSmartPageEventNames = [
   "smart_page_view",
@@ -8,29 +10,23 @@ export const publicSmartPageEventNames = [
   "smart_block_clicked",
   "link_in_bio_product_view",
   "link_in_bio_product_click",
+  "social_click",
 ] as const;
 
 export type PublicSmartPageEventName =
   (typeof publicSmartPageEventNames)[number];
 
-function visitorHash(visitorId: string) {
-  const secret = process.env.BETTER_AUTH_SECRET;
-  if (!secret) throw new Error("BETTER_AUTH_SECRET não está configurado.");
-  return createHash("sha256").update(`${secret}:${visitorId}`).digest("hex");
-}
-
 export async function recordPublicSmartPageEvent(
   input: {
     event: PublicSmartPageEventName;
+    eventId?: string;
     slug: string;
-    visitorId: string;
+    visitorId?: string;
+    sessionId?: string;
     blockId?: string;
   },
   headers: Headers,
 ) {
-  const visit = clickMetadata(headers);
-  if (!visit) return false;
-
   const db = getPrisma();
   const page = await db.smartPage.findFirst({
     where: { slug: input.slug, status: "published" },
@@ -38,12 +34,16 @@ export async function recordPublicSmartPageEvent(
   });
   if (!page) return false;
 
-  const isBlockEvent = input.event !== "smart_page_view";
+  const isBlockEvent = input.event !== "smart_page_view" && input.event !== "social_click";
   const isProductEvent = input.event.startsWith("link_in_bio_product_");
-  let blockId: string | null = null;
+  let block: {
+    id: string;
+    type: string;
+    link: { campaignId: string | null } | null;
+  } | null = null;
   if (isBlockEvent) {
     if (!input.blockId) return false;
-    const block = await db.smartPageBlock.findFirst({
+    block = await db.smartPageBlock.findFirst({
       where: {
         id: input.blockId,
         smartPageId: page.id,
@@ -51,39 +51,40 @@ export async function recordPublicSmartPageEvent(
         analyticsEnabled: true,
         ...(isProductEvent ? { type: "product" } : {}),
       },
-      select: { id: true },
+      select: { id: true, type: true, link: { select: { campaignId: true } } },
     });
     if (!block) return false;
-    blockId = block.id;
   }
-
-  const eventData = {
-    metadata: { path: `/${input.slug}` },
-    workspaceId: page.workspaceId,
-    smartPageId: page.id,
-    smartPageBlockId: blockId,
-    day: visit.day,
-    visitorHash: visitorHash(input.visitorId),
-    referrer: visit.referrer,
-    device: visit.device,
-  };
-  const firstEvent =
+  const name: RecordAnalyticsEventInput["name"] =
     input.event === "smart_page_view"
-      ? "first_page_view"
-      : input.event === "smart_block_clicked" ||
-          input.event === "link_in_bio_product_click"
-        ? "first_click"
-        : null;
-  await db.$transaction(async (tx) => {
-    if (firstEvent)
-      await tx.$queryRaw`SELECT "id" FROM "Workspace" WHERE "id" = ${page.workspaceId} FOR UPDATE`;
-    await tx.analyticsEvent.create({ data: { name: input.event, ...eventData } });
-    if (!firstEvent) return;
-    const priorEvents = await tx.analyticsEvent.count({
-      where: { workspaceId: page.workspaceId, name: firstEvent },
-    });
-    if (!priorEvents)
-      await tx.analyticsEvent.create({ data: { name: firstEvent, ...eventData } });
+      ? "smart_page_view"
+      : input.event === "link_in_bio_product_view"
+        ? "product_view"
+        : input.event === "link_in_bio_product_click"
+          ? "product_click"
+          : input.event === "smart_block_clicked"
+            ? block?.type === "link"
+              ? "link_click"
+              : "button_click"
+            : input.event === "social_click"
+              ? "social_click"
+              : "block_view";
+  const result = await recordAnalyticsEvent({
+    name,
+    eventId: input.eventId,
+    workspaceId: page.workspaceId,
+    visitorKey: input.visitorId,
+    sessionKey: input.sessionId,
+    assetType: "smart_page",
+    assetId: page.id,
+    elementType: block ? "block" : input.event === "social_click" ? "social" : undefined,
+    elementId: block?.id ?? (input.event === "social_click" ? input.blockId : undefined),
+    campaignId: block?.link?.campaignId ?? undefined,
+    smartPageId: page.id,
+    smartPageBlockId: block?.id,
+    path: `/${input.slug}`,
+    origin: "client",
+    headers,
   });
-  return true;
+  return result.recorded || result.duplicate;
 }

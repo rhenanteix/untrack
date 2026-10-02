@@ -1,3 +1,5 @@
+"use client";
+
 import type { CSSProperties } from "react";
 import type { IconType } from "react-icons";
 import {
@@ -12,6 +14,7 @@ import {
   FaYoutube,
 } from "react-icons/fa6";
 import type { SmartPageTheme } from "@/modules/smart-pages/themes";
+import { analytics } from "@/lib/client/analytics";
 import styles from "./themes.module.css";
 
 export type SmartPageSocialNetwork =
@@ -47,10 +50,12 @@ export function PageSocialLinks({
   links,
   theme,
   label = "Redes sociais",
+  slug,
 }: {
   links: SmartPageSocialLink[];
   theme: SmartPageTheme;
   label?: string;
+  slug?: string;
 }) {
   const style = theme.socialStyle ?? "icons";
   const color = theme.socialColor ?? "auto";
@@ -87,6 +92,9 @@ export function PageSocialLinks({
             }
             title={style === "icons" ? network.label : undefined}
             data-network={link.network}
+            onClick={() => {
+              if (slug) void analytics.trackSmartPage("social_click", slug, link.network);
+            }}
           >
             {style !== "text" && <Icon aria-hidden="true" />}
             {style !== "icons" && <span>{displayLabel}</span>}

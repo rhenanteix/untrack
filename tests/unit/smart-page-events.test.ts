@@ -1,14 +1,23 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { getPrisma } from "@/lib/prisma";
+import { recordAnalyticsEvent } from "@/modules/analytics/service";
 import { recordPublicSmartPageEvent } from "@/modules/smart-pages/events";
 
 vi.mock("@/lib/prisma", () => ({ getPrisma: vi.fn() }));
+vi.mock("@/modules/analytics/service", () => ({
+  recordAnalyticsEvent: vi.fn(),
+}));
 
 beforeEach(() => {
   vi.stubEnv(
     "BETTER_AUTH_SECRET",
     "test-secret-with-enough-entropy-for-hashing",
   );
+  vi.mocked(recordAnalyticsEvent).mockResolvedValue({
+    eventId: "event_1",
+    recorded: true,
+    duplicate: false,
+  });
 });
 
 afterEach(() => {
@@ -17,22 +26,13 @@ afterEach(() => {
 });
 
 describe("smart page analytics events", () => {
-  it("records a page view with a hashed session and privacy-safe metadata", async () => {
-    const create = vi.fn().mockResolvedValue({});
-    const transaction = vi.fn(async (work) =>
-      work({
-        $queryRaw: vi.fn(),
-        analyticsEvent: { create, count: vi.fn().mockResolvedValue(1) },
-      }),
-    );
+  it("routes a page view to the universal collector with its trusted asset", async () => {
     vi.mocked(getPrisma).mockReturnValue({
       smartPage: {
         findFirst: vi
           .fn()
           .mockResolvedValue({ id: "page_1", workspaceId: "workspace_1" }),
       },
-      analyticsEvent: { create },
-      $transaction: transaction,
     } as unknown as ReturnType<typeof getPrisma>);
 
     await expect(
@@ -49,48 +49,41 @@ describe("smart page analytics events", () => {
       ),
     ).resolves.toBe(true);
 
-    expect(create).toHaveBeenCalledWith({
-      data: expect.objectContaining({
+    expect(recordAnalyticsEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
         name: "smart_page_view",
-        metadata: { path: "/minha-pagina" },
         workspaceId: "workspace_1",
+        assetType: "smart_page",
+        assetId: "page_1",
         smartPageId: "page_1",
-        smartPageBlockId: null,
-        referrer: "social.example",
-        device: "Celular",
-        visitorHash: expect.stringMatching(/^[a-f0-9]{64}$/),
       }),
-    });
+    );
   });
 
-  it("ignores preview bots before querying the page", async () => {
-    const findFirst = vi.fn();
+  it("records preview bots so standard analytics can exclude them", async () => {
+    const findFirst = vi
+      .fn()
+      .mockResolvedValue({ id: "page_1", workspaceId: "workspace_1" });
     vi.mocked(getPrisma).mockReturnValue({
       smartPage: { findFirst },
     } as unknown as ReturnType<typeof getPrisma>);
 
     await expect(
       recordPublicSmartPageEvent(
-        {
-          event: "smart_page_view",
-          slug: "minha-pagina",
-          visitorId: "d75f415d-9dbd-4a68-b6c2-975f32ed5b4c",
-        },
+        { event: "smart_page_view", slug: "minha-pagina" },
         new Headers({ "user-agent": "Slackbot" }),
       ),
-    ).resolves.toBe(false);
-    expect(findFirst).not.toHaveBeenCalled();
+    ).resolves.toBe(true);
+    expect(findFirst).toHaveBeenCalledOnce();
+    expect(recordAnalyticsEvent).toHaveBeenCalledWith(
+      expect.objectContaining({ headers: expect.any(Headers) }),
+    );
   });
 
   it("records product events only for product blocks on the published page", async () => {
-    const create = vi.fn().mockResolvedValue({});
-    const findFirst = vi.fn().mockResolvedValue({ id: "block_1" });
-    const transaction = vi.fn(async (work) =>
-      work({
-        $queryRaw: vi.fn(),
-        analyticsEvent: { create, count: vi.fn().mockResolvedValue(1) },
-      }),
-    );
+    const findFirst = vi
+      .fn()
+      .mockResolvedValue({ id: "block_1", type: "product", link: null });
     vi.mocked(getPrisma).mockReturnValue({
       smartPage: {
         findFirst: vi
@@ -98,8 +91,6 @@ describe("smart page analytics events", () => {
           .mockResolvedValue({ id: "page_1", workspaceId: "workspace_1" }),
       },
       smartPageBlock: { findFirst },
-      analyticsEvent: { create },
-      $transaction: transaction,
     } as unknown as ReturnType<typeof getPrisma>);
 
     await expect(
@@ -120,10 +111,13 @@ describe("smart page analytics events", () => {
         smartPageId: "page_1",
         type: "product",
       }),
-      select: { id: true },
+      select: { id: true, type: true, link: { select: { campaignId: true } } },
     });
-    expect(create).toHaveBeenCalledWith({
-      data: expect.objectContaining({ name: "link_in_bio_product_click" }),
-    });
+    expect(recordAnalyticsEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        name: "product_click",
+        elementId: "block_1",
+      }),
+    );
   });
 });

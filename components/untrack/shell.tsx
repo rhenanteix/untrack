@@ -72,7 +72,7 @@ const groups: NavigationGroup[] = [
   {
     label: "Inteligência",
     items: [
-      { href: "/conta#desempenho", label: "Analytics", icon: FiBarChart2 },
+      { href: "/untrack/analytics", label: "Analytics", icon: FiBarChart2 },
       { href: "/untrack/audience", label: "Audience", icon: FiUsers },
       { href: "/untrack/link-health", label: "Monitoring", icon: FiActivity },
       { href: "/conta#insights", label: "Insights", icon: FiActivity },

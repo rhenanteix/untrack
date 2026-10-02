@@ -6,7 +6,40 @@ import { appUrl } from "@/lib/app-url";
 import { clickMetadata } from "@/modules/short-links/click-metadata";
 import { publicLink } from "@/lib/short-links";
 import { track } from "@/lib/analytics";
+import { extractUtmAttribution } from "@/modules/analytics/attribution";
+import { recordAnalyticsEvent } from "@/modules/analytics/service";
 import { cachedDestination } from "./cache";
+
+async function recordRedirectAnalytics(
+  request: Request,
+  link: ShortLink,
+  distribution: "digital" | "qr" | "whatsapp",
+) {
+  const qr =
+    distribution === "qr"
+      ? await getPrisma().qrAsset.findFirst({
+          where: { redirectId: link.id, workspaceId: link.workspaceId },
+          select: { id: true },
+        })
+      : null;
+  await recordAnalyticsEvent({
+    name:
+      distribution === "qr"
+        ? "qr_scan"
+        : distribution === "whatsapp"
+          ? "whatsapp_click"
+          : "link_click",
+    workspaceId: link.workspaceId,
+    assetType: qr ? "qr_code" : "link",
+    assetId: qr?.id ?? link.id,
+    campaignId: link.campaignId ?? undefined,
+    path: new URL(request.url).pathname,
+    destinationUrl: link.destinationUrl,
+    attribution: extractUtmAttribution(request.url),
+    origin: "server",
+    headers: request.headers,
+  });
+}
 
 export async function drainClickOutbox() {
   return getPrisma().$transaction(async (tx) => {
@@ -46,6 +79,12 @@ export async function redirectResponse(request: Request, slug: string, distribut
     }
   } else link = await publicLink(slug, hostname, distribution);
   if (!link) return new Response(unavailableMessage, { status: 404, headers: { "Cache-Control": "no-store" } });
+  if (countClick)
+    after(() =>
+      recordRedirectAnalytics(request, link, distribution).catch((error) =>
+        console.error("Redirect analytics event was not recorded", error),
+      ),
+    );
   if (distribution === "whatsapp" && countClick)
     after(async () => {
       await Promise.all([

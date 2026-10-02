@@ -1208,6 +1208,213 @@
   margin: 0;
   text-align: right;
 }
+.analytics-heading {
+  align-items: end;
+}
+.analytics-filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 10px;
+  margin-bottom: 24px;
+}
+.analytics-period {
+  display: inline-flex;
+  min-height: 40px;
+  padding: 3px;
+  border: 1px solid var(--ws-line);
+  border-radius: 8px;
+  background: var(--ws-panel);
+}
+.analytics-period button {
+  border: 0;
+  border-radius: 5px;
+  padding: 0 11px;
+  background: transparent;
+  color: var(--ws-muted);
+  cursor: pointer;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 750;
+}
+.analytics-period button[aria-pressed="true"] {
+  background: var(--ws-accent-soft);
+  color: var(--ws-green);
+}
+.analytics-custom-dates,
+.analytics-asset-filter,
+.analytics-metric {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--ws-muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+.analytics-custom-dates label {
+  display: grid;
+  gap: 4px;
+}
+.analytics-custom-dates input,
+.analytics-asset-filter select,
+.analytics-metric select,
+.analytics-goal-form input,
+.analytics-goal-form select {
+  min-height: 40px;
+  border: 1px solid var(--ws-line);
+  border-radius: 6px;
+  padding: 8px 10px;
+  background: #fff;
+  color: var(--ws-ink);
+  font: inherit;
+}
+.analytics-kpis {
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  margin-bottom: 18px;
+}
+.analytics-kpis > div {
+  min-height: 120px;
+}
+.analytics-performance {
+  margin-bottom: 18px;
+}
+.analytics-table-panel {
+  min-width: 0;
+}
+.analytics-table-wrap {
+  overflow-x: auto;
+}
+.analytics-table {
+  width: 100%;
+  min-width: 560px;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+.analytics-table th,
+.analytics-table td {
+  padding: 11px 10px;
+  border-bottom: 1px solid #edf0eb;
+  text-align: left;
+  vertical-align: top;
+}
+.analytics-table th {
+  color: var(--ws-muted);
+  font-size: 10px;
+  font-weight: 800;
+}
+.analytics-table td:not(:first-child),
+.analytics-table th:not(:first-child) {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.analytics-table small,
+.analytics-asset-type {
+  display: block;
+  margin-top: 2px;
+  color: var(--ws-muted);
+  font-size: 10px;
+}
+.analytics-asset-type {
+  margin: 0;
+  color: var(--ws-green);
+  font-weight: 800;
+  text-transform: capitalize;
+}
+.analytics-muted {
+  color: var(--ws-muted);
+  font-size: 13px;
+}
+.analytics-technology {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+}
+.analytics-list h3 {
+  margin: 0 0 8px;
+  font-size: 12px;
+}
+.analytics-list ul,
+.analytics-location-list,
+.analytics-journeys {
+  display: grid;
+  gap: 0;
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+.analytics-list li,
+.analytics-location-list li,
+.analytics-journeys li {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 9px 0;
+  border-bottom: 1px solid #edf0eb;
+  font-size: 12px;
+}
+.analytics-list li strong,
+.analytics-location-list strong,
+.analytics-journeys strong {
+  flex: 0 0 auto;
+  font-variant-numeric: tabular-nums;
+}
+.analytics-time-panel {
+  margin: 18px 0;
+}
+.analytics-heatmap {
+  display: grid;
+  grid-template-columns: repeat(24, minmax(8px, 1fr));
+  gap: 3px;
+}
+.analytics-heatmap span {
+  display: block;
+  aspect-ratio: 1;
+  min-height: 10px;
+  border-radius: 2px;
+  background: var(--ws-green);
+}
+.analytics-heatmap-labels {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  margin-top: 7px;
+  color: var(--ws-muted);
+  font-size: 10px;
+}
+.analytics-goal-form {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 13px;
+  margin-bottom: 18px;
+}
+.analytics-goal-form label {
+  display: grid;
+  gap: 6px;
+  color: var(--ws-muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+.analytics-icon-button {
+  display: inline-grid;
+  width: 30px;
+  height: 30px;
+  place-items: center;
+  border: 1px solid var(--ws-line);
+  border-radius: 5px;
+  background: #fff;
+  color: #a83a37;
+  cursor: pointer;
+  font: inherit;
+  font-size: 18px;
+}
+@media (max-width: 900px) {
+  .analytics-kpis {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .analytics-technology,
+  .analytics-goal-form {
+    grid-template-columns: 1fr;
+  }
+}
 .workspace-checklist li {
   display: grid;
   grid-template-columns: 24px minmax(0, 1fr) auto;

@@ -1,6 +1,8 @@
-import { createHash } from "node:crypto";
 import { getPrisma } from "@/lib/prisma";
-import { clickMetadata } from "@/modules/short-links/click-metadata";
+import {
+  recordAnalyticsEvent,
+  type RecordAnalyticsEventInput,
+} from "@/modules/analytics/service";
 import type { z } from "zod";
 import { smartCardEventSchema } from "./schemas";
 
@@ -16,53 +18,64 @@ export const publicSmartCardEventNames = [
   "booking_click",
 ] as const;
 
-function visitorHash(visitorId: string) {
-  const secret = process.env.BETTER_AUTH_SECRET;
-  if (!secret) throw new Error("BETTER_AUTH_SECRET não está configurado.");
-  return createHash("sha256").update(`${secret}:${visitorId}`).digest("hex");
-}
-
 export async function recordPublicSmartCardEvent(
   input: z.infer<typeof smartCardEventSchema>,
   headers: Headers,
 ) {
-  const visit = clickMetadata(headers);
-  if (!visit) return false;
-
   const db = getPrisma();
   const card = await db.smartCard.findFirst({
     where: { slug: input.slug, status: "published" },
-    select: { id: true, workspaceId: true },
+    select: { id: true, workspaceId: true, campaignId: true },
   });
   if (!card) return false;
 
-  let actionId: string | null = null;
+  let action: { id: string; type: string } | null = null;
   if (input.actionId) {
-    const action = await db.smartCardAction.findFirst({
+    action = await db.smartCardAction.findFirst({
       where: {
         id: input.actionId,
         smartCardId: card.id,
         visible: true,
         analyticsEnabled: true,
       },
-      select: { id: true },
+      select: { id: true, type: true },
     });
     if (!action) return false;
-    actionId = action.id;
   }
-
-  await db.analyticsEvent.create({
-    data: {
-      name: input.event,
-      metadata: { path: `/c/${input.slug}`, source: input.source },
-      workspaceId: card.workspaceId,
-      smartCardId: card.id,
-      smartCardActionId: actionId,
-      day: visit.day,
-      visitorHash: visitorHash(input.visitorId),
-      referrer: visit.referrer,
-      device: visit.device,
-    },
+  const name: RecordAnalyticsEventInput["name"] =
+    input.event === "card_view" || input.event === "nfc_open"
+      ? "smart_card_view"
+      : input.event === "card_share"
+        ? "share_details_open"
+        : input.event === "qr_scan"
+          ? "qr_scan"
+          : input.event === "contact_save"
+            ? "save_contact_click"
+            : input.event === "contact_form_open"
+              ? "form_view"
+              : input.event === "whatsapp_click"
+                ? "whatsapp_click"
+                : input.event === "booking_click"
+                  ? "button_click"
+                  : action?.type === "website"
+                    ? "website_click"
+                    : "link_click";
+  const result = await recordAnalyticsEvent({
+    name,
+    eventId: input.eventId,
+    workspaceId: card.workspaceId,
+    visitorKey: input.visitorId,
+    sessionKey: input.sessionId,
+    assetType: "smart_card",
+    assetId: card.id,
+    elementType: action ? "action" : undefined,
+    elementId: action?.id,
+    campaignId: card.campaignId ?? undefined,
+    smartCardId: card.id,
+    smartCardActionId: action?.id,
+    path: `/c/${input.slug}`,
+    origin: "client",
+    headers,
   });
   if (input.contactId) {
     const exchange = await db.smartCardContactExchange.findFirst({
@@ -87,12 +100,12 @@ export async function recordPublicSmartCardEvent(
           name: timelineName,
           metadata: {
             smartCardId: card.id,
-            actionId,
+            actionId: action?.id ?? null,
             source: input.source,
           },
         },
       });
     }
   }
-  return true;
+  return result.recorded || result.duplicate;
 }

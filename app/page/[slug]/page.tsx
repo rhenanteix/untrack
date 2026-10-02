@@ -371,6 +371,7 @@ export default async function PublicSmartPage({
               links={socialLinks}
               theme={theme}
               label={`Redes de ${page.title}`}
+              slug={page.slug}
             />
           ) : undefined
         }

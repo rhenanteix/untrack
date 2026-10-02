@@ -13,6 +13,7 @@ export function PageViewTracker() {
     if (lastPath.current !== pathname) {
       lastPath.current = pathname;
       analytics.track("page_view");
+      void analytics.trackPublicEvent("page_view", { path: pathname });
     }
   }, [pathname]);
 

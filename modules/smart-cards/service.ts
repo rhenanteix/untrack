@@ -3,6 +3,7 @@ import { ApiError } from "@/lib/api-response";
 import { appUrl } from "@/lib/app-url";
 import { track } from "@/lib/analytics";
 import { getPrisma } from "@/lib/prisma";
+import { recordAnalyticsEvent } from "@/modules/analytics/service";
 import { PAGE_SIZE } from "@/lib/pagination";
 import { createQrAsset } from "@/modules/untrack-qr/service";
 import { renderVerifiedQr } from "@/modules/untrack-qr/render";
@@ -449,14 +450,44 @@ export async function captureSmartCardContact(
     },
     headers,
   );
-  await getPrisma().analyticsEvent.create({
-    data: {
-      name: "contact_submit",
-      metadata: { path: `/c/${slug}`, source: input.source },
+  await Promise.all([
+    recordAnalyticsEvent({
+      name: "form_submit",
       workspaceId: card.workspaceId,
+      visitorKey: input.visitorId,
+      assetType: "smart_card",
+      assetId: card.id,
+      campaignId: card.campaignId ?? undefined,
       smartCardId: card.id,
-    },
-  });
+      path: `/c/${slug}`,
+      origin: "server",
+      headers,
+    }),
+    recordAnalyticsEvent({
+      name: "lead_created",
+      workspaceId: card.workspaceId,
+      visitorKey: input.visitorId,
+      assetType: "smart_card",
+      assetId: card.id,
+      campaignId: card.campaignId ?? undefined,
+      smartCardId: card.id,
+      path: `/c/${slug}`,
+      origin: "server",
+      headers,
+    }),
+    recordAnalyticsEvent({
+      name: "share_details_submit",
+      workspaceId: card.workspaceId,
+      visitorKey: input.visitorId,
+      assetType: "smart_card",
+      assetId: card.id,
+      campaignId: card.campaignId ?? undefined,
+      smartCardId: card.id,
+      path: `/c/${slug}`,
+      origin: "server",
+      headers,
+    }),
+  ]);
   return { contact, consentText: contactConsentText(card) };
 }
 
@@ -473,13 +504,21 @@ export async function smartCardMetrics(actor: Actor, id: string, days: number) {
   const db = getPrisma();
   const viewWhere = {
     smartCardId: card.id,
-    name: "card_view",
+    name: { in: ["card_view", "smart_card_view"] },
     day: { gte: start },
   };
   const interactionWhere = {
     smartCardId: card.id,
     name: {
-      in: ["link_click", "whatsapp_click", "booking_click", "contact_save"],
+      in: [
+        "link_click",
+        "whatsapp_click",
+        "booking_click",
+        "contact_save",
+        "website_click",
+        "button_click",
+        "save_contact_click",
+      ],
     },
     day: { gte: start },
   };

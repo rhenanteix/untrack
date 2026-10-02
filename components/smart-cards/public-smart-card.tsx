@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { analytics } from "@/lib/client/analytics";
 import styles from "./public-smart-card.module.css";
 
 type CardAction = {
@@ -49,20 +50,6 @@ type ContactForm = {
   primaryCta: "save_contact" | "share_contact" | "first_action";
 };
 
-const visitorKey = "untrack:smart-card-session";
-
-function visitorId() {
-  try {
-    const current = window.sessionStorage.getItem(visitorKey);
-    if (current) return current;
-    const created = crypto.randomUUID();
-    window.sessionStorage.setItem(visitorKey, created);
-    return created;
-  } catch {
-    return crypto.randomUUID();
-  }
-}
-
 function contactKey(slug: string) {
   return `untrack:smart-card-contact:${slug}`;
 }
@@ -110,19 +97,13 @@ function track(
   source: string,
   actionId?: string,
 ) {
-  return fetch("/api/smart-cards/events", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      event,
-      slug,
-      visitorId: visitorId(),
-      actionId,
-      contactId: savedContactId(slug),
-      source,
-    }),
-    keepalive: true,
-  }).catch(() => undefined);
+  return analytics.trackSmartCard(
+    event,
+    slug,
+    source,
+    actionId,
+    savedContactId(slug),
+  );
 }
 
 export function PublicSmartCard({
@@ -164,7 +145,6 @@ export function PublicSmartCard({
   useEffect(() => {
     void track("card_view", card.slug, source);
     if (source === "qr") void track("qr_scan", card.slug, source);
-    if (source === "nfc") void track("nfc_open", card.slug, source);
   }, [card.slug, source]);
 
   function openContactForm() {
@@ -210,7 +190,7 @@ export function PublicSmartCard({
               ? String(formData.get("intent") ?? "")
               : undefined,
             source,
-            visitorId: visitorId(),
+            visitorId: analytics.identity().visitorId ?? crypto.randomUUID(),
             consent: true,
           }),
         },

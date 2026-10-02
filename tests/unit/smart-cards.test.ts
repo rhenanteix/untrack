@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { getPrisma } from "@/lib/prisma";
+import { recordAnalyticsEvent } from "@/modules/analytics/service";
 import { recordPublicSmartCardEvent } from "@/modules/smart-cards/events";
 import {
   smartCardContactFormSchema,
@@ -8,12 +9,20 @@ import {
 } from "@/modules/smart-cards/schemas";
 
 vi.mock("@/lib/prisma", () => ({ getPrisma: vi.fn() }));
+vi.mock("@/modules/analytics/service", () => ({
+  recordAnalyticsEvent: vi.fn(),
+}));
 
 beforeEach(() => {
   vi.stubEnv(
     "BETTER_AUTH_SECRET",
     "test-secret-with-enough-entropy-for-hashing",
   );
+  vi.mocked(recordAnalyticsEvent).mockResolvedValue({
+    eventId: "event_1",
+    recorded: true,
+    duplicate: false,
+  });
 });
 
 afterEach(() => {
@@ -83,18 +92,23 @@ describe("Smart Card schemas", () => {
 });
 
 describe("Smart Card public analytics", () => {
-  it("records a privacy-safe event with the card and action context", async () => {
-    const create = vi.fn().mockResolvedValue({});
+  it("routes an action through the universal collector with card context", async () => {
     vi.mocked(getPrisma).mockReturnValue({
       smartCard: {
         findFirst: vi
           .fn()
-          .mockResolvedValue({ id: "card_1", workspaceId: "workspace_1" }),
+          .mockResolvedValue({
+            id: "card_1",
+            workspaceId: "workspace_1",
+            campaignId: null,
+          }),
       },
       smartCardAction: {
-        findFirst: vi.fn().mockResolvedValue({ id: "action_1" }),
+        findFirst: vi.fn().mockResolvedValue({
+          id: "action_1",
+          type: "whatsapp",
+        }),
       },
-      analyticsEvent: { create },
     } as unknown as ReturnType<typeof getPrisma>);
 
     await expect(
@@ -113,40 +127,40 @@ describe("Smart Card public analytics", () => {
       ),
     ).resolves.toBe(true);
 
-    expect(create).toHaveBeenCalledWith({
-      data: expect.objectContaining({
+    expect(recordAnalyticsEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
         name: "whatsapp_click",
-        metadata: { path: "/c/ana-silva", source: "qr" },
         workspaceId: "workspace_1",
+        assetType: "smart_card",
+        assetId: "card_1",
         smartCardId: "card_1",
         smartCardActionId: "action_1",
-        referrer: "evento.example",
-        device: "Celular",
-        visitorHash: expect.stringMatching(/^[a-f0-9]{64}$/),
+        elementId: "action_1",
       }),
-    });
-    expect(JSON.stringify(create.mock.calls[0][0])).not.toContain(
-      "d75f415d-9dbd-4a68-b6c2-975f32ed5b4c",
     );
   });
 
-  it("ignores preview bots before querying a card", async () => {
-    const findFirst = vi.fn();
+  it("sends preview bots to the collector for marked exclusion", async () => {
+    const findFirst = vi
+      .fn()
+      .mockResolvedValue({
+        id: "card_1",
+        workspaceId: "workspace_1",
+        campaignId: null,
+      });
     vi.mocked(getPrisma).mockReturnValue({
       smartCard: { findFirst },
     } as unknown as ReturnType<typeof getPrisma>);
 
     await expect(
       recordPublicSmartCardEvent(
-        {
-          event: "card_view",
-          slug: "ana-silva",
-          visitorId: "d75f415d-9dbd-4a68-b6c2-975f32ed5b4c",
-          source: "direct",
-        },
+        { event: "card_view", slug: "ana-silva", source: "direct" },
         new Headers({ "user-agent": "Slackbot" }),
       ),
-    ).resolves.toBe(false);
-    expect(findFirst).not.toHaveBeenCalled();
+    ).resolves.toBe(true);
+    expect(findFirst).toHaveBeenCalledOnce();
+    expect(recordAnalyticsEvent).toHaveBeenCalledWith(
+      expect.objectContaining({ headers: expect.any(Headers) }),
+    );
   });
 });

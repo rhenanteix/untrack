@@ -4,6 +4,7 @@ import {
   ANALYTICS_PATHS,
   type AnalyticsEventName,
 } from "../analytics-events";
+import type { UniversalEventName } from "@/modules/analytics/event-types";
 
 export type { AnalyticsEventName };
 
@@ -13,6 +14,76 @@ export type AnalyticsContext = Partial<{
   source: string;
   location: string;
 }>;
+
+type PublicIdentity = {
+  visitorId?: string;
+  sessionId?: string;
+};
+
+type SmartPageEvent =
+  | "smart_page_view"
+  | "smart_block_view"
+  | "smart_block_clicked"
+  | "link_in_bio_product_view"
+  | "link_in_bio_product_click"
+  | "social_click";
+
+type SmartCardEvent =
+  | "card_view"
+  | "card_share"
+  | "qr_scan"
+  | "nfc_open"
+  | "contact_save"
+  | "contact_form_open"
+  | "link_click"
+  | "whatsapp_click"
+  | "booking_click";
+
+const visitorStorageKey = "linkor:analytics:visitor";
+const sessionStorageKey = "linkor:analytics:session";
+
+function publicIdentity(): PublicIdentity {
+  if (typeof window === "undefined") return {};
+  const navigatorWithPrivacy = navigator as Navigator & {
+    globalPrivacyControl?: boolean;
+  };
+  if (
+    navigatorWithPrivacy.globalPrivacyControl ||
+    navigator.doNotTrack === "1"
+  )
+    return {};
+  try {
+    const visitorId =
+      window.localStorage.getItem(visitorStorageKey) ?? crypto.randomUUID();
+    const sessionId =
+      window.sessionStorage.getItem(sessionStorageKey) ?? crypto.randomUUID();
+    window.localStorage.setItem(visitorStorageKey, visitorId);
+    window.sessionStorage.setItem(sessionStorageKey, sessionId);
+    return { visitorId, sessionId };
+  } catch {
+    return {};
+  }
+}
+
+function utmContext() {
+  const search = new URLSearchParams(window.location.search);
+  return {
+    utmSource: search.get("utm_source") ?? undefined,
+    utmMedium: search.get("utm_medium") ?? undefined,
+    utmCampaign: search.get("utm_campaign") ?? undefined,
+    utmContent: search.get("utm_content") ?? undefined,
+    utmTerm: search.get("utm_term") ?? undefined,
+  };
+}
+
+function post(path: string, body: Record<string, unknown>) {
+  return fetch(path, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+    keepalive: true,
+  }).catch(() => undefined);
+}
 
 /**
  * First-party analytics: only event names and known page paths leave the browser.
@@ -37,6 +108,52 @@ export const analytics = {
       keepalive: true,
     }).catch(() => {
       // Analytics failure must not interrupt any tool.
+    });
+  },
+
+  identity: publicIdentity,
+
+  trackPublicEvent(
+    event: UniversalEventName,
+    context: { path?: string } = {},
+  ) {
+    if (typeof window === "undefined") return Promise.resolve(undefined);
+    return post("/api/events", {
+      event,
+      eventId: crypto.randomUUID(),
+      path: context.path ?? window.location.pathname,
+      ...publicIdentity(),
+      ...utmContext(),
+    });
+  },
+
+  trackSmartPage(event: SmartPageEvent, slug: string, blockId?: string) {
+    if (typeof window === "undefined") return Promise.resolve(undefined);
+    return post("/api/smart-pages/events", {
+      event,
+      eventId: crypto.randomUUID(),
+      slug,
+      blockId,
+      ...publicIdentity(),
+    });
+  },
+
+  trackSmartCard(
+    event: SmartCardEvent,
+    slug: string,
+    source: string,
+    actionId?: string,
+    contactId?: string,
+  ) {
+    if (typeof window === "undefined") return Promise.resolve(undefined);
+    return post("/api/smart-cards/events", {
+      event,
+      eventId: crypto.randomUUID(),
+      slug,
+      source,
+      actionId,
+      contactId,
+      ...publicIdentity(),
     });
   },
 };
