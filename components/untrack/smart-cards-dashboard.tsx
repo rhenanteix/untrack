@@ -3,7 +3,14 @@
 /* eslint-disable @next/next/no-img-element */
 
 import Link from "next/link";
-import { useState, type DragEvent, type FormEvent } from "react";
+import {
+  useEffect,
+  useEffectEvent,
+  useRef,
+  useState,
+  type DragEvent,
+  type FormEvent,
+} from "react";
 import {
   FiArrowDown,
   FiArrowUp,
@@ -11,9 +18,12 @@ import {
   FiDownload,
   FiEye,
   FiGrid,
+  FiMail,
+  FiMoreHorizontal,
   FiPlus,
   FiShare2,
   FiTrash2,
+  FiX,
 } from "react-icons/fi";
 import { apiRequest } from "./shared";
 import styles from "./smart-cards-dashboard.module.css";
@@ -47,6 +57,12 @@ type ContactField = {
 
 type ContactForm = {
   fields: ContactField[];
+  publicDetails: {
+    phone: boolean;
+    whatsapp: boolean;
+    email: boolean;
+    website: boolean;
+  };
   intent: { enabled: boolean; label: string; options: string[] };
   primaryCta: "save_contact" | "share_contact" | "first_action";
 };
@@ -101,8 +117,22 @@ type Metrics = {
   trafficSources: { name: string; views: number }[];
 };
 
-type Tab = "content" | "appearance" | "capture" | "sharing" | "analytics";
+type Tab =
+  "profile" | "content" | "appearance" | "capture" | "sharing" | "analytics";
 type Filter = "all" | "mine" | "team" | "active" | "archived";
+type SaveStatus = "saved" | "saving" | "error";
+
+type ContactDetailsDraft = {
+  firstName: string;
+  lastName: string;
+  headline: string;
+  company: string;
+  email: string | null;
+  phone: string | null;
+  whatsapp: string | null;
+  websiteUrl: string | null;
+  publicDetails: ContactForm["publicDetails"];
+};
 
 const blankContactForm: ContactForm = {
   fields: [
@@ -128,6 +158,12 @@ const blankContactForm: ContactForm = {
       options: [],
     },
   ],
+  publicDetails: {
+    phone: true,
+    whatsapp: true,
+    email: true,
+    website: true,
+  },
   intent: {
     enabled: true,
     label: "Como posso ajudar?",
@@ -184,6 +220,10 @@ function toPayload(card: SmartCard) {
   };
 }
 
+function payloadSignature(card: SmartCard) {
+  return JSON.stringify(toPayload(card));
+}
+
 function initials(card: SmartCard) {
   return (
     `${card.firstName[0] ?? ""}${card.lastName[0] ?? ""}`.toUpperCase() || "SC"
@@ -220,7 +260,7 @@ export function SmartCardsDashboard({
   const [draft, setDraft] = useState<SmartCard | null>(
     initial.items[0] ?? null,
   );
-  const [tab, setTab] = useState<Tab>("content");
+  const [tab, setTab] = useState<Tab>("profile");
   const [previewMode, setPreviewMode] = useState<"mobile" | "desktop" | "qr">(
     "mobile",
   );
@@ -233,62 +273,121 @@ export function SmartCardsDashboard({
   const [metrics, setMetrics] = useState<Metrics | null>(null);
   const [qrDataUrl, setQrDataUrl] = useState("");
   const [draggedAction, setDraggedAction] = useState<number | null>(null);
+  const [showShare, setShowShare] = useState(false);
+  const [contactDetails, setContactDetails] =
+    useState<ContactDetailsDraft | null>(null);
+  const [saveStatus, setSaveStatus] = useState<SaveStatus>("saved");
+  const lastSavedPayload = useRef(
+    initial.items[0] ? payloadSignature(initial.items[0]) : "",
+  );
+  const saving = useRef(false);
 
   const filtered = cards.filter((card) => {
-    const matchesSearch = `${displayName(card)} ${card.company} ${card.slug}`
-      .toLowerCase()
-      .includes(search.trim().toLowerCase());
-    if (!matchesSearch) return false;
-    if (filter === "mine") return card.ownerId === currentUserId;
-    if (filter === "team") return card.ownerId !== currentUserId;
-    if (filter === "active") return card.status === "published";
-    if (filter === "archived") return card.status === "archived";
-    return true;
+    const query = search.trim().toLowerCase();
+    const matchesSearch =
+      !query ||
+      [displayName(card), card.company, card.slug].some((value) =>
+        value.toLowerCase().includes(query),
+      );
+    const matchesFilter =
+      filter === "all" ||
+      (filter === "mine" && card.ownerId === currentUserId) ||
+      (filter === "team" && card.ownerId !== currentUserId) ||
+      (filter === "active" && card.status === "published") ||
+      (filter === "archived" && card.status === "archived");
+    return matchesSearch && matchesFilter;
   });
 
   function selectCard(card: SmartCard) {
-    setSelected(card);
-    setDraft({
+    const nextCard = {
       ...card,
       actions: card.actions.map((action) => ({ ...action })),
       contactForm: cloneForm(card.contactForm),
-    });
+    };
+    setSelected(nextCard);
+    setDraft(nextCard);
     setMetrics(null);
-    setQrDataUrl("");
+    setQrDataUrl(card.qrAsset?.encodedUrl ?? "");
     setShowCreate(false);
     setNotice("");
     setError("");
+    lastSavedPayload.current = payloadSignature(nextCard);
+    setSaveStatus("saved");
   }
 
-  function updateDraft(change: Partial<SmartCard>) {
-    setDraft((current) => (current ? { ...current, ...change } : current));
+  function updateDraft(changes: Partial<SmartCard>) {
+    setDraft((current) => (current ? { ...current, ...changes } : current));
+  }
+
+  function editContactDetails(card: SmartCard) {
+    setContactDetails({
+      firstName: card.firstName,
+      lastName: card.lastName,
+      headline: card.headline,
+      company: card.company,
+      email: card.email,
+      phone: card.phone,
+      whatsapp: card.whatsapp,
+      websiteUrl: card.websiteUrl,
+      publicDetails: { ...card.contactForm.publicDetails },
+    });
+  }
+
+  function saveContactDetails() {
+    if (!draft || !contactDetails) return;
+    updateDraft({
+      firstName: contactDetails.firstName,
+      lastName: contactDetails.lastName,
+      headline: contactDetails.headline,
+      company: contactDetails.company,
+      email: contactDetails.email,
+      phone: contactDetails.phone,
+      whatsapp: contactDetails.whatsapp,
+      websiteUrl: contactDetails.websiteUrl,
+      contactForm: {
+        ...draft.contactForm,
+        publicDetails: { ...contactDetails.publicDetails },
+      },
+    });
+    setContactDetails(null);
   }
 
   async function saveCard() {
-    if (!draft || !canEdit) return;
+    if (!draft || !canEdit || saving.current) return;
+    const cardToSave = draft;
+    const savedSignature = payloadSignature(cardToSave);
+    saving.current = true;
     setBusy(true);
+    setSaveStatus("saving");
     setError("");
     try {
       const saved = await apiRequest<SmartCard>(
-        `/api/smart-cards/${draft.id}`,
+        `/api/smart-cards/${cardToSave.id}`,
         {
           method: "PATCH",
-          body: JSON.stringify(toPayload(draft)),
+          body: JSON.stringify(toPayload(cardToSave)),
         },
       );
       setCards((current) =>
         current.map((card) => (card.id === saved.id ? saved : card)),
       );
       setSelected(saved);
-      setDraft(saved);
-      setNotice("Alterações salvas.");
+      setDraft((current) =>
+        current && payloadSignature(current) === savedSignature
+          ? saved
+          : current,
+      );
+      lastSavedPayload.current = savedSignature;
+      setSaveStatus("saved");
     } catch (requestError) {
+      setSaveStatus("error");
       setError(
         requestError instanceof Error
           ? requestError.message
-          : "Não foi possível salvar o cartão.",
+          : "Não foi possível salvar as alterações.",
       );
     } finally {
+      saving.current = false;
       setBusy(false);
     }
   }
@@ -447,7 +546,48 @@ export function SmartCardsDashboard({
     }
   }
 
+  async function shareCard(card: SmartCard) {
+    const url = publicUrl(publicOrigin, card.slug);
+    try {
+      if (navigator.share) {
+        await navigator.share({
+          title: displayName(card),
+          text: [card.headline, card.company].filter(Boolean).join(" · "),
+          url,
+        });
+        setNotice("Cartão compartilhado.");
+      } else {
+        await copy(url, "Link público copiado.");
+      }
+    } catch {
+      // Cancelling the native share sheet should not surface as an error.
+    }
+  }
+
+  const saveDraftAutomatically = useEffectEvent(() => {
+    void saveCard();
+  });
+  const draftSignature = draft ? payloadSignature(draft) : "";
+
+  useEffect(() => {
+    if (
+      !draft ||
+      !canEdit ||
+      showCreate ||
+      draftSignature === lastSavedPayload.current
+    )
+      return;
+    setSaveStatus("saving");
+    const timeout = window.setTimeout(saveDraftAutomatically, 700);
+    return () => window.clearTimeout(timeout);
+  }, [canEdit, draft, draftSignature, showCreate]);
+
   const activeCard = draft ?? selected;
+  const qrPreviewUrl =
+    qrDataUrl ||
+    (activeCard?.qrAsset
+      ? `/api/smart-cards/${activeCard.id}/qr?format=png`
+      : "");
 
   return (
     <section className={styles.dashboard}>
@@ -625,6 +765,42 @@ export function SmartCardsDashboard({
           ) : (
             <p className={styles.empty}>Nenhum cartão com este filtro.</p>
           )}
+          {activeCard && (
+            <nav className={styles.sectionNav} aria-label="Editor do cartão">
+              <span>Configurações</span>
+              {(
+                [
+                  "profile",
+                  "content",
+                  "appearance",
+                  "capture",
+                  "sharing",
+                  "analytics",
+                ] as const
+              ).map((value) => (
+                <button
+                  key={value}
+                  type="button"
+                  aria-current={tab === value ? "page" : undefined}
+                  onClick={() => {
+                    setTab(value);
+                    if (value === "analytics") void loadMetrics();
+                  }}
+                >
+                  {
+                    {
+                      profile: "Perfil",
+                      content: "Conteúdo",
+                      appearance: "Aparência",
+                      capture: "Captura",
+                      sharing: "Compartilhamento",
+                      analytics: "Analytics",
+                    }[value]
+                  }
+                </button>
+              ))}
+            </nav>
+          )}
         </aside>
 
         {activeCard ? (
@@ -635,6 +811,17 @@ export function SmartCardsDashboard({
                 <h2>{displayName(activeCard)}</h2>
               </div>
               <div className={styles.editorActions}>
+                <span
+                  className={styles.saveStatus}
+                  data-status={saveStatus}
+                  role="status"
+                >
+                  {saveStatus === "saving"
+                    ? "Salvando..."
+                    : saveStatus === "error"
+                      ? "Erro ao salvar"
+                      : "Salvo"}
+                </span>
                 <button
                   className="button button-secondary"
                   type="button"
@@ -654,63 +841,46 @@ export function SmartCardsDashboard({
                   target="_blank"
                   rel="noreferrer"
                 >
-                  <FiEye aria-hidden="true" /> <span>Ver</span>
+                  <FiEye aria-hidden="true" /> <span>Visualizar</span>
                 </a>
+                <button
+                  className="button button-secondary"
+                  type="button"
+                  onClick={() => setShowShare(true)}
+                >
+                  <FiShare2 aria-hidden="true" /> <span>Compartilhar</span>
+                </button>
                 {canEdit && (
-                  <button
-                    className="button"
-                    type="button"
-                    disabled={busy}
-                    onClick={saveCard}
-                  >
-                    {busy ? "Salvando..." : "Salvar"}
-                  </button>
+                  <details className={styles.moreMenu}>
+                    <summary aria-label="Mais ações">
+                      <FiMoreHorizontal aria-hidden="true" />
+                    </summary>
+                    <div>
+                      <button type="button" disabled={busy} onClick={saveCard}>
+                        Salvar agora
+                      </button>
+                      <button
+                        type="button"
+                        disabled={busy}
+                        onClick={generateQr}
+                      >
+                        Gerar QR
+                      </button>
+                    </div>
+                  </details>
                 )}
               </div>
             </div>
 
             <div className={styles.editorGrid}>
               <div className={styles.editor}>
-                <div
-                  className={styles.tabs}
-                  role="tablist"
-                  aria-label="Configurações do cartão"
-                >
-                  {(
-                    [
-                      "content",
-                      "appearance",
-                      "capture",
-                      "sharing",
-                      "analytics",
-                    ] as const
-                  ).map((value) => (
-                    <button
-                      key={value}
-                      type="button"
-                      role="tab"
-                      aria-selected={tab === value}
-                      onClick={() => {
-                        setTab(value);
-                        if (value === "analytics") void loadMetrics();
-                      }}
-                    >
-                      {
-                        {
-                          content: "Conteúdo",
-                          appearance: "Aparência",
-                          capture: "Captura",
-                          sharing: "Compartilhamento",
-                          analytics: "Analytics",
-                        }[value]
-                      }
-                    </button>
-                  ))}
-                </div>
-
-                {tab === "content" && (
+                {tab === "profile" && (
                   <div className={styles.panel}>
-                    <h3>Perfil e ações</h3>
+                    <h3>Identidade</h3>
+                    <p>
+                      Apresente sua identidade e mantenha os detalhes de contato
+                      em um único lugar.
+                    </p>
                     <div className={styles.fieldGrid}>
                       <label>
                         Nome
@@ -823,58 +993,27 @@ export function SmartCardsDashboard({
                           }
                         />
                       </label>
-                      <label>
-                        Telefone
-                        <input
-                          disabled={!canEdit}
-                          type="tel"
-                          value={activeCard.phone ?? ""}
-                          onChange={(event) =>
-                            updateDraft({ phone: event.target.value || null })
-                          }
-                        />
-                      </label>
-                      <label>
-                        WhatsApp
-                        <input
-                          disabled={!canEdit}
-                          type="tel"
-                          value={activeCard.whatsapp ?? ""}
-                          onChange={(event) =>
-                            updateDraft({
-                              whatsapp: event.target.value || null,
-                            })
-                          }
-                        />
-                      </label>
-                      <label>
-                        E-mail
-                        <input
-                          disabled={!canEdit}
-                          type="email"
-                          value={activeCard.email ?? ""}
-                          onChange={(event) =>
-                            updateDraft({ email: event.target.value || null })
-                          }
-                        />
-                      </label>
-                      <label>
-                        Site
-                        <input
-                          disabled={!canEdit}
-                          type="url"
-                          value={activeCard.websiteUrl ?? ""}
-                          onChange={(event) =>
-                            updateDraft({
-                              websiteUrl: event.target.value || null,
-                            })
-                          }
-                        />
-                      </label>
                     </div>
+                    <section className={styles.contactSummary}>
+                      <div>
+                        <span>Contato</span>
+                        <h4>Detalhes públicos</h4>
+                        <p>
+                          Escolha o que visitantes podem salvar no seu contato.
+                        </p>
+                      </div>
+                      <button
+                        className="button button-secondary"
+                        type="button"
+                        disabled={!canEdit}
+                        onClick={() => editContactDetails(activeCard)}
+                      >
+                        Editar contato
+                      </button>
+                    </section>
                     <div className={styles.actionHeading}>
                       <div>
-                        <h3>Ações</h3>
+                        <h3>Redes e CTAs</h3>
                         <p>Arraste para ordenar como aparecem no cartão.</p>
                       </div>
                       {canEdit && (
@@ -1018,6 +1157,33 @@ export function SmartCardsDashboard({
                         </li>
                       ))}
                     </ul>
+                  </div>
+                )}
+
+                {tab === "content" && (
+                  <div className={styles.panel}>
+                    <h3>Conteúdo</h3>
+                    <p>
+                      Seus links e CTAs aparecem no cartão na mesma ordem em que
+                      foram configurados no perfil.
+                    </p>
+                    <div className={styles.contentSummary}>
+                      <strong>{activeCard.actions.length}</strong>
+                      <span>
+                        {activeCard.actions.length === 1
+                          ? "link ou CTA configurado"
+                          : "links ou CTAs configurados"}
+                      </span>
+                    </div>
+                    {canEdit && (
+                      <button
+                        className="button button-secondary"
+                        type="button"
+                        onClick={() => setTab("profile")}
+                      >
+                        Editar links e CTAs
+                      </button>
+                    )}
                   </div>
                 )}
 
@@ -1669,27 +1835,50 @@ export function SmartCardsDashboard({
                   className={styles.previewQr}
                   data-active={previewMode === "qr"}
                 >
-                  {qrDataUrl ? (
-                    <img
-                      src={qrDataUrl}
-                      alt={`QR Code de ${displayName(activeCard)}`}
-                    />
-                  ) : (
-                    <>
-                      <FiGrid aria-hidden="true" />
-                      <span>Gere o QR para visualizar aqui.</span>
-                      {canEdit && (
-                        <button
-                          className="button button-secondary"
-                          type="button"
-                          disabled={busy}
-                          onClick={generateQr}
-                        >
-                          Gerar QR
-                        </button>
+                  <article
+                    className={styles.digitalCard}
+                    style={{
+                      background:
+                        activeCard.theme.backgroundSecondary ?? "#dff0d5",
+                      color: activeCard.theme.textColor ?? "#17322c",
+                    }}
+                  >
+                    <div className={styles.digitalBrand}>Untrack</div>
+                    <div className={styles.digitalIdentity}>
+                      <strong>{displayName(activeCard)}</strong>
+                      <span>{activeCard.headline}</span>
+                      <small>{activeCard.company}</small>
+                    </div>
+                    <div className={styles.digitalQr}>
+                      {qrPreviewUrl ? (
+                        <img
+                          src={qrPreviewUrl}
+                          alt={`QR Code de ${displayName(activeCard)}`}
+                        />
+                      ) : (
+                        <>
+                          <FiGrid aria-hidden="true" />
+                          <span>Gere o QR rastreável</span>
+                          {canEdit && (
+                            <button
+                              className="button button-secondary"
+                              type="button"
+                              disabled={busy}
+                              onClick={generateQr}
+                            >
+                              Gerar QR
+                            </button>
+                          )}
+                        </>
                       )}
-                    </>
-                  )}
+                    </div>
+                    <small className={styles.digitalUrl}>
+                      {publicUrl(publicOrigin, activeCard.slug).replace(
+                        /^https?:\/\//,
+                        "",
+                      )}
+                    </small>
+                  </article>
                 </div>
               </aside>
             </div>
@@ -1701,6 +1890,292 @@ export function SmartCardsDashboard({
           </section>
         ) : null}
       </div>
+
+      {contactDetails && (
+        <div
+          className={styles.dialogBackdrop}
+          role="presentation"
+          onMouseDown={() => setContactDetails(null)}
+        >
+          <section
+            className={styles.contactDialog}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="smart-card-contact-title"
+            onMouseDown={(event) => event.stopPropagation()}
+          >
+            <header>
+              <div>
+                <span className="eyebrow">Smart Card</span>
+                <h2 id="smart-card-contact-title">Detalhes de contato</h2>
+                <p>Escolha quais informações as pessoas poderão salvar.</p>
+              </div>
+              <button
+                className={styles.dialogClose}
+                type="button"
+                aria-label="Fechar detalhes de contato"
+                onClick={() => setContactDetails(null)}
+              >
+                <FiX aria-hidden="true" />
+              </button>
+            </header>
+            <div className={styles.contactDialogBody}>
+              <div className={styles.contactDialogGrid}>
+                <label>
+                  Nome
+                  <input
+                    value={contactDetails.firstName}
+                    maxLength={80}
+                    onChange={(event) =>
+                      setContactDetails((current) =>
+                        current
+                          ? { ...current, firstName: event.target.value }
+                          : current,
+                      )
+                    }
+                  />
+                </label>
+                <label>
+                  Sobrenome
+                  <input
+                    value={contactDetails.lastName}
+                    maxLength={80}
+                    onChange={(event) =>
+                      setContactDetails((current) =>
+                        current
+                          ? { ...current, lastName: event.target.value }
+                          : current,
+                      )
+                    }
+                  />
+                </label>
+                <label>
+                  Empresa
+                  <input
+                    value={contactDetails.company}
+                    maxLength={120}
+                    onChange={(event) =>
+                      setContactDetails((current) =>
+                        current
+                          ? { ...current, company: event.target.value }
+                          : current,
+                      )
+                    }
+                  />
+                </label>
+                <label>
+                  Cargo
+                  <input
+                    value={contactDetails.headline}
+                    maxLength={160}
+                    onChange={(event) =>
+                      setContactDetails((current) =>
+                        current
+                          ? { ...current, headline: event.target.value }
+                          : current,
+                      )
+                    }
+                  />
+                </label>
+              </div>
+              <div className={styles.contactDetailsList}>
+                {(
+                  [
+                    ["email", "E-mail", "email"],
+                    ["phone", "Telefone", "tel"],
+                    ["whatsapp", "WhatsApp", "tel"],
+                    ["websiteUrl", "Website", "url"],
+                  ] as const
+                ).map(([key, label, type]) => {
+                  const visibilityKey = key === "websiteUrl" ? "website" : key;
+                  return (
+                    <label key={key}>
+                      <span>{label}</span>
+                      <div>
+                        <input
+                          type={type}
+                          value={contactDetails[key] ?? ""}
+                          onChange={(event) =>
+                            setContactDetails((current) =>
+                              current
+                                ? {
+                                    ...current,
+                                    [key]: event.target.value || null,
+                                  }
+                                : current,
+                            )
+                          }
+                        />
+                        <span className={styles.contactVisibility}>
+                          <input
+                            type="checkbox"
+                            checked={
+                              contactDetails.publicDetails[visibilityKey]
+                            }
+                            onChange={(event) =>
+                              setContactDetails((current) =>
+                                current
+                                  ? {
+                                      ...current,
+                                      publicDetails: {
+                                        ...current.publicDetails,
+                                        [visibilityKey]: event.target.checked,
+                                      },
+                                    }
+                                  : current,
+                              )
+                            }
+                          />
+                          Público
+                        </span>
+                      </div>
+                    </label>
+                  );
+                })}
+              </div>
+            </div>
+            <footer>
+              <button
+                className="button button-secondary"
+                type="button"
+                onClick={() => setContactDetails(null)}
+              >
+                Cancelar
+              </button>
+              <button
+                className="button"
+                type="button"
+                onClick={saveContactDetails}
+              >
+                Salvar alterações
+              </button>
+            </footer>
+          </section>
+        </div>
+      )}
+
+      {activeCard && showShare && (
+        <div
+          className={styles.dialogBackdrop}
+          role="presentation"
+          onMouseDown={() => setShowShare(false)}
+        >
+          <section
+            className={styles.shareDialog}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="smart-card-share-title"
+            onMouseDown={(event) => event.stopPropagation()}
+          >
+            <header>
+              <div>
+                <span className="eyebrow">Compartilhamento</span>
+                <h2 id="smart-card-share-title">Seu Smart Card</h2>
+              </div>
+              <button
+                className={styles.dialogClose}
+                type="button"
+                aria-label="Fechar compartilhamento"
+                onClick={() => setShowShare(false)}
+              >
+                <FiX aria-hidden="true" />
+              </button>
+            </header>
+            <div className={styles.shareDialogContent}>
+              <div className={styles.shareQr}>
+                {qrDataUrl || activeCard.qrAsset ? (
+                  <img
+                    src={
+                      qrDataUrl ||
+                      `/api/smart-cards/${activeCard.id}/qr?format=png`
+                    }
+                    alt={`QR Code de ${displayName(activeCard)}`}
+                  />
+                ) : (
+                  <div>
+                    <FiGrid aria-hidden="true" />
+                    <span>Gere seu QR rastreável</span>
+                    {canEdit && (
+                      <button
+                        className="button button-secondary"
+                        type="button"
+                        disabled={busy}
+                        onClick={generateQr}
+                      >
+                        Gerar QR
+                      </button>
+                    )}
+                  </div>
+                )}
+              </div>
+              <div>
+                <strong>{displayName(activeCard)}</strong>
+                <p>{publicUrl(publicOrigin, activeCard.slug)}</p>
+                <div className={styles.shareDialogLink}>
+                  <input
+                    aria-label="Link público do Smart Card"
+                    readOnly
+                    value={publicUrl(publicOrigin, activeCard.slug)}
+                  />
+                  <button
+                    type="button"
+                    title="Copiar link"
+                    aria-label="Copiar link"
+                    onClick={() =>
+                      copy(
+                        publicUrl(publicOrigin, activeCard.slug),
+                        "Link público copiado.",
+                      )
+                    }
+                  >
+                    <FiCopy aria-hidden="true" />
+                  </button>
+                </div>
+                <div className={styles.shareChannels}>
+                  <button
+                    type="button"
+                    onClick={() => void shareCard(activeCard)}
+                  >
+                    <FiShare2 aria-hidden="true" /> Compartilhar
+                  </button>
+                  <a
+                    href={`https://wa.me/?text=${encodeURIComponent(publicUrl(publicOrigin, activeCard.slug))}`}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    WhatsApp
+                  </a>
+                  <a
+                    href={`mailto:?subject=${encodeURIComponent(displayName(activeCard))}&body=${encodeURIComponent(publicUrl(publicOrigin, activeCard.slug))}`}
+                  >
+                    <FiMail aria-hidden="true" /> E-mail
+                  </a>
+                  <a
+                    href={`https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(publicUrl(publicOrigin, activeCard.slug))}`}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    LinkedIn
+                  </a>
+                </div>
+              </div>
+            </div>
+            {activeCard.qrAsset && (
+              <footer className={styles.shareDownloads}>
+                <a href={`/api/smart-cards/${activeCard.id}/qr?format=png`}>
+                  <FiDownload aria-hidden="true" /> PNG
+                </a>
+                <a href={`/api/smart-cards/${activeCard.id}/qr?format=svg`}>
+                  <FiDownload aria-hidden="true" /> SVG
+                </a>
+                <a href={`/api/smart-cards/${activeCard.id}/qr?format=pdf`}>
+                  Imprimir
+                </a>
+              </footer>
+            )}
+          </section>
+        </div>
+      )}
 
       <section className={styles.audienceHint}>
         <div>

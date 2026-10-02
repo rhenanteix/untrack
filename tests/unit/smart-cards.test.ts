@@ -38,6 +38,12 @@ describe("Smart Card schemas", () => {
         }),
       ]),
     );
+    expect(card.contactForm.publicDetails).toEqual({
+      phone: true,
+      whatsapp: true,
+      email: true,
+      website: true,
+    });
   });
 
   it("rejects reserved addresses, unsafe actions, and ambiguous capture fields", () => {

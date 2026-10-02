@@ -1,6 +1,10 @@
 import { NextResponse } from "next/server";
 import { publicSmartCard } from "@/modules/smart-cards/service";
-import { smartCardSlugSchema } from "@/modules/smart-cards/schemas";
+import {
+  defaultSmartCardContactForm,
+  smartCardContactFormSchema,
+  smartCardSlugSchema,
+} from "@/modules/smart-cards/schemas";
 
 type Context = { params: Promise<{ slug: string }> };
 
@@ -12,6 +16,9 @@ export async function GET(_request: Request, context: Context) {
   const { slug } = await context.params;
   const card = await publicSmartCard(smartCardSlugSchema.parse(slug));
   if (!card) return new NextResponse(null, { status: 404 });
+  const contactForm =
+    smartCardContactFormSchema.safeParse(card.contactForm).data ??
+    defaultSmartCardContactForm;
   const name = [card.lastName, card.firstName].map(escapeVcard).join(";");
   const lines = [
     "BEGIN:VCARD",
@@ -20,9 +27,15 @@ export async function GET(_request: Request, context: Context) {
     `FN:${escapeVcard(`${card.firstName} ${card.lastName}`.trim())}`,
     card.company ? `ORG:${escapeVcard(card.company)}` : null,
     card.headline ? `TITLE:${escapeVcard(card.headline)}` : null,
-    card.phone ? `TEL;TYPE=CELL:${escapeVcard(card.phone)}` : null,
-    card.email ? `EMAIL;TYPE=INTERNET:${escapeVcard(card.email)}` : null,
-    card.websiteUrl ? `URL:${escapeVcard(card.websiteUrl)}` : null,
+    card.phone && contactForm.publicDetails.phone
+      ? `TEL;TYPE=CELL:${escapeVcard(card.phone)}`
+      : null,
+    card.email && contactForm.publicDetails.email
+      ? `EMAIL;TYPE=INTERNET:${escapeVcard(card.email)}`
+      : null,
+    card.websiteUrl && contactForm.publicDetails.website
+      ? `URL:${escapeVcard(card.websiteUrl)}`
+      : null,
     "END:VCARD",
   ].filter(Boolean);
   return new NextResponse(lines.join("\r\n"), {

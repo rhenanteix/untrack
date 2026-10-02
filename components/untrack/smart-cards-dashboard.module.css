@@ -111,16 +111,69 @@
 .advanced textarea,
 .shareUrl input {
   width: 100%;
+  min-height: 48px;
   min-width: 0;
   border: 1px solid var(--ws-line);
-  border-radius: 7px;
-  padding: 9px 10px;
+  border-radius: 8px;
+  padding: 0 12px;
   background: #fff;
   color: var(--ws-ink);
   font-size: 13px;
+  transition:
+    border-color 160ms ease,
+    box-shadow 160ms ease,
+    background 160ms ease;
+}
+.search input:hover,
+.create input:hover,
+.fieldGrid input:hover,
+.fieldGrid textarea:hover,
+.fieldGrid select:hover,
+.actionList input:hover,
+.actionList select:hover,
+.primaryCta select:hover,
+.captureField input:hover,
+.captureField select:hover,
+.advanced input:hover,
+.advanced textarea:hover,
+.shareUrl input:hover {
+  border-color: #93ad8b;
+}
+.search input:focus,
+.create input:focus,
+.fieldGrid input:focus,
+.fieldGrid textarea:focus,
+.fieldGrid select:focus,
+.actionList input:focus,
+.actionList select:focus,
+.primaryCta select:focus,
+.captureField input:focus,
+.captureField select:focus,
+.advanced input:focus,
+.advanced textarea:focus,
+.shareUrl input:focus {
+  border-color: #527b4d;
+  box-shadow: 0 0 0 3px #d8efc9;
+  outline: 0;
+}
+.search input:disabled,
+.create input:disabled,
+.fieldGrid input:disabled,
+.fieldGrid textarea:disabled,
+.fieldGrid select:disabled,
+.actionList input:disabled,
+.actionList select:disabled,
+.primaryCta select:disabled,
+.captureField input:disabled,
+.captureField select:disabled,
+.advanced input:disabled,
+.advanced textarea:disabled {
+  cursor: not-allowed;
+  background: #f2f4f0;
+  color: #829087;
 }
 .search input {
-  min-height: 37px;
+  min-height: 48px;
 }
 .notice {
   margin: 0 0 14px;
@@ -161,7 +214,7 @@
   font-weight: 750;
 }
 .create input {
-  min-height: 39px;
+  min-height: 48px;
 }
 .workspace {
   display: grid;
@@ -260,6 +313,37 @@
   color: var(--ws-muted);
   font-size: 12px;
 }
+.sectionNav {
+  display: grid;
+  gap: 3px;
+  padding: 18px 12px;
+  border-top: 1px solid var(--ws-line);
+}
+.sectionNav > span {
+  padding: 0 7px 6px;
+  color: var(--ws-muted);
+  font-size: 10px;
+  font-weight: 850;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.sectionNav button {
+  min-height: 36px;
+  border: 0;
+  border-radius: 6px;
+  padding: 0 8px;
+  background: transparent;
+  color: var(--ws-muted);
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 750;
+  text-align: left;
+}
+.sectionNav button:hover,
+.sectionNav button[aria-current="page"] {
+  background: #e8f0dc;
+  color: #285239;
+}
 .studio {
   min-width: 0;
 }
@@ -278,12 +362,71 @@
 .editorActions {
   display: flex;
   flex-wrap: wrap;
+  align-items: center;
   justify-content: flex-end;
   gap: 7px;
 }
+.saveStatus {
+  color: #54735a;
+  font-size: 11px;
+  font-weight: 800;
+}
+.saveStatus[data-status="saving"] {
+  color: #7a5c19;
+}
+.saveStatus[data-status="error"] {
+  color: #a83a37;
+}
+.moreMenu {
+  position: relative;
+}
+.moreMenu summary,
+.dialogClose {
+  display: grid;
+  width: 38px;
+  height: 38px;
+  place-items: center;
+  border: 1px solid var(--ws-line);
+  border-radius: 7px;
+  background: #fff;
+  color: var(--ws-ink);
+  cursor: pointer;
+  list-style: none;
+}
+.moreMenu summary::-webkit-details-marker {
+  display: none;
+}
+.moreMenu > div {
+  position: absolute;
+  z-index: 5;
+  top: calc(100% + 6px);
+  right: 0;
+  display: grid;
+  min-width: 142px;
+  padding: 5px;
+  border: 1px solid var(--ws-line);
+  border-radius: 7px;
+  background: #fff;
+  box-shadow: 0 12px 28px #172a3a1f;
+}
+.moreMenu > div button {
+  min-height: 34px;
+  border: 0;
+  border-radius: 5px;
+  padding: 0 9px;
+  background: transparent;
+  color: var(--ws-ink);
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 700;
+  text-align: left;
+}
+.moreMenu > div button:hover {
+  background: #eef5e8;
+}
 .editorGrid {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 328px;
+  grid-template-columns: minmax(0, 1fr) 380px;
   align-items: stretch;
 }
 .editor {
@@ -332,8 +475,60 @@
   grid-column: 1 / -1;
 }
 .fieldGrid textarea {
-  min-height: 88px;
+  min-height: 110px;
   resize: vertical;
+}
+.contactSummary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-top: 18px;
+  padding: 16px;
+  border: 1px solid var(--ws-line);
+  border-radius: 7px;
+  background: #f9fbf6;
+}
+.contactSummary span {
+  color: #63855b;
+  font-size: 10px;
+  font-weight: 850;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.contactSummary h4 {
+  margin: 3px 0;
+  font-size: 14px;
+}
+.contactSummary p {
+  margin: 0;
+  color: var(--ws-muted);
+  font-size: 12px;
+}
+.contentSummary {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+  margin: 20px 0;
+  padding: 18px;
+  border: 1px solid var(--ws-line);
+  border-radius: 7px;
+  background: #f9fbf6;
+}
+.contentSummary strong {
+  display: grid;
+  width: 38px;
+  height: 38px;
+  place-items: center;
+  border-radius: 50%;
+  background: #dff0d5;
+  color: #285239;
+  font-size: 15px;
+}
+.contentSummary span {
+  color: var(--ws-muted);
+  font-size: 12px;
 }
 .actionHeading {
   display: flex;
@@ -824,6 +1019,66 @@
   background: #fff;
   padding: 7px;
 }
+.digitalCard {
+  display: grid;
+  width: min(100%, 284px);
+  min-height: 370px;
+  grid-template-rows: auto 1fr auto auto;
+  overflow: hidden;
+  padding: 22px;
+  border: 1px solid color-mix(in srgb, currentColor 17%, transparent);
+  border-radius: 8px;
+  box-shadow: 0 16px 30px #172a3a1c;
+}
+.digitalBrand {
+  font-size: 13px;
+  font-weight: 850;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.digitalIdentity {
+  display: grid;
+  align-content: end;
+  gap: 3px;
+  margin-top: 32px;
+}
+.digitalIdentity strong {
+  font-size: 20px;
+  line-height: 1.1;
+}
+.digitalIdentity span,
+.digitalIdentity small,
+.digitalUrl {
+  color: color-mix(in srgb, currentColor 70%, transparent);
+  font-size: 10px;
+}
+.digitalQr {
+  display: grid;
+  min-height: 160px;
+  place-items: center;
+  align-content: center;
+  gap: 8px;
+  margin: 22px 0;
+  background: #fff;
+  color: #17322c;
+  text-align: center;
+}
+.digitalQr img {
+  width: 100%;
+  padding: 9px;
+}
+.digitalQr svg {
+  width: 36px;
+  height: 36px;
+}
+.digitalQr span {
+  font-size: 11px;
+}
+.digitalUrl {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 .blank {
   display: grid;
   place-items: center;
@@ -836,6 +1091,227 @@
 }
 .blank p {
   color: var(--ws-muted);
+}
+.dialogBackdrop {
+  position: fixed;
+  z-index: 30;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: #14272080;
+}
+.shareDialog {
+  width: min(100%, 620px);
+  max-height: min(85svh, 720px);
+  overflow: auto;
+  border: 1px solid var(--ws-line);
+  border-radius: 8px;
+  background: #fff;
+  box-shadow: 0 24px 56px #13251f3b;
+}
+.contactDialog {
+  display: flex;
+  width: min(100%, 680px);
+  max-height: 85svh;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid var(--ws-line);
+  border-radius: 8px;
+  background: #fff;
+  box-shadow: 0 24px 56px #13251f3b;
+}
+.contactDialog > header {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 20px 22px 16px;
+  border-bottom: 1px solid var(--ws-line);
+}
+.contactDialog h2 {
+  margin: 3px 0 5px;
+  font-size: 20px;
+}
+.contactDialog > header p {
+  margin: 0;
+  color: var(--ws-muted);
+  font-size: 12px;
+}
+.contactDialogBody {
+  display: grid;
+  gap: 20px;
+  overflow-y: auto;
+  padding: 22px;
+}
+.contactDialogGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 13px;
+}
+.contactDialogGrid label,
+.contactDetailsList > label {
+  display: grid;
+  gap: 6px;
+  color: var(--ws-ink);
+  font-size: 11px;
+  font-weight: 750;
+}
+.contactDialogGrid input,
+.contactDetailsList input[type="email"],
+.contactDetailsList input[type="tel"],
+.contactDetailsList input[type="url"] {
+  width: 100%;
+  min-height: 48px;
+  border: 1px solid var(--ws-line);
+  border-radius: 7px;
+  padding: 0 10px;
+  background: #fff;
+  color: var(--ws-ink);
+  font-size: 13px;
+}
+.contactDetailsList {
+  display: grid;
+  gap: 12px;
+}
+.contactDetailsList > label > div {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+}
+.contactVisibility {
+  display: inline-flex;
+  min-height: 44px;
+  align-items: center;
+  gap: 6px;
+  color: var(--ws-muted);
+  font-size: 11px;
+  font-weight: 750;
+}
+.contactVisibility input {
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  accent-color: #285239;
+}
+.contactDialog > footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 14px 22px;
+  border-top: 1px solid var(--ws-line);
+  background: #fbfcf9;
+}
+.shareDialog > header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 20px 22px 16px;
+  border-bottom: 1px solid var(--ws-line);
+}
+.shareDialog h2 {
+  margin: 3px 0 0;
+  font-size: 20px;
+}
+.shareDialogContent {
+  display: grid;
+  grid-template-columns: 190px minmax(0, 1fr);
+  align-items: center;
+  gap: 24px;
+  padding: 24px 22px;
+}
+.shareQr {
+  display: grid;
+  min-height: 190px;
+  place-items: center;
+  border: 1px solid var(--ws-line);
+  background: #f7f9f5;
+}
+.shareQr img {
+  width: 100%;
+  padding: 12px;
+  background: #fff;
+}
+.shareQr > div {
+  display: grid;
+  justify-items: center;
+  gap: 9px;
+  padding: 16px;
+  color: var(--ws-muted);
+  font-size: 12px;
+  text-align: center;
+}
+.shareQr svg {
+  width: 36px;
+  height: 36px;
+}
+.shareDialogContent strong {
+  display: block;
+  font-size: 16px;
+}
+.shareDialogContent p {
+  overflow: hidden;
+  margin: 5px 0 15px;
+  color: var(--ws-muted);
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.shareDialogLink {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 7px;
+}
+.shareDialogLink input {
+  min-width: 0;
+  min-height: 42px;
+  border: 1px solid var(--ws-line);
+  border-radius: 7px;
+  padding: 0 10px;
+  background: #f7f9f5;
+  color: var(--ws-ink);
+  font-size: 12px;
+}
+.shareDialogLink button {
+  display: grid;
+  width: 42px;
+  place-items: center;
+  border: 1px solid var(--ws-line);
+  border-radius: 7px;
+  background: #fff;
+  color: var(--ws-ink);
+  cursor: pointer;
+}
+.shareChannels {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  margin-top: 14px;
+}
+.shareChannels a,
+.shareChannels button,
+.shareDownloads a {
+  display: inline-flex;
+  min-height: 34px;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid var(--ws-line);
+  border-radius: 6px;
+  padding: 0 9px;
+  background: #fff;
+  color: #285239;
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 800;
+  text-decoration: none;
+}
+.shareDownloads {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  padding: 14px 22px;
+  border-top: 1px solid var(--ws-line);
 }
 .audienceHint {
   display: flex;
@@ -861,7 +1337,7 @@
     grid-template-columns: 230px minmax(0, 1fr);
   }
   .editorGrid {
-    grid-template-columns: minmax(0, 1fr) 278px;
+    grid-template-columns: minmax(0, 1fr) 300px;
   }
   .editor {
     padding-inline: 18px;
@@ -933,6 +1409,13 @@
   .libraryTitle {
     grid-column: 1 / -1;
   }
+  .sectionNav {
+    grid-column: 1 / -1;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+  .sectionNav > span {
+    grid-column: 1 / -1;
+  }
   .cardRow {
     min-height: 66px;
   }
@@ -984,6 +1467,9 @@
   .analyticsLists {
     grid-template-columns: 1fr;
   }
+  .shareDialogContent {
+    grid-template-columns: 160px minmax(0, 1fr);
+  }
 }
 @media (max-width: 560px) {
   .kpis {
@@ -998,6 +1484,9 @@
   }
   .library {
     grid-template-columns: 1fr;
+  }
+  .sectionNav {
+    grid-template-columns: 1fr 1fr;
   }
   .cardRow {
     grid-template-columns: 35px minmax(0, 1fr);
@@ -1042,5 +1531,28 @@
   .qrArea {
     align-items: start;
     flex-direction: column;
+  }
+  .dialogBackdrop {
+    align-items: end;
+    padding: 0;
+  }
+  .shareDialog {
+    width: 100%;
+    max-height: 90svh;
+    border-radius: 8px 8px 0 0;
+  }
+  .shareDialogContent {
+    grid-template-columns: 1fr;
+  }
+  .shareQr {
+    width: min(190px, 100%);
+  }
+  .contactDialog {
+    width: 100%;
+    max-height: 92svh;
+    border-radius: 8px 8px 0 0;
+  }
+  .contactDialogGrid {
+    grid-template-columns: 1fr;
   }
 }

@@ -101,6 +101,12 @@ export const defaultSmartCardContactForm = {
       options: [],
     },
   ],
+  publicDetails: {
+    phone: true,
+    whatsapp: true,
+    email: true,
+    website: true,
+  },
   intent: {
     enabled: true,
     label: "Como posso ajudar?",
@@ -117,6 +123,15 @@ export const defaultSmartCardContactForm = {
 export const smartCardContactFormSchema = z
   .object({
     fields: z.array(smartCardContactFieldSchema).min(1).max(10),
+    publicDetails: z
+      .object({
+        phone: z.boolean().default(true),
+        whatsapp: z.boolean().default(true),
+        email: z.boolean().default(true),
+        website: z.boolean().default(true),
+      })
+      .strict()
+      .default(defaultSmartCardContactForm.publicDetails),
     intent: z
       .object({
         enabled: z.boolean().default(true),
