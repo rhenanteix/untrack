@@ -43,6 +43,8 @@ export function ContentBlock({
   block,
   index,
   disabled = false,
+  isDragging = false,
+  isDropTarget = false,
   onEdit,
   onToggle,
   onDelete,
@@ -50,10 +52,13 @@ export function ContentBlock({
   onDragStart,
   onDragOver,
   onDrop,
+  onDragEnd,
 }: {
   block: SmartPageContentBlock;
   index: number;
   disabled?: boolean;
+  isDragging?: boolean;
+  isDropTarget?: boolean;
   onEdit: (block: SmartPageContentBlock) => void;
   onToggle: (block: SmartPageContentBlock) => void;
   onDelete: (block: SmartPageContentBlock) => void;
@@ -61,6 +66,7 @@ export function ContentBlock({
   onDragStart: (event: DragEvent<HTMLElement>, blockId: string) => void;
   onDragOver: (event: DragEvent<HTMLElement>, blockId: string) => void;
   onDrop: (event: DragEvent<HTMLElement>, blockId: string) => void;
+  onDragEnd: () => void;
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const Icon = block.type === "product" ? HiOutlineShoppingBag : HiOutlineLink;
@@ -71,11 +77,21 @@ export function ContentBlock({
 
   return (
     <article
-      className={`sp-content-block${block.visible ? "" : " is-hidden"}`}
+      className={`sp-content-block${block.visible ? "" : " is-hidden"}${isDragging ? " is-dragging" : ""}${isDropTarget ? " is-drop-target" : ""}`}
       draggable={!disabled}
-      onDragStart={(event) => onDragStart(event, block.id)}
+      onDragStart={(event) => {
+        if (
+          !(event.target instanceof Element) ||
+          !event.target.closest(".sp-content-block-handle")
+        ) {
+          event.preventDefault();
+          return;
+        }
+        onDragStart(event, block.id);
+      }}
       onDragOver={(event) => onDragOver(event, block.id)}
       onDrop={(event) => onDrop(event, block.id)}
+      onDragEnd={onDragEnd}
       aria-label={`${title}, ${block.visible ? "ativo" : "oculto"}`}
     >
       <button
@@ -84,6 +100,7 @@ export function ContentBlock({
         aria-label={`Arrastar ${title}`}
         title="Arraste para reorganizar"
         disabled={disabled}
+        draggable={!disabled}
         onClick={() => onEdit(block)}
       >
         <HiOutlineBars3 aria-hidden="true" />

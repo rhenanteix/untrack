@@ -43,6 +43,7 @@ export function ContentList({
 }) {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [draggedId, setDraggedId] = useState<string | null>(null);
+  const [dropTargetId, setDropTargetId] = useState<string | null>(null);
 
   function reorder(draggedBlockId: string, targetBlockId: string) {
     if (draggedBlockId === targetBlockId) return;
@@ -101,6 +102,10 @@ export function ContentList({
               block={draft}
               index={index}
               disabled={!canEdit || busy}
+              isDragging={draggedId === block.id}
+              isDropTarget={
+                dropTargetId === block.id && draggedId !== block.id
+              }
               onEdit={(item) => setExpandedId((current) => current === item.id ? null : item.id)}
               onToggle={onToggle}
               onDelete={onDelete}
@@ -113,6 +118,7 @@ export function ContentList({
               onDragOver={(event) => {
                 event.preventDefault();
                 event.dataTransfer.dropEffect = "move";
+                setDropTargetId(block.id);
               }}
               onDrop={(event, targetBlockId) => {
                 event.preventDefault();
@@ -121,6 +127,11 @@ export function ContentList({
                   targetBlockId,
                 );
                 setDraggedId(null);
+                setDropTargetId(null);
+              }}
+              onDragEnd={() => {
+                setDraggedId(null);
+                setDropTargetId(null);
               }}
             />
             {expanded && (

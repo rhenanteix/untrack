@@ -219,6 +219,9 @@ export function SmartPagesDashboard({
   const [activeForm, setActiveForm] = useState("");
   const [contentModalOpen, setContentModalOpen] = useState(false);
   const [editorSection, setEditorSection] = useState("profile");
+  const [appearanceTab, setAppearanceTab] = useState<
+    "themes" | "customize"
+  >("themes");
   const [search, setSearch] = useState(params.get("search") ?? "");
   const [appliedSearch, setAppliedSearch] = useState(
     params.get("search") ?? "",
@@ -238,8 +241,12 @@ export function SmartPagesDashboard({
     "saved" | "saving" | "error"
   >("saved");
   const [autosaveError, setAutosaveError] = useState("");
+  const [profileSaveError, setProfileSaveError] = useState<Error | null>(null);
   const [autosaveRevision, setAutosaveRevision] = useState(0);
   const editorRef = useRef<HTMLHeadingElement>(null);
+  const profileDraftVersion = useRef(0);
+  const failedProfileDraftVersion = useRef<number | null>(null);
+  const autosavingProfile = useRef(false);
   const blockDraftVersions = useRef<Record<string, number>>({});
   const failedBlockDraftVersions = useRef<Record<string, number>>({});
   const autosavingBlockId = useRef<string | null>(null);
@@ -263,6 +270,69 @@ export function SmartPagesDashboard({
     window.addEventListener("beforeunload", warn);
     return () => window.removeEventListener("beforeunload", warn);
   }, [hasUnsaved]);
+  useEffect(() => {
+    if (
+      !selected ||
+      !dirty ||
+      autosavingProfile.current ||
+      failedProfileDraftVersion.current === profileDraftVersion.current
+    )
+      return;
+    const version = profileDraftVersion.current;
+    const timeout = window.setTimeout(() => {
+      autosavingProfile.current = true;
+      setAutosaveState("saving");
+      void apiRequest<SmartPageDetail>(`/api/smart-pages/${selected.id}`, {
+        method: "PATCH",
+        body: JSON.stringify({
+          slug: profileDraft.slug ?? selected.slug,
+          title: profileDraft.title ?? selected.title,
+          description: profileDraft.description ?? selected.description,
+          avatarUrl:
+            profileDraft.avatarUrl === undefined
+              ? selected.avatarUrl
+              : profileDraft.avatarUrl,
+          theme: profileDraft.theme ?? selected.theme,
+          socialLinks: profileDraft.socialLinks ?? selected.socialLinks,
+        }),
+      })
+        .then((page) => {
+          setSelected((current) =>
+            current ? { ...current, ...page } : current,
+          );
+          setPages((current) =>
+            current.map((item) =>
+              item.id === page.id ? { ...item, ...page } : item,
+            ),
+          );
+          if (profileDraftVersion.current !== version) return;
+          setProfileDraft({});
+          setDirty(false);
+          failedProfileDraftVersion.current = null;
+          setAutosaveError("");
+          setProfileSaveError(null);
+          setAutosaveState("saved");
+        })
+        .catch((error) => {
+          if (profileDraftVersion.current !== version) return;
+          failedProfileDraftVersion.current = version;
+          const saveError =
+            error instanceof Error
+              ? error
+              : new Error("Não foi possível salvar o perfil.");
+          setProfileSaveError(saveError);
+          setAutosaveError(
+            saveError.message,
+          );
+          setAutosaveState("error");
+        })
+        .finally(() => {
+          autosavingProfile.current = false;
+          setAutosaveRevision((current) => current + 1);
+        });
+    }, 650);
+    return () => window.clearTimeout(timeout);
+  }, [autosaveRevision, dirty, profileDraft, selected]);
   useEffect(() => {
     const blockId = dirtyBlocks.find(
       (id) => blockDrafts[id]?.type === "link",
@@ -357,9 +427,14 @@ export function SmartPagesDashboard({
         });
         setProfileDraft({});
         setDirty(false);
+        profileDraftVersion.current = 0;
+        failedProfileDraftVersion.current = null;
+        autosavingProfile.current = false;
+        setProfileSaveError(null);
         setDirtyBlocks([]);
         setBlockDrafts({});
         setEditorSection("profile");
+        setAppearanceTab("themes");
         setEditorTab("editor");
         setContentModalOpen(false);
         setSocialPickerOpen(false);
@@ -444,6 +519,15 @@ export function SmartPagesDashboard({
       setLibraryLoading(false);
     }
   }
+  function markProfileDirty() {
+    profileDraftVersion.current += 1;
+    failedProfileDraftVersion.current = null;
+    setDirty(true);
+    setAutosaveError("");
+    setProfileSaveError(null);
+    action.setNotice("");
+  }
+
   function profileChanged(event: FormEvent<HTMLFormElement>) {
     if (
       !(
@@ -455,9 +539,8 @@ export function SmartPagesDashboard({
     )
       return;
     const data = new FormData(event.currentTarget);
-    action.setNotice("");
-    setDirty(true);
     setProfileDraft({
+      slug: String(data.get("slug") ?? ""),
       title: String(data.get("title") ?? ""),
       description: String(data.get("description") ?? ""),
       avatarUrl: String(data.get("avatarUrl") ?? "") || null,
@@ -467,6 +550,7 @@ export function SmartPagesDashboard({
         profileDraft.socialLinks ?? selected?.socialLinks ?? [],
       ),
     });
+    markProfileDirty();
   }
 
   function updateSocialLink(network: SocialNetwork, value: string) {
@@ -480,8 +564,7 @@ export function SmartPagesDashboard({
       if (url) next.push({ network, url });
       return { ...current, socialLinks: next };
     });
-    setDirty(true);
-    action.setNotice("");
+    markProfileDirty();
   }
 
   async function selectPage(id: string) {
@@ -531,43 +614,6 @@ export function SmartPagesDashboard({
         "Rascunho criado. Adicione seus links e publique quando estiver pronto.",
       );
       form.reset();
-    });
-  }
-
-  async function saveProfile(event: FormEvent<HTMLFormElement>) {
-    setActiveForm("profile");
-    event.preventDefault();
-    if (!selected) return;
-    const form = event.currentTarget;
-    const data = new FormData(form);
-    const socialLinks = collectSocialLinks(
-      data,
-      profileDraft.socialLinks ?? selected.socialLinks,
-    );
-    await action.run(async () => {
-      const page = await apiRequest<SmartPageDetail>(
-        `/api/smart-pages/${selected.id}`,
-        {
-          method: "PATCH",
-          body: JSON.stringify({
-            slug: data.get("slug"),
-            title: data.get("title"),
-            description: data.get("description"),
-            avatarUrl: data.get("avatarUrl") || null,
-            theme: profileDraft.theme ?? selected.theme,
-            socialLinks,
-          }),
-        },
-      );
-      setSelected((current) => (current ? { ...current, ...page } : current));
-      setPages((current) =>
-        current.map((item) =>
-          item.id === page.id ? { ...item, ...page } : item,
-        ),
-      );
-      setProfileDraft({});
-      setDirty(false);
-      action.setNotice("Perfil salvo.");
     });
   }
 
@@ -850,14 +896,77 @@ export function SmartPagesDashboard({
     >
       <div className="sp-studio-topbar">
         {editId ? (
-          <button
-            type="button"
-            className="sp-studio-back"
-            onClick={backToLibrary}
-          >
-            <HiOutlineArrowLeft aria-hidden="true" />
-            Smart Pages
-          </button>
+          <>
+            <button
+              type="button"
+              className="sp-studio-back"
+              onClick={backToLibrary}
+            >
+              <HiOutlineArrowLeft aria-hidden="true" />
+              Smart Pages
+            </button>
+            {selected && (
+              <>
+                <div className="sp-studio-page-meta">
+                  <strong>{selected.title}</strong>
+                  <span>untrack.app/page/{selected.slug}</span>
+                </div>
+                <span
+                  className={
+                    selected.status === "published"
+                      ? "success-badge"
+                      : "inactive-badge"
+                  }
+                >
+                  {selected.status === "published" ? "Publicada" : "Rascunho"}
+                </span>
+                <span className="sp-studio-save-status" role="status">
+                  {autosaveState === "saving"
+                    ? "Salvando…"
+                    : autosaveState === "error"
+                      ? "Erro ao salvar"
+                      : hasUnsaved
+                        ? "Alterações pendentes"
+                        : "✓ Salvo"}
+                </span>
+                <div className="sp-studio-toolbar-actions">
+                  {selected.status === "published" && (
+                    <a
+                      className="button button-secondary"
+                      href={publicUrl(selected.slug)}
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      Visualizar
+                    </a>
+                  )}
+                  {selected.status === "published" && (
+                    <CopyButton
+                      value={`${publicOrigin}${publicUrl(selected.slug)}`}
+                      label="Compartilhar"
+                    />
+                  )}
+                  <button
+                    className="button"
+                    disabled={
+                      action.busy ||
+                      !(selected.status === "published"
+                        ? canUnpublish
+                        : canEdit) ||
+                      hasUnsaved
+                    }
+                    onClick={() =>
+                      void setPublished(selected.status !== "published")
+                    }
+                  >
+                    {selected.status === "published"
+                      ? "Despublicar"
+                      : "Publicar"}
+                  </button>
+                </div>
+              </>
+            )}
+          </>
         ) : (
           <div className="sp-studio-product">
             <Link href="/conta" className="sp-studio-brand" aria-label="Voltar para a conta">
@@ -1112,7 +1221,7 @@ export function SmartPagesDashboard({
                             : "Salvo"}
                     </p>
                   </div>
-                  <div className="action-row">
+                  <div className="action-row" hidden>
                     {selected.status === "published" && (
                       <a
                         className="button button-secondary"
@@ -1223,29 +1332,27 @@ export function SmartPagesDashboard({
                 </nav>
                 <SmartForm
                   hidden={!["profile", "appearance"].includes(editorSection)}
-                  failure={activeForm === "profile" ? action.failure : null}
+                  failure={profileSaveError}
+                  hideSummary
                   reveal={() => setEditorSection("profile")}
                   id="smart-page-profile-form"
                   className="smart-page-profile-form"
-                  onSubmit={saveProfile}
+                  onSubmit={(event) => event.preventDefault()}
                   onChange={profileChanged}
                 >
                   <div className="sp-save-bar">
                     <small>
-                      {action.busy
+                      {autosaveState === "saving"
                         ? "Salvando…"
-                        : action.error
-                          ? "Falha ao salvar. Seus dados foram mantidos."
+                        : autosaveState === "error"
+                          ? "Erro ao salvar"
                           : hasUnsaved
                             ? "Alterações pendentes"
                             : "✓ Salvo"}
                     </small>
-                    <button
-                      className="button button-secondary"
-                      disabled={action.busy || !canEdit}
-                    >
-                      Salvar perfil
-                    </button>
+                    {autosaveState === "error" && autosaveError && (
+                      <span role="alert">{autosaveError}</span>
+                    )}
                   </div>{" "}
                   <fieldset
                     className="smart-page-form-fields"
@@ -1298,8 +1405,7 @@ export function SmartPagesDashboard({
                             ...current,
                             avatarUrl: url,
                           }));
-                          setDirty(true);
-                          action.setNotice("");
+                          markProfileDirty();
                         }}
                       />
                       <SmartField hint="Use o endereço https:// de uma imagem. Escolha uma foto nítida ou o logo da sua marca.">
@@ -1454,31 +1560,56 @@ export function SmartPagesDashboard({
                       aria-labelledby="sp-tab-appearance"
                       hidden={editorSection !== "appearance"}
                     >
-                      <ThemeGallery
-                        value={profileDraft.theme ?? selected.theme}
-                        disabled={!canEdit || action.busy}
-                        onChange={(theme) => {
-                          action.setNotice("");
-                          setProfileDraft((current) => ({ ...current, theme }));
-                          setDirty(true);
-                        }}
-                      />
-                      <details className="sp-advanced">
-                        <summary>Personalização avançada</summary>{" "}
-                        <AppearanceControls
-                          pageId={selected.id}
-                          theme={profileDraft.theme ?? selected.theme}
-                          disabled={!canEdit || action.busy}
-                          onChange={(theme) => {
-                            setProfileDraft((current) => ({
-                              ...current,
-                              theme,
-                            }));
-                            setDirty(true);
-                            action.setNotice("");
-                          }}
-                        />
-                      </details>{" "}
+                      <section className="sp-theme-studio" aria-label="Theme Studio">
+                        <div
+                          className="sp-theme-studio-tabs"
+                          role="tablist"
+                          aria-label="Aparência"
+                        >
+                          <button
+                            type="button"
+                            role="tab"
+                            aria-selected={appearanceTab === "themes"}
+                            onClick={() => setAppearanceTab("themes")}
+                          >
+                            Temas
+                          </button>
+                          <button
+                            type="button"
+                            role="tab"
+                            aria-selected={appearanceTab === "customize"}
+                            onClick={() => setAppearanceTab("customize")}
+                          >
+                            Personalizar
+                          </button>
+                        </div>
+                        {appearanceTab === "themes" ? (
+                          <ThemeGallery
+                            value={profileDraft.theme ?? selected.theme}
+                            disabled={!canEdit || action.busy}
+                            onChange={(theme) => {
+                              setProfileDraft((current) => ({
+                                ...current,
+                                theme,
+                              }));
+                              markProfileDirty();
+                            }}
+                          />
+                        ) : (
+                          <AppearanceControls
+                            pageId={selected.id}
+                            theme={profileDraft.theme ?? selected.theme}
+                            disabled={!canEdit || action.busy}
+                            onChange={(theme) => {
+                              setProfileDraft((current) => ({
+                                ...current,
+                                theme,
+                              }));
+                              markProfileDirty();
+                            }}
+                          />
+                        )}
+                      </section>
                     </div>
                   </fieldset>
                 </SmartForm>

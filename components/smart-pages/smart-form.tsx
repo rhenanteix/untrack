@@ -92,12 +92,14 @@ export function SmartField({
 export function SmartForm({
   failure = null,
   reveal,
+  hideSummary = false,
   children,
   onSubmit,
   ...props
 }: FormHTMLAttributes<HTMLFormElement> & {
   failure?: Error | null;
   reveal?: () => void;
+  hideSummary?: boolean;
 }) {
   const ref = useRef<HTMLFormElement>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -177,7 +179,7 @@ export function SmartForm({
           onSubmit?.(event);
         }}
       >
-        {Object.keys(errors).length > 0 && (
+        {!hideSummary && Object.keys(errors).length > 0 && (
           <div className="sp-form-summary" role="alert">
             <strong>Vamos ajustar alguns campos</strong>
             <span>
@@ -185,7 +187,7 @@ export function SmartForm({
             </span>
           </div>
         )}
-        {failure && !Object.keys(errors).length && (
+        {!hideSummary && failure && !Object.keys(errors).length && (
           <div className="sp-form-summary" role="alert">
             <strong>Não foi possível salvar</strong>
             <span>{failure.message} Seus dados continuam no formulário.</span>

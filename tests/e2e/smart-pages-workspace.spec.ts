@@ -72,13 +72,14 @@ test("Smart Pages loads, previews profile changes, saves and publishes", async (
   ).toBeVisible();
   if (await page.getByRole("tab", { name: "Editar", exact: true }).isVisible())
     await page.getByRole("tab", { name: "Editar", exact: true }).click();
-  await page
-    .getByRole("button", { name: "Salvar perfil", exact: true })
-    .click();
-  await expect(page.getByText("Perfil salvo.", { exact: true })).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Salvar perfil", exact: true }),
+  ).toHaveCount(0);
+  await expect(page.locator(".smart-page-save-status")).toHaveText("Salvo");
   await page.getByRole("tab", { name: "Conteúdo", exact: true }).click();
   await page.getByRole("button", { name: "+ Adicionar", exact: true }).click();
   const addContent = page.getByRole("dialog", { name: "Adicionar conteúdo" });
+  await addContent.getByRole("button", { name: /^Link/ }).click();
   await addContent.locator('input[name="title"]').fill("Conheça nossos projetos");
   await addContent
     .locator('input[name="destinationUrl"]')
@@ -289,19 +290,13 @@ test("field errors explain slug issues; career templates preserve and publish re
     1,
   );
   await page.getByRole("button", { name: "Usar modelo Trajetória" }).click();
-  await page
-    .getByRole("button", { name: "Salvar perfil", exact: true })
-    .click();
-  await expect(page.getByText("Perfil salvo.", { exact: true })).toBeVisible();
+  await expect(page.locator(".smart-page-save-status")).toHaveText("Salvo");
   await page.getByRole("tab", { name: "Perfil", exact: true }).click();
   const profileSlug = page.locator(
     '.smart-page-profile-form input[name="slug"]',
   );
   await profileSlug.fill("ana com espaços");
   await page.getByRole("tab", { name: "Aparência", exact: true }).click();
-  await page
-    .getByRole("button", { name: "Salvar perfil", exact: true })
-    .click();
   await expect(profileSlug).toBeVisible();
   await expect(profileSlug).toBeFocused();
   await page.screenshot({
@@ -309,10 +304,7 @@ test("field errors explain slug issues; career templates preserve and publish re
     fullPage: true,
   });
   await profileSlug.fill(slug);
-  await page
-    .getByRole("button", { name: "Salvar perfil", exact: true })
-    .click();
-  await expect(page.getByText("Perfil salvo.", { exact: true })).toBeVisible();
+  await expect(page.locator(".smart-page-save-status")).toHaveText("Salvo");
   await page.getByRole("tab", { name: "Links", exact: true }).click();
   await page
     .locator('.smart-page-add-block input[name="title"]')
@@ -404,21 +396,13 @@ test("server conflicts and invalid social URLs point to the correct form field",
     const linkedin = socialComposer.locator('input[name="social-linkedin"]');
     await linkedin.fill("ftp://example.com/profile");
     await page.getByRole("tab", { name: "Aparência", exact: true }).click();
-    await page
-      .getByRole("button", { name: "Salvar perfil", exact: true })
-      .click();
     await expect(linkedin).toBeVisible();
     await expect(linkedin).toBeFocused();
     await expect(linkedin).toHaveAttribute("aria-invalid", "true");
     await expect(linkedin).toHaveAccessibleDescription(/HTTP ou HTTPS/);
     await expect(linkedin).toHaveValue("ftp://example.com/profile");
     await linkedin.fill("https://www.linkedin.com/in/example");
-    await page
-      .getByRole("button", { name: "Salvar perfil", exact: true })
-      .click();
-    await expect(
-      page.getByText("Perfil salvo.", { exact: true }),
-    ).toBeVisible();
+    await expect(page.locator(".smart-page-save-status")).toHaveText("Salvo");
     await expect(linkedin).toHaveAttribute("aria-invalid", "false");
   } finally {
     await other.close();
@@ -470,36 +454,29 @@ test("live card customization, upload isolation, reorder and downgrade", async (
   const visitor = await browser.newContext();
   expect((await visitor.request.get(avatarUrl)).status()).toBe(404);
   await page.getByRole("tab", { name: "Aparência", exact: true }).click();
-  await page.getByText("Personalização avançada", { exact: true }).click();
-  await page
-    .getByRole("combobox", { name: "Alinhamento", exact: true })
-    .selectOption("left");
-  await page
-    .getByRole("combobox", { name: "Tipografia", exact: true })
-    .selectOption("serif");
+  await page.getByRole("tab", { name: "Personalizar", exact: true }).click();
+  await page.getByRole("button", { name: /^Layout/ }).click();
+  await page.getByRole("button", { name: "À esquerda", exact: true }).click();
   await page.getByRole("button", { name: "Subir Nome", exact: true }).click();
+  await page.getByRole("button", { name: "Personalizar", exact: true }).click();
+  await page.getByRole("button", { name: /^Tipografia/ }).click();
+  await page.getByRole("button", { name: "Serif", exact: true }).click();
   await expect(
     page.locator('.smart-page-preview [data-alignment="left"]'),
   ).toHaveCount(1);
   await expect(
     page.locator(".smart-page-preview [data-section]").first(),
   ).toHaveAttribute("data-section", "title");
+  await expect(page.locator(".smart-page-save-status")).toHaveText("Salvo");
+  await page.getByRole("tab", { name: "Conteúdo", exact: true }).click();
+  await page.locator(".sp-content-block-summary").first().click();
   await page
-    .getByRole("button", { name: "Salvar perfil", exact: true })
-    .click();
-  await expect(page.getByText("Perfil salvo.", { exact: true })).toBeVisible();
-  await page.getByRole("tab", { name: "Links", exact: true }).click();
-  await page.locator(".sp-link-card summary").first().click();
-  await page
-    .locator('.smart-page-block-list input[name="title"]')
+    .locator('.sp-content-block-editor input[name="title"]')
     .fill("Projeto em tempo real");
   await expect(page.locator(".smart-page-preview")).toContainText(
     "Projeto em tempo real",
   );
-  await page.getByRole("button", { name: "Salvar", exact: true }).click();
-  await expect(
-    page.getByText("Link atualizado.", { exact: true }),
-  ).toBeVisible();
+  await expect(page.locator(".smart-page-save-status")).toHaveText("Salvo");
   await page.getByRole("button", { name: "Publicar", exact: true }).click();
   await expect(
     page.getByText("Página publicada.", { exact: true }),

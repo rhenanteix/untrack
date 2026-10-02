@@ -5,7 +5,7 @@ import { HiOutlineLink, HiOutlineShoppingBag, HiOutlineXMark } from "react-icons
 import { BlockDestinationFields } from "@/components/smart-pages/block-destination-fields";
 import { SmartField } from "@/components/smart-pages/smart-form";
 
-type ContentKind = "link" | "product" | "create-product";
+type ContentKind = "choose" | "link" | "product" | "create-product";
 
 export function AddContentModal({
   open,
@@ -28,7 +28,7 @@ export function AddContentModal({
   onAddProduct: (event: FormEvent<HTMLFormElement>) => void;
   onCreateProduct: (event: FormEvent<HTMLFormElement>) => void;
 }) {
-  const [kind, setKind] = useState<ContentKind>("link");
+  const [kind, setKind] = useState<ContentKind>("choose");
 
   useEffect(() => {
     if (!open) return;
@@ -71,41 +71,47 @@ export function AddContentModal({
             <HiOutlineXMark aria-hidden="true" />
           </button>
         </header>
-        <div className="sp-add-content-types" role="tablist" aria-label="Tipo de conteúdo">
-          <button
-            type="button"
-            role="tab"
-            aria-selected={kind === "link"}
-            onClick={() => setKind("link")}
-          >
-            <HiOutlineLink aria-hidden="true" />
-            Link
-          </button>
-          <button
-            type="button"
-            role="tab"
-            aria-selected={kind === "product"}
-            onClick={() => setKind("product")}
-          >
-            <HiOutlineShoppingBag aria-hidden="true" />
-            Produto
-          </button>
-          <button
-            type="button"
-            role="tab"
-            aria-selected={kind === "create-product"}
-            onClick={() => setKind("create-product")}
-          >
-            <HiOutlineShoppingBag aria-hidden="true" />
-            Novo produto
-          </button>
-        </div>
         {failure && <p className="sp-add-content-error" role="alert">{failure}</p>}
+        {kind === "choose" ? (
+          <div className="sp-add-content-choices" aria-label="Tipo de conteúdo">
+            <button type="button" onClick={() => setKind("link")}>
+              <HiOutlineLink aria-hidden="true" />
+              <span>
+                <strong>Link</strong>
+                <small>Adicione qualquer endereço</small>
+              </span>
+              <span aria-hidden="true">›</span>
+            </button>
+            <button type="button" onClick={() => setKind("product")}>
+              <HiOutlineShoppingBag aria-hidden="true" />
+              <span>
+                <strong>Produto</strong>
+                <small>Venda ou destaque um produto</small>
+              </span>
+              <span aria-hidden="true">›</span>
+            </button>
+          </div>
+        ) : (
+          <button
+            type="button"
+            className="sp-add-content-back"
+            onClick={() => setKind(kind === "create-product" ? "product" : "choose")}
+          >
+            ← {kind === "create-product" ? "Adicionar produto" : "Adicionar à sua página"}
+          </button>
+        )}
         {kind === "link" ? (
           <form className="sp-add-content-form" noValidate onSubmit={onAddLink}>
             <SmartField>
               Título
-              <input required name="title" maxLength={120} placeholder="Meu portfólio" autoFocus />
+              <input
+                required
+                name="title"
+                maxLength={120}
+                placeholder="Meu portfólio"
+                autoComplete="off"
+                autoFocus
+              />
             </SmartField>
             <BlockDestinationFields links={links} />
             <SmartField className="smart-page-check">
@@ -117,6 +123,20 @@ export function AddContentModal({
           </form>
         ) : kind === "product" ? (
           <form className="sp-add-content-form" noValidate onSubmit={onAddProduct}>
+            <div className="sp-add-content-product-heading">
+              <div>
+                <strong>Adicionar produto</strong>
+                <small>Escolha um produto da sua loja ou crie um novo.</small>
+              </div>
+              <button
+                type="button"
+                className="button button-secondary"
+                disabled={busy}
+                onClick={() => setKind("create-product")}
+              >
+                + Criar novo produto
+              </button>
+            </div>
             {products.some((product) => product.status !== "archived") ? (
               <>
                 <SmartField>
@@ -151,9 +171,21 @@ export function AddContentModal({
           </form>
         ) : (
           <form className="sp-add-content-form" noValidate onSubmit={onCreateProduct}>
+            <div className="sp-add-content-product-heading">
+              <div>
+                <strong>Criar produto</strong>
+                <small>Depois você poderá adicioná-lo à sua página.</small>
+              </div>
+            </div>
             <SmartField>
               Nome do produto
-              <input required name="name" maxLength={120} autoFocus />
+              <input
+                required
+                name="name"
+                maxLength={120}
+                autoComplete="off"
+                autoFocus
+              />
             </SmartField>
             <SmartField>
               Endereço do produto
@@ -163,6 +195,7 @@ export function AddContentModal({
                 minLength={3}
                 maxLength={140}
                 pattern="[a-z0-9]+(?:-[a-z0-9]+)*"
+                autoComplete="off"
               />
             </SmartField>
             <SmartField>
@@ -176,7 +209,16 @@ export function AddContentModal({
             </SmartField>
             <SmartField>
               Preço (R$)
-              <input required name="price" type="number" min="0" max="9999999.99" step="0.01" />
+              <input
+                required
+                name="price"
+                type="number"
+                min="0"
+                max="9999999.99"
+                step="0.01"
+                inputMode="decimal"
+                autoComplete="off"
+              />
             </SmartField>
             <SmartField>
               Status
