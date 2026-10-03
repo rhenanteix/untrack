@@ -227,11 +227,11 @@ export function SmartPagesDashboard({
   );
   const activeSocialUrl = activeSocial
     ? (draftSocialLinks.find((social) => social.network === activeSocial.value)
-        ?.url ?? "")
+      ?.url ?? "")
     : "";
   const activeSocialLabel = activeSocial
     ? (draftSocialLinks.find((social) => social.network === activeSocial.value)
-        ?.label ?? "")
+      ?.label ?? "")
     : "";
   useEffect(() => {
     if (!hasUnsaved) return;
@@ -312,7 +312,7 @@ export function SmartPagesDashboard({
       !draft ||
       autosavingBlockId.current ||
       failedBlockDraftVersions.current[blockId] ===
-        blockDraftVersions.current[blockId]
+      blockDraftVersions.current[blockId]
     )
       return;
     const version = blockDraftVersions.current[blockId] ?? 0;
@@ -340,11 +340,11 @@ export function SmartPagesDashboard({
           setSelected((current) =>
             current
               ? {
-                  ...current,
-                  blocks: current.blocks.map((item) =>
-                    item.id === updated.id ? updated : item,
-                  ),
-                }
+                ...current,
+                blocks: current.blocks.map((item) =>
+                  item.id === updated.id ? updated : item,
+                ),
+              }
               : current,
           );
           if (blockDraftVersions.current[blockId] !== version) return;
@@ -774,11 +774,11 @@ export function SmartPagesDashboard({
       setSelected((current) =>
         current
           ? {
-              ...current,
-              blocks: current.blocks.map((item) =>
-                item.id === updated.id ? updated : item,
-              ),
-            }
+            ...current,
+            blocks: current.blocks.map((item) =>
+              item.id === updated.id ? updated : item,
+            ),
+          }
           : current,
       );
       setDirtyBlocks((ids) => ids.filter((id) => id !== block.id));
@@ -810,11 +810,11 @@ export function SmartPagesDashboard({
       setSelected((current) =>
         current
           ? {
-              ...current,
-              blocks: current.blocks.map((item) =>
-                item.id === updated.id ? updated : item,
-              ),
-            }
+            ...current,
+            blocks: current.blocks.map((item) =>
+              item.id === updated.id ? updated : item,
+            ),
+          }
           : current,
       );
       action.setNotice("Conteúdo atualizado.");
@@ -831,9 +831,9 @@ export function SmartPagesDashboard({
       setSelected((current) =>
         current
           ? {
-              ...current,
-              blocks: current.blocks.filter((block) => block.id !== blockId),
-            }
+            ...current,
+            blocks: current.blocks.filter((block) => block.id !== blockId),
+          }
           : current,
       );
       setDirtyBlocks((ids) => ids.filter((id) => id !== blockId));
@@ -854,11 +854,11 @@ export function SmartPagesDashboard({
     setSelected((current) =>
       current
         ? {
-            ...current,
-            blocks: current.blocks.map((item) =>
-              item.id === block.id ? { ...item, visible } : item,
-            ),
-          }
+          ...current,
+          blocks: current.blocks.map((item) =>
+            item.id === block.id ? { ...item, visible } : item,
+          ),
+        }
         : current,
     );
     await action.run(async () => {
@@ -870,37 +870,37 @@ export function SmartPagesDashboard({
             body: JSON.stringify(
               block.type === "product"
                 ? {
-                    type: "product",
-                    productId: block.productId,
-                    visible,
-                    analyticsEnabled: block.analyticsEnabled,
-                    settings: {
-                      buttonLabel: block.settings.buttonLabel ?? "Ver produto",
-                    },
-                  }
-                : {
-                    type: "link",
-                    linkId: block.linkId ?? null,
-                    visible,
-                    analyticsEnabled: block.analyticsEnabled,
-                    settings: {
-                      title: block.settings.title ?? "",
-                      destinationUrl:
-                        block.settings.destinationUrl || undefined,
-                      openInNewTab: block.settings.openInNewTab ?? true,
-                    },
+                  type: "product",
+                  productId: block.productId,
+                  visible,
+                  analyticsEnabled: block.analyticsEnabled,
+                  settings: {
+                    buttonLabel: block.settings.buttonLabel ?? "Ver produto",
                   },
+                }
+                : {
+                  type: "link",
+                  linkId: block.linkId ?? null,
+                  visible,
+                  analyticsEnabled: block.analyticsEnabled,
+                  settings: {
+                    title: block.settings.title ?? "",
+                    destinationUrl:
+                      block.settings.destinationUrl || undefined,
+                    openInNewTab: block.settings.openInNewTab ?? true,
+                  },
+                },
             ),
           },
         );
         setSelected((current) =>
           current
             ? {
-                ...current,
-                blocks: current.blocks.map((item) =>
-                  item.id === updated.id ? updated : item,
-                ),
-              }
+              ...current,
+              blocks: current.blocks.map((item) =>
+                item.id === updated.id ? updated : item,
+              ),
+            }
             : current,
         );
         setBlockDrafts((current) => {
@@ -1329,7 +1329,7 @@ export function SmartPagesDashboard({
                     <h2 ref={editorRef} tabIndex={-1}>
                       {selected.title}
                     </h2>
-                    <p className="sp-editor-url">untrack.app/{selected.slug}</p>
+                    <p className="sp-editor-url">linkor.me/{selected.slug}</p>
                     <p className="smart-page-save-status" role="status">
                       {action.busy
                         ? "Salvando…"
@@ -1856,8 +1856,8 @@ export function SmartPagesDashboard({
                   busy={action.busy}
                   failure={
                     activeForm === "add" ||
-                    activeForm === "add-product" ||
-                    activeForm === "create-product"
+                      activeForm === "add-product" ||
+                      activeForm === "create-product"
                       ? action.error
                       : ""
                   }
