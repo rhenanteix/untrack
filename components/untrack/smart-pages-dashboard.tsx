@@ -9,7 +9,6 @@ import {
   type CSSProperties,
   type FormEvent,
 } from "react";
-import type { IconType } from "react-icons";
 import {
   HiOutlineArrowLeft,
   HiOutlineArrowPath,
@@ -26,17 +25,6 @@ import {
   HiOutlineShare,
   HiOutlineUserCircle,
 } from "react-icons/hi2";
-import {
-  FaEnvelope,
-  FaFacebookF,
-  FaGlobe,
-  FaInstagram,
-  FaLinkedinIn,
-  FaTiktok,
-  FaWhatsapp,
-  FaXTwitter,
-  FaYoutube,
-} from "react-icons/fa6";
 import { AppearanceControls } from "@/components/smart-pages/appearance-controls";
 import { AddContentModal } from "@/components/smart-pages/editor/add-content-modal";
 import { ContentList } from "@/components/smart-pages/editor/content-list";
@@ -53,18 +41,13 @@ import { ActionStatus, apiRequest, useAction } from "./shared";
 
 import { ThemeGallery } from "@/components/smart-pages/theme-gallery";
 import type { SmartPageTheme } from "@/modules/smart-pages/themes";
+import {
+  socialProviders,
+  type SocialProviderId,
+} from "@/modules/social-providers";
 
 type PageStatus = "draft" | "published";
-type SocialNetwork =
-  | "instagram"
-  | "tiktok"
-  | "youtube"
-  | "linkedin"
-  | "x"
-  | "facebook"
-  | "whatsapp"
-  | "website"
-  | "email";
+type SocialNetwork = SocialProviderId;
 
 type SocialLink = {
   network: SocialNetwork;
@@ -72,67 +55,12 @@ type SocialLink = {
   label?: string;
 };
 
-const socialNetworks: {
-  value: SocialNetwork;
-  label: string;
-  placeholder: string;
-  Icon: IconType;
-}[] = [
-  {
-    value: "instagram",
-    label: "Instagram",
-    placeholder: "https://instagram.com/seuperfil",
-    Icon: FaInstagram,
-  },
-  {
-    value: "tiktok",
-    label: "TikTok",
-    placeholder: "https://tiktok.com/@seuperfil",
-    Icon: FaTiktok,
-  },
-  {
-    value: "youtube",
-    label: "YouTube",
-    placeholder: "https://youtube.com/@seucanal",
-    Icon: FaYoutube,
-  },
-  {
-    value: "linkedin",
-    label: "LinkedIn",
-    placeholder: "https://linkedin.com/in/seuperfil",
-    Icon: FaLinkedinIn,
-  },
-  {
-    value: "x",
-    label: "X",
-    placeholder: "https://x.com/seuperfil",
-    Icon: FaXTwitter,
-  },
-  {
-    value: "facebook",
-    label: "Facebook",
-    placeholder: "https://facebook.com/seuperfil",
-    Icon: FaFacebookF,
-  },
-  {
-    value: "whatsapp",
-    label: "WhatsApp",
-    placeholder: "https://wa.me/5511999999999",
-    Icon: FaWhatsapp,
-  },
-  {
-    value: "website",
-    label: "Site",
-    placeholder: "https://seusite.com",
-    Icon: FaGlobe,
-  },
-  {
-    value: "email",
-    label: "E-mail",
-    placeholder: "voce@exemplo.com",
-    Icon: FaEnvelope,
-  },
-];
+const socialNetworks = socialProviders.map((provider) => ({
+  value: provider.id,
+  label: provider.name,
+  placeholder: provider.placeholder,
+  Icon: provider.icon,
+}));
 
 interface SmartPageSummary {
   id: string;

@@ -35,8 +35,13 @@ describe("Smart Card schemas", () => {
     const card = smartCardInputSchema.parse({
       slug: " Ana-Silva ",
       firstName: "Ana",
+      contactPoints: [{ type: "phone", value: "+55 11 99999-9999" }],
+      socialLinks: [{ providerId: "instagram", url: "@ana" }],
     });
     expect(card.slug).toBe("ana-silva");
+    expect(card.socialLinks).toEqual([
+      { providerId: "instagram", url: "https://instagram.com/ana" },
+    ]);
     expect(card.contactForm.fields).toEqual(
       expect.arrayContaining([
         expect.objectContaining({ key: "firstName", required: true }),

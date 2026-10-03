@@ -8,8 +8,13 @@ import {
   defaultSmartCardContactForm,
   defaultSmartCardTheme,
   smartCardContactFormSchema,
+  smartCardSocialLinksSchema,
   smartCardThemeSchema,
 } from "@/modules/smart-cards/schemas";
+import {
+  walletCanIssue,
+  walletConfiguration,
+} from "@/modules/smart-cards/wallet-config";
 
 export const dynamic = "force-dynamic";
 
@@ -57,12 +62,29 @@ export default async function SmartCardPublicPage({
   const contactForm =
     smartCardContactFormSchema.safeParse(card.contactForm).data ??
     defaultSmartCardContactForm;
+  const socialLinks =
+    smartCardSocialLinksSchema.safeParse(card.socialLinks).data ?? [];
+  const wallet = {
+    apple:
+      walletCanIssue(walletConfiguration("apple")) &&
+      card.walletPasses.some(
+        (pass) => pass.provider === "apple" && pass.status === "synced",
+      ),
+    google:
+      walletCanIssue(walletConfiguration("google")) &&
+      card.walletPasses.some(
+        (pass) => pass.provider === "google" && pass.status === "synced",
+      ),
+    qr: Boolean(card.qrAsset),
+  };
   return (
     <PublicSmartCard
-      card={card}
+      card={{ ...card, socialLinks }}
       contactForm={contactForm}
       theme={theme}
       source={source}
+      wallet={wallet}
+      publicUrl={new URL(`/c/${encodeURIComponent(card.slug)}`, appUrl()).href}
     />
   );
 }

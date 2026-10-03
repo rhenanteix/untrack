@@ -11,9 +11,12 @@ export const publicSmartCardEventNames = [
   "card_share",
   "qr_scan",
   "nfc_open",
+  "apple_wallet_add_click",
+  "google_wallet_add_click",
   "contact_save",
   "contact_form_open",
   "link_click",
+  "social_click",
   "whatsapp_click",
   "booking_click",
 ] as const;
@@ -48,13 +51,19 @@ export async function recordPublicSmartCardEvent(
       : input.event === "card_share"
         ? "share_details_open"
         : input.event === "qr_scan"
-          ? "qr_scan"
+            ? "smart_card_qr_scan"
+            : input.event === "apple_wallet_add_click"
+              ? "apple_wallet_add_click"
+              : input.event === "google_wallet_add_click"
+                ? "google_wallet_add_click"
           : input.event === "contact_save"
             ? "save_contact_click"
             : input.event === "contact_form_open"
               ? "form_view"
               : input.event === "whatsapp_click"
                 ? "whatsapp_click"
+                : input.event === "social_click"
+                  ? "social_click"
                 : input.event === "booking_click"
                   ? "button_click"
                   : action?.type === "website"

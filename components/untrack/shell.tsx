@@ -219,7 +219,7 @@ function UserMenu({ name, plan }: { name: string; plan: string }) {
         >
           Meu plano
         </Link>
-        <Link href="/settings/account#preferencias">Preferências</Link>
+        <Link href="/settings/account#preferencias">Configurações</Link>
         <Link href="/ajuda">Ajuda</Link>
         <hr />
         <SignOutButton />

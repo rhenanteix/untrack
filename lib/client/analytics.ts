@@ -33,9 +33,12 @@ type SmartCardEvent =
   | "card_share"
   | "qr_scan"
   | "nfc_open"
+  | "apple_wallet_add_click"
+  | "google_wallet_add_click"
   | "contact_save"
   | "contact_form_open"
   | "link_click"
+  | "social_click"
   | "whatsapp_click"
   | "booking_click";
 
@@ -144,6 +147,7 @@ export const analytics = {
     source: string,
     actionId?: string,
     contactId?: string,
+    providerId?: string,
   ) {
     if (typeof window === "undefined") return Promise.resolve(undefined);
     return post("/api/smart-cards/events", {
@@ -153,6 +157,7 @@ export const analytics = {
       source,
       actionId,
       contactId,
+      providerId,
       ...publicIdentity(),
     });
   },

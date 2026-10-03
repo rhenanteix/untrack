@@ -25,6 +25,13 @@ import {
   FiTrash2,
   FiX,
 } from "react-icons/fi";
+import type { WalletConfigurationState } from "@/modules/smart-cards/wallet-config";
+import {
+  getSocialProvider,
+  normalizeSocialUrl,
+  socialProviders,
+  type SocialProviderId,
+} from "@/modules/social-providers";
 import { apiRequest } from "./shared";
 import styles from "./smart-cards-dashboard.module.css";
 
@@ -67,6 +74,31 @@ type ContactForm = {
   primaryCta: "save_contact" | "share_contact" | "first_action";
 };
 
+type ContactPoint = {
+  type: "phone" | "email";
+  value: string;
+  label?: string;
+};
+
+type SocialLink = {
+  providerId: SocialProviderId;
+  url: string;
+  label?: string;
+};
+
+type WalletStatus = {
+  providers: {
+    provider: "apple" | "google";
+    state: WalletConfigurationState;
+    message: string;
+    pass: {
+      status: "pending_sync" | "synced" | "sync_failed" | "revoked";
+      lastSyncedAt: string | null;
+      lastError: string | null;
+    } | null;
+  }[];
+};
+
 type SmartCard = {
   id: string;
   ownerId: string;
@@ -84,6 +116,8 @@ type SmartCard = {
   email: string | null;
   websiteUrl: string | null;
   location: string | null;
+  contactPoints: ContactPoint[];
+  socialLinks: SocialLink[];
   theme: {
     preset:
       "minimal" | "professional" | "creator" | "dark" | "bold" | "corporate";
@@ -108,6 +142,10 @@ type SmartCard = {
 type Metrics = {
   periodDays: number;
   views: number;
+  qrScans: number;
+  appleWalletClicks: number;
+  googleWalletClicks: number;
+  walletAddsConfirmed: number | null;
   uniqueVisitors: number;
   interactions: number;
   contacts: number;
@@ -118,7 +156,7 @@ type Metrics = {
 };
 
 type Tab =
-  "profile" | "content" | "appearance" | "capture" | "sharing" | "analytics";
+  "identity" | "contact" | "socials" | "appearance" | "wallet" | "analytics";
 type Filter = "all" | "mine" | "team" | "active" | "archived";
 type SaveStatus = "saved" | "saving" | "error";
 
@@ -132,6 +170,7 @@ type ContactDetailsDraft = {
   whatsapp: string | null;
   websiteUrl: string | null;
   publicDetails: ContactForm["publicDetails"];
+  contactPoints: ContactPoint[];
 };
 
 const blankContactForm: ContactForm = {
@@ -204,6 +243,8 @@ function toPayload(card: SmartCard) {
     email: card.email,
     websiteUrl: card.websiteUrl,
     location: card.location,
+    contactPoints: card.contactPoints,
+    socialLinks: card.socialLinks,
     theme: card.theme,
     contactForm: card.contactForm,
     privacyPolicyUrl: card.privacyPolicyUrl,
@@ -260,9 +301,9 @@ export function SmartCardsDashboard({
   const [draft, setDraft] = useState<SmartCard | null>(
     initial.items[0] ?? null,
   );
-  const [tab, setTab] = useState<Tab>("profile");
-  const [previewMode, setPreviewMode] = useState<"mobile" | "desktop" | "qr">(
-    "mobile",
+  const [tab, setTab] = useState<Tab>("identity");
+  const [previewMode, setPreviewMode] = useState<"web" | "apple" | "google">(
+    "web",
   );
   const [filter, setFilter] = useState<Filter>("all");
   const [search, setSearch] = useState("");
@@ -271,11 +312,16 @@ export function SmartCardsDashboard({
   const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
   const [metrics, setMetrics] = useState<Metrics | null>(null);
+  const [walletStatus, setWalletStatus] = useState<WalletStatus | null>(null);
   const [qrDataUrl, setQrDataUrl] = useState("");
   const [draggedAction, setDraggedAction] = useState<number | null>(null);
   const [showShare, setShowShare] = useState(false);
   const [contactDetails, setContactDetails] =
     useState<ContactDetailsDraft | null>(null);
+  const [socialPickerOpen, setSocialPickerOpen] = useState(false);
+  const [socialSearch, setSocialSearch] = useState("");
+  const [socialDraft, setSocialDraft] = useState<SocialLink | null>(null);
+  const [socialError, setSocialError] = useState("");
   const [saveStatus, setSaveStatus] = useState<SaveStatus>("saved");
   const lastSavedPayload = useRef(
     initial.items[0] ? payloadSignature(initial.items[0]) : "",
@@ -303,10 +349,13 @@ export function SmartCardsDashboard({
       ...card,
       actions: card.actions.map((action) => ({ ...action })),
       contactForm: cloneForm(card.contactForm),
+      contactPoints: card.contactPoints.map((point) => ({ ...point })),
+      socialLinks: card.socialLinks.map((link) => ({ ...link })),
     };
     setSelected(nextCard);
     setDraft(nextCard);
     setMetrics(null);
+    setWalletStatus(null);
     setQrDataUrl(card.qrAsset?.encodedUrl ?? "");
     setShowCreate(false);
     setNotice("");
@@ -330,11 +379,21 @@ export function SmartCardsDashboard({
       whatsapp: card.whatsapp,
       websiteUrl: card.websiteUrl,
       publicDetails: { ...card.contactForm.publicDetails },
+      contactPoints: card.contactPoints.map((point) => ({ ...point })),
     });
   }
 
   function saveContactDetails() {
     if (!draft || !contactDetails) return;
+    const invalidContactPoint = contactDetails.contactPoints.some((point) =>
+      point.type === "phone"
+        ? !/^\+?[0-9 ()-]{7,24}$/.test(point.value)
+        : !/^\S+@\S+\.\S+$/.test(point.value),
+    );
+    if (invalidContactPoint) {
+      setError("Complete os telefones e e-mails adicionais antes de salvar.");
+      return;
+    }
     updateDraft({
       firstName: contactDetails.firstName,
       lastName: contactDetails.lastName,
@@ -344,12 +403,39 @@ export function SmartCardsDashboard({
       phone: contactDetails.phone,
       whatsapp: contactDetails.whatsapp,
       websiteUrl: contactDetails.websiteUrl,
+      contactPoints: contactDetails.contactPoints,
       contactForm: {
         ...draft.contactForm,
         publicDetails: { ...contactDetails.publicDetails },
       },
     });
     setContactDetails(null);
+  }
+
+  function saveSocialLink(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!draft || !socialDraft) return;
+    const url = normalizeSocialUrl(socialDraft.providerId, socialDraft.url);
+    if (!url) {
+      setSocialError("Informe um endereço válido para esta rede.");
+      return;
+    }
+    updateDraft({
+      socialLinks: [
+        ...draft.socialLinks.filter(
+          (link) => link.providerId !== socialDraft.providerId,
+        ),
+        {
+          ...socialDraft,
+          url,
+          ...(socialDraft.label?.trim()
+            ? { label: socialDraft.label.trim() }
+            : {}),
+        },
+      ],
+    });
+    setSocialDraft(null);
+    setSocialError("");
   }
 
   async function saveCard() {
@@ -503,6 +589,53 @@ export function SmartCardsDashboard({
     }
   }
 
+  async function loadWalletStatus() {
+    if (!selected) return;
+    setBusy(true);
+    setError("");
+    try {
+      setWalletStatus(
+        await apiRequest<WalletStatus>(
+          `/api/smart-cards/${selected.id}/wallet`,
+        ),
+      );
+    } catch (requestError) {
+      setError(
+        requestError instanceof Error
+          ? requestError.message
+          : "Não foi possível carregar o status de Wallet.",
+      );
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function syncWallet(provider: "apple" | "google") {
+    if (!selected || !canEdit) return;
+    setBusy(true);
+    setError("");
+    try {
+      await apiRequest(`/api/smart-cards/${selected.id}/wallet`, {
+        method: "POST",
+        body: JSON.stringify({ provider }),
+      });
+      setNotice(
+        provider === "apple"
+          ? "Apple Wallet sincronizado."
+          : "Google Wallet sincronizado.",
+      );
+      await loadWalletStatus();
+    } catch (requestError) {
+      setError(
+        requestError instanceof Error
+          ? requestError.message
+          : "Não foi possível sincronizar o passe.",
+      );
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function generateQr() {
     if (!selected) return;
     setBusy(true);
@@ -594,11 +727,8 @@ export function SmartCardsDashboard({
       <header className={styles.heading}>
         <div>
           <span className="eyebrow">Smart Cards</span>
-          <h1>Transforme cada encontro em uma conexão mensurável.</h1>
-          <p>
-            Compartilhe sua identidade, capture interesse e acompanhe o que
-            acontece depois.
-          </p>
+          <h1>Cartões profissionais preparados para Wallet.</h1>
+          <p>Seu cartão profissional sempre com você.</p>
         </div>
         {canEdit && (
           <button
@@ -763,18 +893,22 @@ export function SmartCardsDashboard({
               </button>
             ))
           ) : (
-            <p className={styles.empty}>Nenhum cartão com este filtro.</p>
+            <p className={styles.empty}>
+              {cards.length
+                ? "Nenhum cartão com este filtro."
+                : "Crie seu primeiro Smart Card."}
+            </p>
           )}
           {activeCard && (
             <nav className={styles.sectionNav} aria-label="Editor do cartão">
               <span>Configurações</span>
               {(
                 [
-                  "profile",
-                  "content",
+                  "identity",
+                  "contact",
+                  "socials",
                   "appearance",
-                  "capture",
-                  "sharing",
+                  "wallet",
                   "analytics",
                 ] as const
               ).map((value) => (
@@ -785,15 +919,16 @@ export function SmartCardsDashboard({
                   onClick={() => {
                     setTab(value);
                     if (value === "analytics") void loadMetrics();
+                    if (value === "wallet") void loadWalletStatus();
                   }}
                 >
                   {
                     {
-                      profile: "Perfil",
-                      content: "Conteúdo",
+                      identity: "Identidade",
+                      contact: "Contato",
+                      socials: "Redes",
                       appearance: "Aparência",
-                      capture: "Captura",
-                      sharing: "Compartilhamento",
+                      wallet: "Wallet",
                       analytics: "Analytics",
                     }[value]
                   }
@@ -874,7 +1009,7 @@ export function SmartCardsDashboard({
 
             <div className={styles.editorGrid}>
               <div className={styles.editor}>
-                {tab === "profile" && (
+                {tab === "identity" && (
                   <div className={styles.panel}>
                     <h3>Identidade</h3>
                     <p>
@@ -926,38 +1061,6 @@ export function SmartCardsDashboard({
                           maxLength={120}
                         />
                       </label>
-                      <label>
-                        Localização
-                        <input
-                          disabled={!canEdit}
-                          value={activeCard.location ?? ""}
-                          onChange={(event) =>
-                            updateDraft({
-                              location: event.target.value || null,
-                            })
-                          }
-                          maxLength={160}
-                        />
-                      </label>
-                      <label>
-                        Campanha
-                        <select
-                          disabled={!canEdit}
-                          value={activeCard.campaignId ?? ""}
-                          onChange={(event) =>
-                            updateDraft({
-                              campaignId: event.target.value || null,
-                            })
-                          }
-                        >
-                          <option value="">Sem campanha</option>
-                          {campaigns.map((campaign) => (
-                            <option key={campaign.id} value={campaign.id}>
-                              {campaign.name}
-                            </option>
-                          ))}
-                        </select>
-                      </label>
                       <label className={styles.full}>
                         Descrição
                         <textarea
@@ -982,208 +1085,241 @@ export function SmartCardsDashboard({
                           }
                         />
                       </label>
-                      <label>
-                        Logo (URL)
-                        <input
-                          disabled={!canEdit}
-                          type="url"
-                          value={activeCard.logoUrl ?? ""}
-                          onChange={(event) =>
-                            updateDraft({ logoUrl: event.target.value || null })
-                          }
-                        />
-                      </label>
                     </div>
-                    <section className={styles.contactSummary}>
+                  </div>
+                )}
+
+                {tab === "socials" && (
+                  <div className={styles.panel}>
+                    <div className={styles.socialHeading}>
                       <div>
-                        <span>Contato</span>
-                        <h4>Detalhes públicos</h4>
+                        <h3>Redes sociais</h3>
                         <p>
-                          Escolha o que visitantes podem salvar no seu contato.
+                          Adicione apenas os canais que fazem sentido para o
+                          cartão profissional.
                         </p>
-                      </div>
-                      <button
-                        className="button button-secondary"
-                        type="button"
-                        disabled={!canEdit}
-                        onClick={() => editContactDetails(activeCard)}
-                      >
-                        Editar contato
-                      </button>
-                    </section>
-                    <div className={styles.actionHeading}>
-                      <div>
-                        <h3>Redes e CTAs</h3>
-                        <p>Arraste para ordenar como aparecem no cartão.</p>
                       </div>
                       {canEdit && (
                         <button
                           className="button button-secondary"
                           type="button"
-                          onClick={() =>
-                            replaceActions([
-                              ...activeCard.actions,
-                              {
-                                type: "website",
-                                label: "Novo link",
-                                url: "https://",
-                                visible: true,
-                                analyticsEnabled: true,
-                              },
-                            ])
-                          }
+                          onClick={() => {
+                            setSocialSearch("");
+                            setSocialPickerOpen(true);
+                          }}
                         >
-                          <FiPlus aria-hidden="true" /> Adicionar
+                          <FiPlus aria-hidden="true" /> Adicionar rede
                         </button>
                       )}
                     </div>
-                    <ul className={styles.actionList}>
-                      {activeCard.actions.map((action, index) => (
-                        <li
-                          key={`${action.id ?? "new"}-${index}`}
-                          draggable={canEdit}
-                          onDragStart={() => setDraggedAction(index)}
-                          onDragOver={(event) => event.preventDefault()}
-                          onDrop={(event) => dropAction(event, index)}
-                        >
-                          <span
-                            className={styles.dragHandle}
-                            aria-hidden="true"
+                    {activeCard.socialLinks.length ? (
+                      <ul className={styles.socialList}>
+                        {activeCard.socialLinks.map((link) => {
+                          const provider = getSocialProvider(link.providerId);
+                          if (!provider) return null;
+                          const Icon = provider.icon;
+                          return (
+                            <li key={link.providerId}>
+                              <span className={styles.socialIcon}>
+                                <Icon aria-hidden="true" />
+                              </span>
+                              <div>
+                                <strong>{provider.name}</strong>
+                                <small>{link.label || link.url}</small>
+                              </div>
+                              {canEdit && (
+                                <div className={styles.socialTools}>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setSocialError("");
+                                      setSocialDraft({ ...link });
+                                    }}
+                                  >
+                                    Editar
+                                  </button>
+                                  <button
+                                    type="button"
+                                    aria-label={`Remover ${provider.name}`}
+                                    title={`Remover ${provider.name}`}
+                                    onClick={() =>
+                                      updateDraft({
+                                        socialLinks:
+                                          activeCard.socialLinks.filter(
+                                            (item) =>
+                                              item.providerId !==
+                                              link.providerId,
+                                          ),
+                                      })
+                                    }
+                                  >
+                                    <FiTrash2 aria-hidden="true" />
+                                  </button>
+                                </div>
+                              )}
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    ) : (
+                      <p className={styles.empty}>
+                        Nenhuma rede adicionada a este cartão.
+                      </p>
+                    )}
+                    <section className={styles.linkActionsSection}>
+                      <div className={styles.actionHeading}>
+                        <div>
+                          <h3>Links e CTAs</h3>
+                          <p>Arraste para ordenar como aparecem no cartão.</p>
+                        </div>
+                        {canEdit && (
+                          <button
+                            className="button button-secondary"
+                            type="button"
+                            onClick={() =>
+                              replaceActions([
+                                ...activeCard.actions,
+                                {
+                                  type: "website",
+                                  label: "Novo link",
+                                  url: "https://",
+                                  visible: true,
+                                  analyticsEnabled: true,
+                                },
+                              ])
+                            }
                           >
-                            ⠿
-                          </span>
-                          <label>
-                            Rótulo
-                            <input
-                              disabled={!canEdit}
-                              value={action.label}
-                              maxLength={80}
-                              onChange={(event) =>
-                                replaceActions(
-                                  activeCard.actions.map((item, position) =>
-                                    position === index
-                                      ? { ...item, label: event.target.value }
-                                      : item,
-                                  ),
-                                )
-                              }
-                            />
-                          </label>
-                          <label>
-                            Destino
-                            <input
-                              disabled={!canEdit}
-                              value={action.url}
-                              maxLength={4096}
-                              onChange={(event) =>
-                                replaceActions(
-                                  activeCard.actions.map((item, position) =>
-                                    position === index
-                                      ? { ...item, url: event.target.value }
-                                      : item,
-                                  ),
-                                )
-                              }
-                            />
-                          </label>
-                          <label>
-                            Tipo
-                            <select
-                              disabled={!canEdit}
-                              value={action.type}
-                              onChange={(event) =>
-                                replaceActions(
-                                  activeCard.actions.map((item, position) =>
-                                    position === index
-                                      ? {
-                                          ...item,
-                                          type: event.target
-                                            .value as ActionType,
-                                        }
-                                      : item,
-                                  ),
-                                )
-                              }
+                            <FiPlus aria-hidden="true" /> Adicionar link
+                          </button>
+                        )}
+                      </div>
+                      <ul className={styles.actionList}>
+                        {activeCard.actions.map((action, index) => (
+                          <li
+                            key={`${action.id ?? "new"}-${index}`}
+                            draggable={canEdit}
+                            onDragStart={() => setDraggedAction(index)}
+                            onDragOver={(event) => event.preventDefault()}
+                            onDrop={(event) => dropAction(event, index)}
+                          >
+                            <span
+                              className={styles.dragHandle}
+                              aria-hidden="true"
                             >
-                              {[
-                                "website",
-                                "whatsapp",
-                                "email",
-                                "phone",
-                                "calendar",
-                                "smartPage",
-                                "custom",
-                              ].map((type) => (
-                                <option key={type} value={type}>
-                                  {type}
-                                </option>
-                              ))}
-                            </select>
-                          </label>
-                          {canEdit && (
-                            <div className={styles.actionTools}>
-                              <button
-                                type="button"
-                                title="Mover ação para cima"
-                                aria-label="Mover ação para cima"
-                                onClick={() => moveAction(index, index - 1)}
-                              >
-                                <FiArrowUp />
-                              </button>
-                              <button
-                                type="button"
-                                title="Mover ação para baixo"
-                                aria-label="Mover ação para baixo"
-                                onClick={() => moveAction(index, index + 1)}
-                              >
-                                <FiArrowDown />
-                              </button>
-                              <button
-                                type="button"
-                                title="Remover ação"
-                                aria-label="Remover ação"
-                                onClick={() =>
+                              ⠿
+                            </span>
+                            <label>
+                              Rótulo
+                              <input
+                                disabled={!canEdit}
+                                value={action.label}
+                                maxLength={80}
+                                onChange={(event) =>
                                   replaceActions(
-                                    activeCard.actions.filter(
-                                      (_, position) => position !== index,
+                                    activeCard.actions.map((item, position) =>
+                                      position === index
+                                        ? {
+                                            ...item,
+                                            label: event.target.value,
+                                          }
+                                        : item,
+                                    ),
+                                  )
+                                }
+                              />
+                            </label>
+                            <label>
+                              Destino
+                              <input
+                                disabled={!canEdit}
+                                value={action.url}
+                                maxLength={4096}
+                                onChange={(event) =>
+                                  replaceActions(
+                                    activeCard.actions.map((item, position) =>
+                                      position === index
+                                        ? {
+                                            ...item,
+                                            url: event.target.value,
+                                          }
+                                        : item,
+                                    ),
+                                  )
+                                }
+                              />
+                            </label>
+                            <label>
+                              Tipo
+                              <select
+                                disabled={!canEdit}
+                                value={action.type}
+                                onChange={(event) =>
+                                  replaceActions(
+                                    activeCard.actions.map((item, position) =>
+                                      position === index
+                                        ? {
+                                            ...item,
+                                            type: event.target
+                                              .value as ActionType,
+                                          }
+                                        : item,
                                     ),
                                   )
                                 }
                               >
-                                <FiTrash2 />
-                              </button>
-                            </div>
-                          )}
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-
-                {tab === "content" && (
-                  <div className={styles.panel}>
-                    <h3>Conteúdo</h3>
-                    <p>
-                      Seus links e CTAs aparecem no cartão na mesma ordem em que
-                      foram configurados no perfil.
-                    </p>
-                    <div className={styles.contentSummary}>
-                      <strong>{activeCard.actions.length}</strong>
-                      <span>
-                        {activeCard.actions.length === 1
-                          ? "link ou CTA configurado"
-                          : "links ou CTAs configurados"}
-                      </span>
-                    </div>
-                    {canEdit && (
-                      <button
-                        className="button button-secondary"
-                        type="button"
-                        onClick={() => setTab("profile")}
-                      >
-                        Editar links e CTAs
-                      </button>
-                    )}
+                                {[
+                                  "website",
+                                  "whatsapp",
+                                  "email",
+                                  "phone",
+                                  "calendar",
+                                  "smartPage",
+                                  "custom",
+                                ].map((type) => (
+                                  <option key={type} value={type}>
+                                    {type}
+                                  </option>
+                                ))}
+                              </select>
+                            </label>
+                            {canEdit && (
+                              <div className={styles.actionTools}>
+                                <button
+                                  type="button"
+                                  title="Mover ação para cima"
+                                  aria-label="Mover ação para cima"
+                                  onClick={() => moveAction(index, index - 1)}
+                                >
+                                  <FiArrowUp />
+                                </button>
+                                <button
+                                  type="button"
+                                  title="Mover ação para baixo"
+                                  aria-label="Mover ação para baixo"
+                                  onClick={() => moveAction(index, index + 1)}
+                                >
+                                  <FiArrowDown />
+                                </button>
+                                <button
+                                  type="button"
+                                  title="Remover ação"
+                                  aria-label="Remover ação"
+                                  onClick={() =>
+                                    replaceActions(
+                                      activeCard.actions.filter(
+                                        (_, position) => position !== index,
+                                      ),
+                                    )
+                                  }
+                                >
+                                  <FiTrash2 />
+                                </button>
+                              </div>
+                            )}
+                          </li>
+                        ))}
+                      </ul>
+                    </section>
                   </div>
                 )}
 
@@ -1266,6 +1402,38 @@ export function SmartCardsDashboard({
                         />
                       </label>
                       <label>
+                        Texto
+                        <input
+                          disabled={!canEdit}
+                          type="color"
+                          value={activeCard.theme.textColor ?? "#17322c"}
+                          onChange={(event) =>
+                            updateDraft({
+                              theme: {
+                                ...activeCard.theme,
+                                textColor: event.target.value,
+                              },
+                            })
+                          }
+                        />
+                      </label>
+                      <label>
+                        Texto dos botões
+                        <input
+                          disabled={!canEdit}
+                          type="color"
+                          value={activeCard.theme.buttonTextColor ?? "#ffffff"}
+                          onChange={(event) =>
+                            updateDraft({
+                              theme: {
+                                ...activeCard.theme,
+                                buttonTextColor: event.target.value,
+                              },
+                            })
+                          }
+                        />
+                      </label>
+                      <label>
                         Tipografia
                         <select
                           disabled={!canEdit}
@@ -1305,255 +1473,393 @@ export function SmartCardsDashboard({
                           <option value="square">Quadrado</option>
                         </select>
                       </label>
+                      <label className={styles.full}>
+                        Logo (URL)
+                        <input
+                          disabled={!canEdit}
+                          type="url"
+                          value={activeCard.logoUrl ?? ""}
+                          onChange={(event) =>
+                            updateDraft({ logoUrl: event.target.value || null })
+                          }
+                        />
+                      </label>
                     </div>
                   </div>
                 )}
 
-                {tab === "capture" && (
+                {tab === "contact" && (
                   <div className={styles.panel}>
-                    <h3>Troca de contatos</h3>
+                    <h3>Contato</h3>
                     <p>
-                      Peça somente o necessário. O contexto do cartão é
-                      registrado automaticamente.
+                      Defina os dados que estarão disponíveis no cartão e na
+                      Wallet.
                     </p>
-                    <label className={styles.primaryCta}>
-                      CTA principal
-                      <select
-                        disabled={!canEdit}
-                        value={activeCard.contactForm.primaryCta}
-                        onChange={(event) =>
-                          updateDraft({
-                            contactForm: {
-                              ...activeCard.contactForm,
-                              primaryCta: event.target
-                                .value as ContactForm["primaryCta"],
-                            },
-                          })
-                        }
-                      >
-                        <option value="share_contact">
-                          Compartilhar seus dados
-                        </option>
-                        <option value="save_contact">Salvar meu contato</option>
-                        <option value="first_action">Primeira ação</option>
-                      </select>
-                    </label>
-                    <div className={styles.captureFields}>
-                      {activeCard.contactForm.fields.map((field, index) => (
-                        <div key={field.key} className={styles.captureField}>
-                          <label>
-                            Campo
-                            <input
-                              disabled={!canEdit}
-                              value={field.label}
-                              onChange={(event) => {
-                                const fields =
-                                  activeCard.contactForm.fields.map(
-                                    (item, position) =>
-                                      position === index
-                                        ? { ...item, label: event.target.value }
-                                        : item,
-                                  );
-                                updateDraft({
-                                  contactForm: {
-                                    ...activeCard.contactForm,
-                                    fields,
-                                  },
-                                });
-                              }}
-                            />
-                          </label>
-                          <label>
-                            Tipo
-                            <select
-                              disabled={!canEdit}
-                              value={field.type}
-                              onChange={(event) => {
-                                const fields =
-                                  activeCard.contactForm.fields.map(
-                                    (item, position) =>
-                                      position === index
-                                        ? {
-                                            ...item,
-                                            type: event.target
-                                              .value as ContactField["type"],
-                                          }
-                                        : item,
-                                  );
-                                updateDraft({
-                                  contactForm: {
-                                    ...activeCard.contactForm,
-                                    fields,
-                                  },
-                                });
-                              }}
-                            >
-                              <option value="text">Texto</option>
-                              <option value="email">E-mail</option>
-                              <option value="tel">Telefone</option>
-                              <option value="select">Seleção</option>
-                            </select>
-                          </label>
-                          <label className={styles.toggle}>
-                            <input
-                              disabled={!canEdit}
-                              type="checkbox"
-                              checked={field.required}
-                              onChange={(event) => {
-                                const fields =
-                                  activeCard.contactForm.fields.map(
-                                    (item, position) =>
-                                      position === index
-                                        ? {
-                                            ...item,
-                                            required: event.target.checked,
-                                          }
-                                        : item,
-                                  );
-                                updateDraft({
-                                  contactForm: {
-                                    ...activeCard.contactForm,
-                                    fields,
-                                  },
-                                });
-                              }}
-                            />{" "}
-                            Obrigatório
-                          </label>
-                          {canEdit && index > 0 && (
-                            <button
-                              type="button"
-                              title="Remover campo"
-                              aria-label="Remover campo"
-                              onClick={() =>
-                                updateDraft({
-                                  contactForm: {
-                                    ...activeCard.contactForm,
-                                    fields:
-                                      activeCard.contactForm.fields.filter(
-                                        (_, position) => position !== index,
-                                      ),
-                                  },
-                                })
-                              }
-                            >
-                              <FiTrash2 />
-                            </button>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                    {canEdit && activeCard.contactForm.fields.length < 10 && (
+                    <section className={styles.contactSummary}>
+                      <div>
+                        <span>Dados públicos</span>
+                        <h4>Detalhes de contato</h4>
+                        <p>
+                          Telefones, e-mails e canais que visitantes podem
+                          salvar.
+                        </p>
+                      </div>
                       <button
                         className="button button-secondary"
                         type="button"
-                        onClick={() =>
-                          updateDraft({
-                            contactForm: {
-                              ...activeCard.contactForm,
-                              fields: [
-                                ...activeCard.contactForm.fields,
-                                {
-                                  key: `custom${activeCard.contactForm.fields.length + 1}`,
-                                  label: "Novo campo",
-                                  type: "text",
-                                  required: false,
-                                  options: [],
-                                },
-                              ],
-                            },
-                          })
-                        }
+                        disabled={!canEdit}
+                        onClick={() => editContactDetails(activeCard)}
                       >
-                        <FiPlus aria-hidden="true" /> Adicionar campo
+                        Editar contato
                       </button>
-                    )}
+                    </section>
+                    <div className={styles.fieldGrid}>
+                      <label>
+                        Localização
+                        <input
+                          disabled={!canEdit}
+                          value={activeCard.location ?? ""}
+                          maxLength={160}
+                          onChange={(event) =>
+                            updateDraft({
+                              location: event.target.value || null,
+                            })
+                          }
+                        />
+                      </label>
+                      <label>
+                        Campanha
+                        <select
+                          disabled={!canEdit}
+                          value={activeCard.campaignId ?? ""}
+                          onChange={(event) =>
+                            updateDraft({
+                              campaignId: event.target.value || null,
+                            })
+                          }
+                        >
+                          <option value="">Sem campanha</option>
+                          {campaigns.map((campaign) => (
+                            <option key={campaign.id} value={campaign.id}>
+                              {campaign.name}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                    </div>
                     <details className={styles.advanced}>
-                      <summary>Interesse e privacidade</summary>
-                      <label className={styles.toggle}>
-                        <input
+                      <summary>Captura de contato (opcional)</summary>
+                      <label className={styles.primaryCta}>
+                        CTA principal
+                        <select
                           disabled={!canEdit}
-                          type="checkbox"
-                          checked={activeCard.contactForm.intent.enabled}
+                          value={activeCard.contactForm.primaryCta}
                           onChange={(event) =>
                             updateDraft({
                               contactForm: {
                                 ...activeCard.contactForm,
-                                intent: {
-                                  ...activeCard.contactForm.intent,
-                                  enabled: event.target.checked,
-                                },
+                                primaryCta: event.target
+                                  .value as ContactForm["primaryCta"],
                               },
                             })
                           }
-                        />{" "}
-                        Perguntar interesse
+                        >
+                          <option value="share_contact">
+                            Compartilhar seus dados
+                          </option>
+                          <option value="save_contact">
+                            Salvar meu contato
+                          </option>
+                          <option value="first_action">Primeira ação</option>
+                        </select>
                       </label>
-                      <label>
-                        Pergunta
-                        <input
-                          disabled={!canEdit}
-                          value={activeCard.contactForm.intent.label}
-                          onChange={(event) =>
+                      <div className={styles.captureFields}>
+                        {activeCard.contactForm.fields.map((field, index) => (
+                          <div key={field.key} className={styles.captureField}>
+                            <label>
+                              Campo
+                              <input
+                                disabled={!canEdit}
+                                value={field.label}
+                                onChange={(event) => {
+                                  const fields =
+                                    activeCard.contactForm.fields.map(
+                                      (item, position) =>
+                                        position === index
+                                          ? {
+                                              ...item,
+                                              label: event.target.value,
+                                            }
+                                          : item,
+                                    );
+                                  updateDraft({
+                                    contactForm: {
+                                      ...activeCard.contactForm,
+                                      fields,
+                                    },
+                                  });
+                                }}
+                              />
+                            </label>
+                            <label>
+                              Tipo
+                              <select
+                                disabled={!canEdit}
+                                value={field.type}
+                                onChange={(event) => {
+                                  const fields =
+                                    activeCard.contactForm.fields.map(
+                                      (item, position) =>
+                                        position === index
+                                          ? {
+                                              ...item,
+                                              type: event.target
+                                                .value as ContactField["type"],
+                                            }
+                                          : item,
+                                    );
+                                  updateDraft({
+                                    contactForm: {
+                                      ...activeCard.contactForm,
+                                      fields,
+                                    },
+                                  });
+                                }}
+                              >
+                                <option value="text">Texto</option>
+                                <option value="email">E-mail</option>
+                                <option value="tel">Telefone</option>
+                                <option value="select">Seleção</option>
+                              </select>
+                            </label>
+                            <label className={styles.toggle}>
+                              <input
+                                disabled={!canEdit}
+                                type="checkbox"
+                                checked={field.required}
+                                onChange={(event) => {
+                                  const fields =
+                                    activeCard.contactForm.fields.map(
+                                      (item, position) =>
+                                        position === index
+                                          ? {
+                                              ...item,
+                                              required: event.target.checked,
+                                            }
+                                          : item,
+                                    );
+                                  updateDraft({
+                                    contactForm: {
+                                      ...activeCard.contactForm,
+                                      fields,
+                                    },
+                                  });
+                                }}
+                              />{" "}
+                              Obrigatório
+                            </label>
+                            {canEdit && index > 0 && (
+                              <button
+                                type="button"
+                                title="Remover campo"
+                                aria-label="Remover campo"
+                                onClick={() =>
+                                  updateDraft({
+                                    contactForm: {
+                                      ...activeCard.contactForm,
+                                      fields:
+                                        activeCard.contactForm.fields.filter(
+                                          (_, position) => position !== index,
+                                        ),
+                                    },
+                                  })
+                                }
+                              >
+                                <FiTrash2 />
+                              </button>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                      {canEdit && activeCard.contactForm.fields.length < 10 && (
+                        <button
+                          className="button button-secondary"
+                          type="button"
+                          onClick={() =>
                             updateDraft({
                               contactForm: {
                                 ...activeCard.contactForm,
-                                intent: {
-                                  ...activeCard.contactForm.intent,
-                                  label: event.target.value,
-                                },
+                                fields: [
+                                  ...activeCard.contactForm.fields,
+                                  {
+                                    key: `custom${activeCard.contactForm.fields.length + 1}`,
+                                    label: "Novo campo",
+                                    type: "text",
+                                    required: false,
+                                    options: [],
+                                  },
+                                ],
                               },
                             })
                           }
-                        />
-                      </label>
-                      <label>
-                        Opções, uma por linha
-                        <textarea
-                          disabled={!canEdit}
-                          value={activeCard.contactForm.intent.options.join(
-                            "\n",
-                          )}
-                          onChange={(event) =>
-                            updateDraft({
-                              contactForm: {
-                                ...activeCard.contactForm,
-                                intent: {
-                                  ...activeCard.contactForm.intent,
-                                  options: event.target.value
-                                    .split("\n")
-                                    .map((value) => value.trim())
-                                    .filter(Boolean),
+                        >
+                          <FiPlus aria-hidden="true" /> Adicionar campo
+                        </button>
+                      )}
+                      <details className={styles.advanced}>
+                        <summary>Interesse e privacidade</summary>
+                        <label className={styles.toggle}>
+                          <input
+                            disabled={!canEdit}
+                            type="checkbox"
+                            checked={activeCard.contactForm.intent.enabled}
+                            onChange={(event) =>
+                              updateDraft({
+                                contactForm: {
+                                  ...activeCard.contactForm,
+                                  intent: {
+                                    ...activeCard.contactForm.intent,
+                                    enabled: event.target.checked,
+                                  },
                                 },
-                              },
-                            })
-                          }
-                        />
-                      </label>
-                      <label>
-                        Política de privacidade
-                        <input
-                          disabled={!canEdit}
-                          type="url"
-                          value={activeCard.privacyPolicyUrl ?? ""}
-                          onChange={(event) =>
-                            updateDraft({
-                              privacyPolicyUrl: event.target.value || null,
-                            })
-                          }
-                        />
-                      </label>
+                              })
+                            }
+                          />{" "}
+                          Perguntar interesse
+                        </label>
+                        <label>
+                          Pergunta
+                          <input
+                            disabled={!canEdit}
+                            value={activeCard.contactForm.intent.label}
+                            onChange={(event) =>
+                              updateDraft({
+                                contactForm: {
+                                  ...activeCard.contactForm,
+                                  intent: {
+                                    ...activeCard.contactForm.intent,
+                                    label: event.target.value,
+                                  },
+                                },
+                              })
+                            }
+                          />
+                        </label>
+                        <label>
+                          Opções, uma por linha
+                          <textarea
+                            disabled={!canEdit}
+                            value={activeCard.contactForm.intent.options.join(
+                              "\n",
+                            )}
+                            onChange={(event) =>
+                              updateDraft({
+                                contactForm: {
+                                  ...activeCard.contactForm,
+                                  intent: {
+                                    ...activeCard.contactForm.intent,
+                                    options: event.target.value
+                                      .split("\n")
+                                      .map((value) => value.trim())
+                                      .filter(Boolean),
+                                  },
+                                },
+                              })
+                            }
+                          />
+                        </label>
+                        <label>
+                          Política de privacidade
+                          <input
+                            disabled={!canEdit}
+                            type="url"
+                            value={activeCard.privacyPolicyUrl ?? ""}
+                            onChange={(event) =>
+                              updateDraft({
+                                privacyPolicyUrl: event.target.value || null,
+                              })
+                            }
+                          />
+                        </label>
+                      </details>
                     </details>
                   </div>
                 )}
 
-                {tab === "sharing" && (
+                {tab === "wallet" && (
                   <div className={styles.panel}>
-                    <h3>Compartilhamento</h3>
+                    <h3>Wallet e distribuição</h3>
                     <p>
-                      Seu QR aponta para uma URL gerenciada: atualize o cartão
-                      sem reimprimir o código.
+                      Seu cartão profissional pode ser emitido para Apple Wallet
+                      e Google Wallet quando a integração estiver configurada.
                     </p>
+                    {!walletStatus ? (
+                      <button
+                        className="button button-secondary"
+                        type="button"
+                        disabled={busy}
+                        onClick={loadWalletStatus}
+                      >
+                        Carregar status de Wallet
+                      </button>
+                    ) : (
+                      <div className={styles.walletProviders}>
+                        {walletStatus.providers.map((wallet) => {
+                          const configured =
+                            wallet.state === "test_mode" ||
+                            wallet.state === "ready";
+                          const stateLabel = {
+                            not_configured: "Configuração necessária",
+                            configuration_pending: "Configuração pendente",
+                            test_mode: "Modo de teste",
+                            ready: "Pronto",
+                            error: "Erro de configuração",
+                          }[wallet.state];
+                          const passLabel = wallet.pass
+                            ? {
+                                pending_sync: "Pendente de sincronização",
+                                synced: "Sincronizado",
+                                sync_failed: "Falha na sincronização",
+                                revoked: "Desativado",
+                              }[wallet.pass.status]
+                            : "Ainda não emitido";
+                          return (
+                            <section
+                              key={wallet.provider}
+                              className={styles.walletProvider}
+                              data-state={wallet.state}
+                            >
+                              <div>
+                                <strong>
+                                  {wallet.provider === "apple"
+                                    ? "Apple Wallet"
+                                    : "Google Wallet"}
+                                </strong>
+                                <span>{stateLabel}</span>
+                                <small>{wallet.message}</small>
+                                <small>{passLabel}</small>
+                              </div>
+                              <button
+                                className="button button-secondary"
+                                type="button"
+                                disabled={
+                                  busy ||
+                                  !canEdit ||
+                                  !configured ||
+                                  activeCard.status !== "published"
+                                }
+                                onClick={() => syncWallet(wallet.provider)}
+                              >
+                                {wallet.pass?.status === "synced"
+                                  ? "Sincronizar"
+                                  : "Emitir passe"}
+                              </button>
+                            </section>
+                          );
+                        })}
+                      </div>
+                    )}
+                    <h4 className={styles.distributionTitle}>QR e link</h4>
                     <div className={styles.shareUrl}>
                       <input
                         readOnly
@@ -1618,20 +1924,23 @@ export function SmartCardsDashboard({
                         )}
                       </div>
                     </div>
-                    <a
-                      className="button button-secondary"
-                      href={`https://wa.me/?text=${encodeURIComponent(publicUrl(publicOrigin, activeCard.slug))}`}
-                      target="_blank"
-                      rel="noreferrer"
-                    >
-                      <FiShare2 aria-hidden="true" /> Compartilhar por WhatsApp
-                    </a>
-                    <a
-                      className="button button-secondary"
-                      href={`mailto:?subject=${encodeURIComponent(displayName(activeCard))}&body=${encodeURIComponent(publicUrl(publicOrigin, activeCard.slug))}`}
-                    >
-                      Compartilhar por e-mail
-                    </a>
+                    <details className={styles.shareMoreOptions}>
+                      <summary>Mais opções</summary>
+                      <div>
+                        <a
+                          href={`https://wa.me/?text=${encodeURIComponent(publicUrl(publicOrigin, activeCard.slug))}`}
+                          target="_blank"
+                          rel="noreferrer"
+                        >
+                          <FiShare2 aria-hidden="true" /> WhatsApp
+                        </a>
+                        <a
+                          href={`mailto:?subject=${encodeURIComponent(displayName(activeCard))}&body=${encodeURIComponent(publicUrl(publicOrigin, activeCard.slug))}`}
+                        >
+                          <FiMail aria-hidden="true" /> E-mail
+                        </a>
+                      </div>
+                    </details>
                   </div>
                 )}
 
@@ -1667,17 +1976,23 @@ export function SmartCardsDashboard({
                             <small>{metrics.uniqueVisitors} únicas</small>
                           </div>
                           <div>
-                            <span>Interações</span>
-                            <strong>{metrics.interactions}</strong>
+                            <span>QR rastreável</span>
+                            <strong>{metrics.qrScans}</strong>
                           </div>
                           <div>
-                            <span>Contatos</span>
-                            <strong>{metrics.contacts}</strong>
+                            <span>Apple Wallet</span>
+                            <strong>{metrics.appleWalletClicks}</strong>
                           </div>
                           <div>
-                            <span>Conversões</span>
-                            <strong>{metrics.conversions}</strong>
+                            <span>Google Wallet</span>
+                            <strong>{metrics.googleWalletClicks}</strong>
                           </div>
+                          {metrics.walletAddsConfirmed !== null && (
+                            <div>
+                              <span>Adições confirmadas</span>
+                              <strong>{metrics.walletAddsConfirmed}</strong>
+                            </div>
+                          )}
                         </div>
                         <ol className={styles.funnel}>
                           {metrics.funnel.map((step, index) => (
@@ -1752,7 +2067,7 @@ export function SmartCardsDashboard({
                 <div className={styles.previewHeader}>
                   <span>Preview ao vivo</span>
                   <div className={styles.previewModes}>
-                    {(["mobile", "desktop", "qr"] as const).map((mode) => (
+                    {(["web", "apple", "google"] as const).map((mode) => (
                       <button
                         key={mode}
                         type="button"
@@ -1760,15 +2075,20 @@ export function SmartCardsDashboard({
                         onClick={() => setPreviewMode(mode)}
                       >
                         {
-                          { mobile: "Mobile", desktop: "Desktop", qr: "QR" }[
-                            mode
-                          ]
+                          {
+                            web: "Web",
+                            apple: "Apple Wallet",
+                            google: "Google Wallet",
+                          }[mode]
                         }
                       </button>
                     ))}
                   </div>
                 </div>
-                <div className={styles.phone} data-preview={previewMode}>
+                <div
+                  className={styles.phone}
+                  data-preview={previewMode === "web" ? "web" : "wallet"}
+                >
                   <div
                     className={styles.phoneScreen}
                     style={{
@@ -1832,24 +2152,41 @@ export function SmartCardsDashboard({
                   </div>
                 </div>
                 <div
-                  className={styles.previewQr}
-                  data-active={previewMode === "qr"}
+                  className={styles.walletPreview}
+                  data-active={previewMode !== "web"}
                 >
                   <article
-                    className={styles.digitalCard}
-                    style={{
-                      background:
-                        activeCard.theme.backgroundSecondary ?? "#dff0d5",
-                      color: activeCard.theme.textColor ?? "#17322c",
-                    }}
+                    className={styles.walletPassPreview}
+                    data-provider={previewMode}
                   >
-                    <div className={styles.digitalBrand}>Untrack</div>
-                    <div className={styles.digitalIdentity}>
-                      <strong>{displayName(activeCard)}</strong>
-                      <span>{activeCard.headline}</span>
-                      <small>{activeCard.company}</small>
+                    <header>
+                      <strong>
+                        {previewMode === "apple"
+                          ? "Apple Wallet"
+                          : "Google Wallet"}
+                      </strong>
+                      <span>Smart Card</span>
+                    </header>
+                    <div className={styles.walletPassIdentity}>
+                      {activeCard.avatarUrl ? (
+                        <img src={activeCard.avatarUrl} alt="" />
+                      ) : (
+                        <span>{initials(activeCard)}</span>
+                      )}
+                      <div>
+                        <strong>{displayName(activeCard)}</strong>
+                        <span>{activeCard.headline}</span>
+                        <small>{activeCard.company}</small>
+                      </div>
                     </div>
-                    <div className={styles.digitalQr}>
+                    <div className={styles.walletPassFields}>
+                      {activeCard.email && <span>{activeCard.email}</span>}
+                      {activeCard.phone && <span>{activeCard.phone}</span>}
+                      {activeCard.websiteUrl && (
+                        <span>{activeCard.websiteUrl}</span>
+                      )}
+                    </div>
+                    <div className={styles.walletPassQr}>
                       {qrPreviewUrl ? (
                         <img
                           src={qrPreviewUrl}
@@ -1858,27 +2195,15 @@ export function SmartCardsDashboard({
                       ) : (
                         <>
                           <FiGrid aria-hidden="true" />
-                          <span>Gere o QR rastreável</span>
-                          {canEdit && (
-                            <button
-                              className="button button-secondary"
-                              type="button"
-                              disabled={busy}
-                              onClick={generateQr}
-                            >
-                              Gerar QR
-                            </button>
-                          )}
+                          <span>QR rastreável ao emitir</span>
                         </>
                       )}
                     </div>
-                    <small className={styles.digitalUrl}>
-                      {publicUrl(publicOrigin, activeCard.slug).replace(
-                        /^https?:\/\//,
-                        "",
-                      )}
-                    </small>
                   </article>
+                  <p>
+                    A Wallet usa os campos compatíveis do cartão; cores, fontes
+                    e layout seguem a plataforma.
+                  </p>
                 </div>
               </aside>
             </div>
@@ -2033,6 +2358,133 @@ export function SmartCardsDashboard({
                   );
                 })}
               </div>
+              <div className={styles.contactPoints}>
+                <div className={styles.contactPointHeader}>
+                  <div>
+                    <h3>Contatos adicionais</h3>
+                    <p>
+                      Inclua telefones ou e-mails alternativos, se necessário.
+                    </p>
+                  </div>
+                  <div>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setContactDetails((current) =>
+                          current
+                            ? {
+                                ...current,
+                                contactPoints: [
+                                  ...current.contactPoints,
+                                  { type: "phone", value: "" },
+                                ],
+                              }
+                            : current,
+                        )
+                      }
+                    >
+                      <FiPlus aria-hidden="true" /> Adicionar telefone
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setContactDetails((current) =>
+                          current
+                            ? {
+                                ...current,
+                                contactPoints: [
+                                  ...current.contactPoints,
+                                  { type: "email", value: "" },
+                                ],
+                              }
+                            : current,
+                        )
+                      }
+                    >
+                      <FiPlus aria-hidden="true" /> Adicionar e-mail
+                    </button>
+                  </div>
+                </div>
+                {contactDetails.contactPoints.map((point, index) => (
+                  <div
+                    className={styles.contactPoint}
+                    key={`${point.type}-${index}`}
+                  >
+                    <label>
+                      {point.type === "phone" ? "Telefone" : "E-mail"}
+                      <input
+                        type={point.type === "phone" ? "tel" : "email"}
+                        value={point.value}
+                        onChange={(event) =>
+                          setContactDetails((current) =>
+                            current
+                              ? {
+                                  ...current,
+                                  contactPoints: current.contactPoints.map(
+                                    (item, itemIndex) =>
+                                      itemIndex === index
+                                        ? { ...item, value: event.target.value }
+                                        : item,
+                                  ),
+                                }
+                              : current,
+                          )
+                        }
+                      />
+                    </label>
+                    <label>
+                      Rótulo opcional
+                      <input
+                        value={point.label ?? ""}
+                        maxLength={80}
+                        placeholder={
+                          point.type === "phone" ? "Comercial" : "Trabalho"
+                        }
+                        onChange={(event) =>
+                          setContactDetails((current) =>
+                            current
+                              ? {
+                                  ...current,
+                                  contactPoints: current.contactPoints.map(
+                                    (item, itemIndex) =>
+                                      itemIndex === index
+                                        ? {
+                                            ...item,
+                                            label:
+                                              event.target.value || undefined,
+                                          }
+                                        : item,
+                                  ),
+                                }
+                              : current,
+                          )
+                        }
+                      />
+                    </label>
+                    <button
+                      type="button"
+                      aria-label={`Remover ${
+                        point.type === "phone" ? "telefone" : "e-mail"
+                      } adicional`}
+                      title="Remover contato adicional"
+                      onClick={() =>
+                        setContactDetails((current) =>
+                          current
+                            ? {
+                                ...current,
+                                contactPoints: current.contactPoints.filter(
+                                  (_, itemIndex) => itemIndex !== index,
+                                ),
+                              }
+                            : current,
+                        )
+                      }
+                    >
+                      <FiTrash2 aria-hidden="true" />
+                    </button>
+                  </div>
+                ))}
+              </div>
             </div>
             <footer>
               <button
@@ -2051,6 +2503,158 @@ export function SmartCardsDashboard({
               </button>
             </footer>
           </section>
+        </div>
+      )}
+
+      {activeCard && socialPickerOpen && (
+        <div
+          className={styles.dialogBackdrop}
+          role="presentation"
+          onMouseDown={() => setSocialPickerOpen(false)}
+        >
+          <section
+            className={styles.socialDialog}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="smart-card-social-picker-title"
+            onMouseDown={(event) => event.stopPropagation()}
+          >
+            <header>
+              <div>
+                <span className="eyebrow">Redes sociais</span>
+                <h2 id="smart-card-social-picker-title">Adicionar rede</h2>
+              </div>
+              <button
+                className={styles.dialogClose}
+                type="button"
+                aria-label="Fechar seletor de rede"
+                onClick={() => setSocialPickerOpen(false)}
+              >
+                <FiX aria-hidden="true" />
+              </button>
+            </header>
+            <label className={styles.socialSearch}>
+              Buscar rede
+              <input
+                autoFocus
+                value={socialSearch}
+                placeholder="Instagram, GitHub, LinkedIn..."
+                onChange={(event) => setSocialSearch(event.target.value)}
+              />
+            </label>
+            <div className={styles.socialPickerList}>
+              {socialProviders
+                .filter(
+                  (provider) =>
+                    !activeCard.socialLinks.some(
+                      (link) => link.providerId === provider.id,
+                    ) &&
+                    provider.name
+                      .toLowerCase()
+                      .includes(socialSearch.trim().toLowerCase()),
+                )
+                .map((provider) => {
+                  const Icon = provider.icon;
+                  return (
+                    <button
+                      key={provider.id}
+                      type="button"
+                      onClick={() => {
+                        setSocialDraft({ providerId: provider.id, url: "" });
+                        setSocialPickerOpen(false);
+                      }}
+                    >
+                      <Icon aria-hidden="true" />
+                      <span>{provider.name}</span>
+                    </button>
+                  );
+                })}
+            </div>
+          </section>
+        </div>
+      )}
+
+      {socialDraft && (
+        <div
+          className={styles.dialogBackdrop}
+          role="presentation"
+          onMouseDown={() => setSocialDraft(null)}
+        >
+          <form
+            className={styles.socialDialog}
+            onSubmit={saveSocialLink}
+            onMouseDown={(event) => event.stopPropagation()}
+          >
+            {(() => {
+              const provider = getSocialProvider(socialDraft.providerId);
+              if (!provider) return null;
+              return (
+                <>
+                  <header>
+                    <div>
+                      <span className="eyebrow">{provider.name}</span>
+                      <h2>Detalhes da rede</h2>
+                    </div>
+                    <button
+                      className={styles.dialogClose}
+                      type="button"
+                      aria-label="Fechar detalhes da rede"
+                      onClick={() => setSocialDraft(null)}
+                    >
+                      <FiX aria-hidden="true" />
+                    </button>
+                  </header>
+                  <label className={styles.socialSearch}>
+                    Endereço
+                    <input
+                      autoFocus
+                      required
+                      value={socialDraft.url}
+                      placeholder={provider.placeholder}
+                      onChange={(event) =>
+                        setSocialDraft((current) =>
+                          current
+                            ? { ...current, url: event.target.value }
+                            : current,
+                        )
+                      }
+                    />
+                  </label>
+                  <label className={styles.socialSearch}>
+                    Rótulo opcional
+                    <input
+                      value={socialDraft.label ?? ""}
+                      maxLength={80}
+                      onChange={(event) =>
+                        setSocialDraft((current) =>
+                          current
+                            ? { ...current, label: event.target.value }
+                            : current,
+                        )
+                      }
+                    />
+                  </label>
+                  {socialError && (
+                    <p className="form-error" role="alert">
+                      {socialError}
+                    </p>
+                  )}
+                  <footer>
+                    <button
+                      className="button button-secondary"
+                      type="button"
+                      onClick={() => setSocialDraft(null)}
+                    >
+                      Cancelar
+                    </button>
+                    <button className="button" type="submit">
+                      Adicionar rede
+                    </button>
+                  </footer>
+                </>
+              );
+            })()}
+          </form>
         </div>
       )}
 

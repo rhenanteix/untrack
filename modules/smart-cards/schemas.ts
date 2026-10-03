@@ -1,4 +1,8 @@
 import { z } from "zod";
+import {
+  normalizeSocialUrl,
+  socialProviderIds,
+} from "@/modules/social-providers";
 import { webUrlSchema } from "@/modules/validation/url-validation";
 
 const reservedSlugs = new Set(["api", "admin", "c", "new"]);
@@ -192,6 +196,55 @@ const nullableUrlSchema = webUrlSchema.nullable().optional();
 const nullableText = (max: number) =>
   z.string().trim().max(max).nullable().optional();
 
+export const smartCardContactPointSchema = z
+  .object({
+    type: z.enum(["phone", "email"]),
+    value: z.string().trim().min(1).max(254),
+    label: z.string().trim().max(40).optional(),
+  })
+  .strict()
+  .superRefine((point, context) => {
+    const valid =
+      point.type === "phone"
+        ? phoneSchema.safeParse(point.value).success
+        : z.string().email().safeParse(point.value).success;
+    if (!valid) {
+      context.addIssue({
+        code: "custom",
+        path: ["value"],
+        message:
+          point.type === "phone"
+            ? "Informe um telefone válido."
+            : "Informe um e-mail válido.",
+      });
+    }
+  });
+
+export const smartCardSocialLinkSchema = z
+  .object({
+    providerId: z.enum(socialProviderIds),
+    url: z.string().trim().min(1).max(4096),
+    label: z.string().trim().max(80).optional(),
+  })
+  .strict()
+  .superRefine((link, context) => {
+    if (!normalizeSocialUrl(link.providerId, link.url)) {
+      context.addIssue({
+        code: "custom",
+        path: ["url"],
+        message: "Informe um endereço válido para esta rede.",
+      });
+    }
+  })
+  .transform((link) => ({
+    ...link,
+    url: normalizeSocialUrl(link.providerId, link.url) ?? link.url,
+  }));
+
+export const smartCardSocialLinksSchema = z
+  .array(smartCardSocialLinkSchema)
+  .max(20);
+
 export const smartCardInputSchema = z
   .object({
     slug: smartCardSlugSchema,
@@ -207,6 +260,8 @@ export const smartCardInputSchema = z
     email: z.string().trim().email().max(254).nullable().optional(),
     websiteUrl: nullableUrlSchema,
     location: nullableText(160),
+    contactPoints: z.array(smartCardContactPointSchema).max(8).default([]),
+    socialLinks: smartCardSocialLinksSchema.default([]),
     theme: smartCardThemeSchema.default(defaultSmartCardTheme),
     contactForm: smartCardContactFormSchema.default(
       defaultSmartCardContactForm,
@@ -237,9 +292,12 @@ export const smartCardEventSchema = z
       "card_share",
       "qr_scan",
       "nfc_open",
+      "apple_wallet_add_click",
+      "google_wallet_add_click",
       "contact_save",
       "contact_form_open",
       "link_click",
+      "social_click",
       "whatsapp_click",
       "booking_click",
     ]),
@@ -248,6 +306,7 @@ export const smartCardEventSchema = z
     visitorId: z.string().uuid().optional(),
     sessionId: z.string().uuid().optional(),
     actionId: z.string().min(1).max(200).optional(),
+    providerId: z.enum(socialProviderIds).optional(),
     contactId: z.string().min(1).max(200).optional(),
     source: z.string().trim().min(1).max(80).default("direct"),
   })
@@ -261,6 +320,13 @@ export const smartCardEventSchema = z
         code: "custom",
         path: ["actionId"],
         message: "Informe a ação do cartão.",
+      });
+    }
+    if (input.event === "social_click" && !input.providerId) {
+      context.addIssue({
+        code: "custom",
+        path: ["providerId"],
+        message: "Informe a rede social acessada.",
       });
     }
   });

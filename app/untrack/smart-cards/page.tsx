@@ -8,7 +8,9 @@ import { sessionFromHeaders } from "@/lib/session";
 import {
   defaultSmartCardContactForm,
   defaultSmartCardTheme,
+  smartCardContactPointSchema,
   smartCardContactFormSchema,
+  smartCardSocialLinksSchema,
   smartCardThemeSchema,
 } from "@/modules/smart-cards/schemas";
 import {
@@ -62,6 +64,14 @@ export default async function SmartCardsPage() {
           contactForm:
             smartCardContactFormSchema.safeParse(card.contactForm).data ??
             defaultSmartCardContactForm,
+          contactPoints: Array.isArray(card.contactPoints)
+            ? card.contactPoints.flatMap((point) => {
+                const parsed = smartCardContactPointSchema.safeParse(point);
+                return parsed.success ? [parsed.data] : [];
+              })
+            : [],
+          socialLinks:
+            smartCardSocialLinksSchema.safeParse(card.socialLinks).data ?? [],
         })),
       }}
       campaigns={data.campaigns}

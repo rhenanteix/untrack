@@ -24,6 +24,18 @@ enum SmartCardActionType {
   custom
 }
 
+enum SmartCardWalletProvider {
+  apple
+  google
+}
+
+enum SmartCardWalletPassStatus {
+  pending_sync
+  synced
+  sync_failed
+  revoked
+}
+
 enum AudienceContactStatus {
   new_contact
   interested
@@ -378,6 +390,8 @@ model SmartCard {
   email            String?         @db.VarChar(254)
   websiteUrl       String?         @db.VarChar(4096)
   location         String?         @db.VarChar(160)
+  contactPoints    Json            @default("[]")
+  socialLinks      Json            @default("[]")
   theme            Json            @default("{}")
   contactForm      Json            @default("{}")
   privacyPolicyUrl String?         @db.VarChar(4096)
@@ -391,12 +405,34 @@ model SmartCard {
   campaign         Campaign?       @relation(fields: [campaignId, workspaceId], references: [id, workspaceId])
   qrAsset          QrAsset?        @relation("SmartCardQr", fields: [qrAssetId], references: [id], onDelete: SetNull)
   actions          SmartCardAction[]
+  walletPasses     SmartCardWalletPass[]
   contactExchanges SmartCardContactExchange[]
   analyticsEvents  AnalyticsEvent[]
 
   @@index([workspaceId, status, updatedAt])
   @@index([ownerId, createdAt])
   @@index([campaignId])
+}
+
+model SmartCardWalletPass {
+  id               String                    @id @default(cuid())
+  workspaceId      String
+  smartCardId      String
+  provider         SmartCardWalletProvider
+  status           SmartCardWalletPassStatus @default(pending_sync)
+  serialNumber     String?                   @unique @db.VarChar(120)
+  externalObjectId String?                   @unique @db.VarChar(255)
+  issuedAt         DateTime?
+  lastSyncedAt     DateTime?
+  lastError        String?                   @db.VarChar(1000)
+  createdAt        DateTime                  @default(now())
+  updatedAt        DateTime                  @updatedAt
+  workspace        Workspace                 @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  smartCard        SmartCard                 @relation(fields: [smartCardId], references: [id], onDelete: Cascade)
+
+  @@unique([smartCardId, provider])
+  @@index([workspaceId, status, updatedAt])
+  @@index([smartCardId, updatedAt])
 }
 
 model SmartCardAction {
@@ -656,6 +692,7 @@ model Workspace {
   whatsappLinks WhatsappLink[]
   products Product[]
   smartCards SmartCard[]
+  smartCardWalletPasses SmartCardWalletPass[]
   audienceContacts AudienceContact[]
   smartCardContactExchanges SmartCardContactExchange[]
   audienceContactEvents AudienceContactEvent[]

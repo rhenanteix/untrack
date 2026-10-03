@@ -2,6 +2,10 @@
 
 import { useEffect, useState } from "react";
 import { analytics } from "@/lib/client/analytics";
+import {
+  getSocialProvider,
+  type SocialProviderId,
+} from "@/modules/social-providers";
 import styles from "./public-smart-card.module.css";
 
 type CardAction = {
@@ -26,6 +30,12 @@ type ContactField = {
   options: string[];
 };
 
+type SocialLink = {
+  providerId: SocialProviderId;
+  url: string;
+  label?: string;
+};
+
 type PublicSmartCardData = {
   slug: string;
   firstName: string;
@@ -41,6 +51,7 @@ type PublicSmartCardData = {
   websiteUrl: string | null;
   location: string | null;
   privacyPolicyUrl: string | null;
+  socialLinks: SocialLink[];
   actions: CardAction[];
 };
 
@@ -85,9 +96,12 @@ type PublicCardEvent =
   | "card_share"
   | "qr_scan"
   | "nfc_open"
+  | "apple_wallet_add_click"
+  | "google_wallet_add_click"
   | "contact_save"
   | "contact_form_open"
   | "link_click"
+  | "social_click"
   | "whatsapp_click"
   | "booking_click";
 
@@ -96,13 +110,16 @@ function track(
   slug: string,
   source: string,
   actionId?: string,
+  contactId?: string,
+  providerId?: string,
 ) {
   return analytics.trackSmartCard(
     event,
     slug,
     source,
     actionId,
-    savedContactId(slug),
+    contactId ?? savedContactId(slug),
+    providerId,
   );
 }
 
@@ -111,6 +128,8 @@ export function PublicSmartCard({
   contactForm,
   theme,
   source,
+  wallet,
+  publicUrl,
 }: {
   card: PublicSmartCardData;
   contactForm: ContactForm;
@@ -126,13 +145,15 @@ export function PublicSmartCard({
     font?: "sans" | "serif" | "mono";
   };
   source: string;
+  wallet: { apple: boolean; google: boolean; qr: boolean };
+  publicUrl: string;
 }) {
   const [formOpen, setFormOpen] = useState(false);
+  const [qrOpen, setQrOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [formError, setFormError] = useState("");
   const [submitted, setSubmitted] = useState(false);
   const displayName = `${card.firstName} ${card.lastName}`.trim();
-  const firstAction = card.actions[0];
   const cardStyle = {
     "--card-background": theme.background ?? "#f7f8f1",
     "--card-background-secondary": theme.backgroundSecondary ?? "#dff0d5",
@@ -153,17 +174,12 @@ export function PublicSmartCard({
     void track("contact_form_open", card.slug, source);
   }
 
-  async function shareCard() {
-    const url = window.location.href;
+  async function copyCardLink() {
     try {
-      if (navigator.share) {
-        await navigator.share({ title: displayName, text: card.headline, url });
-      } else {
-        await navigator.clipboard.writeText(url);
-      }
+      await navigator.clipboard.writeText(publicUrl);
       void track("card_share", card.slug, source);
     } catch {
-      /* Cancelling the native dialog should not surface an error. */
+      /* Clipboard access should not block the public card. */
     }
   }
 
@@ -216,13 +232,6 @@ export function PublicSmartCard({
     }
   }
 
-  const primary =
-    contactForm.primaryCta === "first_action" && firstAction
-      ? { kind: "action" as const, action: firstAction }
-      : contactForm.primaryCta === "save_contact"
-        ? { kind: "save" as const }
-        : { kind: "share" as const };
-
   return (
     <main
       className={`${styles.page} ${styles[`preset${theme.preset[0]?.toUpperCase() ?? "P"}${theme.preset.slice(1)}`] ?? ""}`}
@@ -241,13 +250,8 @@ export function PublicSmartCard({
           ) : (
             <span className={styles.brand}>LinkOr</span>
           )}
-          <button
-            className={styles.share}
-            type="button"
-            onClick={shareCard}
-            aria-label="Compartilhar cartão"
-          >
-            Compartilhar
+          <button className={styles.share} type="button" onClick={copyCardLink}>
+            Copiar link
           </button>
         </div>
 
@@ -282,36 +286,51 @@ export function PublicSmartCard({
         {card.location && <p className={styles.location}>{card.location}</p>}
 
         <div className={styles.primaryActions}>
-          {primary.kind === "share" ? (
-            <button
-              className={styles.primaryButton}
-              type="button"
-              onClick={openContactForm}
+          {(wallet.apple || wallet.google || wallet.qr) && (
+            <div
+              className={styles.walletActions}
+              aria-label="Adicionar à carteira"
             >
-              Compartilhar seus dados
-            </button>
-          ) : primary.kind === "save" ? (
+              {wallet.apple && (
+                <a
+                  className={`${styles.walletButton} ${styles.appleWalletButton}`}
+                  href={`/c/${encodeURIComponent(card.slug)}/wallet/apple`}
+                  onClick={() =>
+                    void track("apple_wallet_add_click", card.slug, source)
+                  }
+                >
+                  Adicionar ao Apple Wallet
+                </a>
+              )}
+              {wallet.google && (
+                <a
+                  className={`${styles.walletButton} ${styles.googleWalletButton}`}
+                  href={`/c/${encodeURIComponent(card.slug)}/wallet/google`}
+                  onClick={() =>
+                    void track("google_wallet_add_click", card.slug, source)
+                  }
+                >
+                  Adicionar ao Google Wallet
+                </a>
+              )}
+              {wallet.qr && (
+                <button
+                  className={styles.qrButton}
+                  type="button"
+                  onClick={() => setQrOpen(true)}
+                >
+                  Mostrar QR Code
+                </button>
+              )}
+            </div>
+          )}
+          {!wallet.apple && !wallet.google && !wallet.qr && (
             <a
               className={styles.primaryButton}
               href={`/c/${encodeURIComponent(card.slug)}/contact.vcf`}
               onClick={() => void track("contact_save", card.slug, source)}
             >
               Salvar meu contato
-            </a>
-          ) : (
-            <a
-              className={styles.primaryButton}
-              href={primary.action.url}
-              onClick={() =>
-                void track(
-                  actionEvent(primary.action),
-                  card.slug,
-                  source,
-                  primary.action.id,
-                )
-              }
-            >
-              {primary.action.label}
             </a>
           )}
           <div className={styles.secondaryActions}>
@@ -325,6 +344,23 @@ export function PublicSmartCard({
               Trocar contatos
             </button>
           </div>
+          <details className={styles.moreOptions}>
+            <summary>Mais opções</summary>
+            <div>
+              <a
+                href={`https://wa.me/?text=${encodeURIComponent(publicUrl)}`}
+                target="_blank"
+                rel="noreferrer"
+              >
+                WhatsApp
+              </a>
+              <a
+                href={`mailto:?subject=${encodeURIComponent(displayName)}&body=${encodeURIComponent(publicUrl)}`}
+              >
+                E-mail
+              </a>
+            </div>
+          </details>
         </div>
 
         {card.actions.length > 0 && (
@@ -342,6 +378,38 @@ export function PublicSmartCard({
               </a>
             ))}
           </div>
+        )}
+
+        {card.socialLinks.length > 0 && (
+          <nav className={styles.socialLinks} aria-label="Redes sociais">
+            {card.socialLinks.map((link) => {
+              const provider = getSocialProvider(link.providerId);
+              if (!provider) return null;
+              const Icon = provider.icon;
+              return (
+                <a
+                  key={link.providerId}
+                  href={link.url}
+                  target={link.providerId === "email" ? undefined : "_blank"}
+                  rel={link.providerId === "email" ? undefined : "noreferrer"}
+                  title={link.label || provider.name}
+                  aria-label={link.label || provider.name}
+                  onClick={() =>
+                    void track(
+                      "social_click",
+                      card.slug,
+                      source,
+                      undefined,
+                      undefined,
+                      link.providerId,
+                    )
+                  }
+                >
+                  <Icon aria-hidden="true" />
+                </a>
+              );
+            })}
+          </nav>
         )}
 
         <footer className={styles.footer}>Feito com LinkOr</footer>
@@ -457,6 +525,36 @@ export function PublicSmartCard({
                 </button>
               </form>
             )}
+          </section>
+        </div>
+      )}
+      {qrOpen && (
+        <div
+          className={styles.sheetBackdrop}
+          role="presentation"
+          onMouseDown={() => setQrOpen(false)}
+        >
+          <section
+            className={styles.sheet}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="smart-card-qr-title"
+            onMouseDown={(event) => event.stopPropagation()}
+          >
+            <button
+              className={styles.sheetClose}
+              type="button"
+              onClick={() => setQrOpen(false)}
+            >
+              Fechar
+            </button>
+            <div className={styles.qrSheet}>
+              <h2 id="smart-card-qr-title">QR Code do Smart Card</h2>
+              <img
+                src={`/c/${encodeURIComponent(card.slug)}/qr`}
+                alt={`QR Code de ${displayName}`}
+              />
+            </div>
           </section>
         </div>
       )}

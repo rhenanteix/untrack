@@ -151,6 +151,39 @@
 .primaryActions {
   margin-top: 30px;
 }
+.walletActions {
+  display: grid;
+  gap: 9px;
+}
+.walletButton,
+.qrButton {
+  display: grid;
+  width: 100%;
+  min-height: 50px;
+  place-items: center;
+  border-radius: var(--card-radius);
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 800;
+  line-height: 1.2;
+  text-align: center;
+  text-decoration: none;
+}
+.appleWalletButton {
+  border: 1px solid #111111;
+  background: #111111;
+  color: #ffffff;
+}
+.googleWalletButton {
+  border: 1px solid color-mix(in srgb, var(--card-ink) 28%, transparent);
+  background: #ffffff;
+  color: #202124;
+}
+.qrButton {
+  border: 1px solid color-mix(in srgb, var(--card-ink) 24%, transparent);
+  background: transparent;
+  color: inherit;
+}
 .primaryButton {
   display: grid;
   width: 100%;
@@ -174,6 +207,30 @@
   grid-template-columns: 1fr 1fr;
   gap: 8px;
   margin-top: 9px;
+}
+.moreOptions {
+  margin-top: 10px;
+  color: color-mix(in srgb, var(--card-ink) 80%, transparent);
+  font-size: 12px;
+  font-weight: 750;
+  text-align: center;
+}
+.moreOptions summary {
+  cursor: pointer;
+  list-style: none;
+}
+.moreOptions summary::-webkit-details-marker {
+  display: none;
+}
+.moreOptions > div {
+  display: flex;
+  justify-content: center;
+  gap: 14px;
+  padding-top: 9px;
+}
+.moreOptions a {
+  color: inherit;
+  text-decoration: none;
 }
 .secondaryActions a,
 .secondaryActions button {
@@ -219,6 +276,30 @@
   background: color-mix(
     in srgb,
     var(--card-background-secondary) 64%,
+    transparent
+  );
+}
+.socialLinks {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 9px;
+  margin-top: 24px;
+}
+.socialLinks a {
+  display: grid;
+  width: 38px;
+  height: 38px;
+  place-items: center;
+  border: 1px solid color-mix(in srgb, var(--card-ink) 18%, transparent);
+  border-radius: 50%;
+  color: inherit;
+  text-decoration: none;
+}
+.socialLinks a:hover {
+  background: color-mix(
+    in srgb,
+    var(--card-background-secondary) 70%,
     transparent
   );
 }
@@ -300,6 +381,24 @@
   display: grid;
   gap: 14px;
   padding: 24px 0 8px;
+}
+.qrSheet {
+  display: grid;
+  justify-items: center;
+  gap: 18px;
+  padding: 14px 0 4px;
+  text-align: center;
+}
+.qrSheet h2 {
+  margin: 0;
+  font-size: 22px;
+  line-height: 1.2;
+}
+.qrSheet img {
+  width: min(100%, 320px);
+  aspect-ratio: 1;
+  border: 1px solid #d5ded7;
+  border-radius: 8px;
 }
 
 @media (min-width: 700px) {

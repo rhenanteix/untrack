@@ -1,49 +1,20 @@
 "use client";
 
 import type { CSSProperties } from "react";
-import type { IconType } from "react-icons";
 import {
-  FaEnvelope,
-  FaFacebookF,
-  FaGlobe,
-  FaInstagram,
-  FaLinkedinIn,
-  FaTiktok,
-  FaWhatsapp,
-  FaXTwitter,
-  FaYoutube,
-} from "react-icons/fa6";
+  getSocialProvider,
+  type SocialProviderId,
+} from "@/modules/social-providers";
 import type { SmartPageTheme } from "@/modules/smart-pages/themes";
 import { analytics } from "@/lib/client/analytics";
 import styles from "./themes.module.css";
 
-export type SmartPageSocialNetwork =
-  | "instagram"
-  | "tiktok"
-  | "youtube"
-  | "linkedin"
-  | "x"
-  | "facebook"
-  | "whatsapp"
-  | "website"
-  | "email";
+export type SmartPageSocialNetwork = SocialProviderId;
 
 export type SmartPageSocialLink = {
   network: SmartPageSocialNetwork;
   url: string;
   label?: string;
-};
-
-const networks: Record<SmartPageSocialNetwork, { label: string; Icon: IconType }> = {
-  instagram: { label: "Instagram", Icon: FaInstagram },
-  tiktok: { label: "TikTok", Icon: FaTiktok },
-  youtube: { label: "YouTube", Icon: FaYoutube },
-  linkedin: { label: "LinkedIn", Icon: FaLinkedinIn },
-  x: { label: "X", Icon: FaXTwitter },
-  facebook: { label: "Facebook", Icon: FaFacebookF },
-  whatsapp: { label: "WhatsApp", Icon: FaWhatsapp },
-  website: { label: "Site", Icon: FaGlobe },
-  email: { label: "E-mail", Icon: FaEnvelope },
 };
 
 export function PageSocialLinks({
@@ -76,9 +47,10 @@ export function PageSocialLinks({
       }
     >
       {links.map((link) => {
-        const network = networks[link.network];
-        const Icon = network.Icon;
-        const displayLabel = link.label || network.label;
+        const provider = getSocialProvider(link.network);
+        if (!provider) return null;
+        const Icon = provider.icon;
+        const displayLabel = link.label || provider.name;
         return (
           <a
             key={link.network}
@@ -86,11 +58,11 @@ export function PageSocialLinks({
             target={link.network === "email" ? undefined : "_blank"}
             rel={link.network === "email" ? undefined : "noreferrer"}
             aria-label={
-              displayLabel === network.label
-                ? network.label
-                : `${network.label}: ${displayLabel}`
+              displayLabel === provider.name
+                ? provider.name
+                : `${provider.name}: ${displayLabel}`
             }
-            title={style === "icons" ? network.label : undefined}
+            title={style === "icons" ? provider.name : undefined}
             data-network={link.network}
             onClick={() => {
               if (slug) void analytics.trackSmartPage("social_click", slug, link.network);

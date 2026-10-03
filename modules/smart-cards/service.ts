@@ -6,7 +6,7 @@ import { getPrisma } from "@/lib/prisma";
 import { recordAnalyticsEvent } from "@/modules/analytics/service";
 import { PAGE_SIZE } from "@/lib/pagination";
 import { createQrAsset } from "@/modules/untrack-qr/service";
-import { renderVerifiedQr } from "@/modules/untrack-qr/render";
+import { exportQr, renderVerifiedQr } from "@/modules/untrack-qr/render";
 import {
   assertReferences,
   audit,
@@ -28,6 +28,7 @@ import { recordPublicSmartCardEvent } from "./events";
 const cardInclude = {
   actions: { orderBy: { position: "asc" as const } },
   qrAsset: true,
+  walletPasses: { orderBy: { updatedAt: "desc" as const } },
   _count: { select: { contactExchanges: true } },
 } as const;
 
@@ -113,29 +114,43 @@ export async function getSmartCard(actor: Actor, id: string) {
 
 export async function createSmartCard(actor: Actor, raw: unknown) {
   const input = smartCardInputSchema.parse(raw);
-  const { actions, campaignId, ...cardData } = input;
+  const {
+    actions,
+    campaignId,
+    contactForm,
+    contactPoints,
+    socialLinks,
+    theme,
+    ...cardData
+  } = input;
   try {
-    const card = await workspaceTransaction(actor, "write", async (tx, plan) => {
-      await assertReferences(tx, actor.workspaceId, { campaignId });
-      await reserveQuota(tx, actor.workspaceId, plan, "smartCards");
-      const card = await tx.smartCard.create({
-        data: {
-          ...cardData,
-          workspaceId: actor.workspaceId,
-          ownerId: actor.userId,
-          campaignId: campaignId ?? null,
-          theme: json(cardData.theme),
-          contactForm: json(cardData.contactForm),
-          actions: { create: actionRows(actions) },
-        },
-        include: cardInclude,
-      });
-      await audit(tx, actor, "smartCard.created", card.id, {
-        slug: card.slug,
-        campaignId: card.campaignId,
-      });
-      return card;
-    });
+    const card = await workspaceTransaction(
+      actor,
+      "write",
+      async (tx, plan) => {
+        await assertReferences(tx, actor.workspaceId, { campaignId });
+        await reserveQuota(tx, actor.workspaceId, plan, "smartCards");
+        const card = await tx.smartCard.create({
+          data: {
+            ...cardData,
+            workspaceId: actor.workspaceId,
+            ownerId: actor.userId,
+            campaignId: campaignId ?? null,
+            theme: json(theme),
+            contactForm: json(contactForm),
+            contactPoints: json(contactPoints),
+            socialLinks: json(socialLinks),
+            actions: { create: actionRows(actions) },
+          },
+          include: cardInclude,
+        });
+        await audit(tx, actor, "smartCard.created", card.id, {
+          slug: card.slug,
+          campaignId: card.campaignId,
+        });
+        return card;
+      },
+    );
     await track("smart_card_created", { workspaceId: actor.workspaceId });
     return card;
   } catch (error) {
@@ -145,7 +160,15 @@ export async function createSmartCard(actor: Actor, raw: unknown) {
 
 export async function updateSmartCard(actor: Actor, id: string, raw: unknown) {
   const input = smartCardUpdateSchema.parse(raw);
-  const { actions, campaignId, theme, contactForm, ...cardData } = input;
+  const {
+    actions,
+    campaignId,
+    contactForm,
+    contactPoints,
+    socialLinks,
+    theme,
+    ...cardData
+  } = input;
   try {
     return await workspaceTransaction(actor, "write", async (tx) => {
       const current = await tx.smartCard.findFirst({
@@ -178,9 +201,21 @@ export async function updateSmartCard(actor: Actor, id: string, raw: unknown) {
           ...(contactForm === undefined
             ? {}
             : { contactForm: json(contactForm) }),
+          ...(contactPoints === undefined
+            ? {}
+            : { contactPoints: json(contactPoints) }),
+          ...(socialLinks === undefined
+            ? {}
+            : { socialLinks: json(socialLinks) }),
         },
         include: cardInclude,
       });
+      if (Object.keys(input).length > 0) {
+        await tx.smartCardWalletPass.updateMany({
+          where: { smartCardId: id, status: "synced" },
+          data: { status: "pending_sync", lastError: null },
+        });
+      }
       await audit(tx, actor, "smartCard.updated", id, {
         before: { slug: current.slug },
         fields: Object.keys(input),
@@ -280,8 +315,25 @@ export async function publicSmartCard(slug: string) {
     where: { slug, status: "published" },
     include: {
       actions: { where: { visible: true }, orderBy: { position: "asc" } },
+      qrAsset: { select: { id: true } },
+      walletPasses: {
+        select: { provider: true, status: true },
+      },
     },
   });
+}
+
+export async function publicSmartCardQr(slug: string) {
+  const card = await getPrisma().smartCard.findFirst({
+    where: { slug, status: "published" },
+    select: {
+      qrAsset: { select: { encodedUrl: true, visual: true } },
+    },
+  });
+  if (!card?.qrAsset) {
+    throw new ApiError(404, "SMART_CARD_QR_NOT_FOUND", "QR não encontrado.");
+  }
+  return exportQr(card.qrAsset.encodedUrl, card.qrAsset.visual, "png");
 }
 
 function contactConsentText(card: {
@@ -518,12 +570,18 @@ export async function smartCardMetrics(actor: Actor, id: string, days: number) {
         "website_click",
         "button_click",
         "save_contact_click",
+        "social_click",
+        "apple_wallet_add_click",
+        "google_wallet_add_click",
       ],
     },
     day: { gte: start },
   };
   const [
     views,
+    qrScans,
+    appleWalletClicks,
+    googleWalletClicks,
     interactions,
     visitors,
     contacts,
@@ -532,6 +590,27 @@ export async function smartCardMetrics(actor: Actor, id: string, days: number) {
     sources,
   ] = await Promise.all([
     db.analyticsEvent.count({ where: viewWhere }),
+    db.analyticsEvent.count({
+      where: {
+        smartCardId: card.id,
+        name: { in: ["qr_scan", "smart_card_qr_scan"] },
+        day: { gte: start },
+      },
+    }),
+    db.analyticsEvent.count({
+      where: {
+        smartCardId: card.id,
+        name: "apple_wallet_add_click",
+        day: { gte: start },
+      },
+    }),
+    db.analyticsEvent.count({
+      where: {
+        smartCardId: card.id,
+        name: "google_wallet_add_click",
+        day: { gte: start },
+      },
+    }),
     db.analyticsEvent.count({ where: interactionWhere }),
     db.analyticsEvent.groupBy({
       by: ["visitorHash"],
@@ -575,15 +654,21 @@ export async function smartCardMetrics(actor: Actor, id: string, days: number) {
   return {
     periodDays: days,
     views,
+    qrScans,
+    appleWalletClicks,
+    googleWalletClicks,
+    walletAddsConfirmed: null,
     uniqueVisitors: visitors.length,
     interactions,
     contacts,
     conversions,
     funnel: [
-      { key: "views", label: "Visitas", value: views },
-      { key: "interactions", label: "Interações", value: interactions },
-      { key: "contacts", label: "Contatos", value: contacts },
-      { key: "conversions", label: "Conversões", value: conversions },
+      { key: "views", label: "Visualizações", value: views },
+      {
+        key: "wallet_cta_clicks",
+        label: "CTA de Wallet clicada",
+        value: appleWalletClicks + googleWalletClicks,
+      },
     ],
     topActions: topActions.flatMap((item) =>
       item.smartCardActionId

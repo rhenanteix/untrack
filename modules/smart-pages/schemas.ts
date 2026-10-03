@@ -1,6 +1,10 @@
 import { z } from "zod";
 import { themeIds } from "./themes";
 import { productBlockSettingsSchema } from "@/modules/products/schemas";
+import {
+  normalizeSocialUrl,
+  socialProviderIds,
+} from "@/modules/social-providers";
 import { webUrlSchema } from "@/modules/validation/url-validation";
 
 const reservedSlugs = new Set(["new", "api", "admin"]);
@@ -98,43 +102,29 @@ export const smartPageThemeSchema = z
   })
   .strict();
 
+const socialLinkSchema = z
+  .object({
+    network: z.enum(socialProviderIds),
+    url: z.string().trim().min(1).max(4096),
+    label: socialLabelSchema,
+  })
+  .strict()
+  .superRefine((link, context) => {
+    if (!normalizeSocialUrl(link.network, link.url)) {
+      context.addIssue({
+        code: "custom",
+        path: ["url"],
+        message: "Informe um endereço válido para esta rede.",
+      });
+    }
+  })
+  .transform((link) => ({
+    ...link,
+    url: normalizeSocialUrl(link.network, link.url) ?? link.url,
+  }));
+
 export const socialLinksSchema = z
-  .array(
-    z.union([
-      z
-        .object({
-          network: z.enum([
-            "instagram",
-            "tiktok",
-            "youtube",
-            "linkedin",
-            "x",
-            "facebook",
-            "whatsapp",
-            "website",
-          ]),
-          url: webUrlSchema,
-          label: socialLabelSchema,
-        })
-        .strict(),
-      z
-        .object({
-          network: z.literal("email"),
-          url: z
-            .string()
-            .trim()
-            .refine(
-              (value) =>
-                value.startsWith("mailto:") &&
-                z.string().email().safeParse(value.slice("mailto:".length))
-                  .success,
-              "Informe um e-mail válido.",
-            ),
-          label: socialLabelSchema,
-        })
-        .strict(),
-    ]),
-  )
+  .array(socialLinkSchema)
   .max(8)
   .superRefine((links, context) => {
     if (new Set(links.map((link) => link.network)).size !== links.length) {
