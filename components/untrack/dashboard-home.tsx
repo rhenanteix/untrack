@@ -14,6 +14,7 @@ import {
 import { WorkspaceCommandPalette } from "./workspace-command-palette";
 import { SetupChecklist } from "./setup-checklist";
 import { CreateLauncher } from "./create-launcher";
+import { SignOutButton } from "@/components/sign-out-button";
 
 const periods = [7, 30, 90] as const;
 
@@ -93,6 +94,7 @@ function DashboardHeader({
       <div className="dashboard-header-actions">
         <WorkspaceCommandPalette />
         {canWrite ? <CreateLauncher /> : null}
+        <SignOutButton />
       </div>
     </header>
   );
