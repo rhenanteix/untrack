@@ -7,6 +7,7 @@ import {
 } from "@/components/commercial-tracking";
 import { usePublicLanguage } from "@/components/public-language-provider";
 import { getFreeTools, getProduct } from "@/lib/products";
+import { LinkInBioPreview } from "@/components/link-in-bio-preview";
 
 const freeToolLabels = {
   "qr-code": "Criar QR Code",
@@ -188,12 +189,7 @@ export function LandingPage() {
               </CommercialLink>
             </div>
             <div className="link-in-bio-preview" aria-label="Exemplo de uma página Link in Bio">
-              <span>Exemplo de página</span>
-              <strong>Seu próximo destino começa aqui.</strong>
-              <p>Links, produtos, WhatsApp e campanhas em uma página só.</p>
-              <i>Conteúdo em destaque</i>
-              <i>Fale no WhatsApp</i>
-              <i>Conheça a campanha</i>
+              <LinkInBioPreview />
             </div>
           </div>
         </section>

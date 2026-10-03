@@ -5,6 +5,7 @@ import {
 } from "@/components/commercial-tracking";
 import type { Product } from "@/lib/products";
 import { getProduct } from "@/lib/products";
+import { LinkInBioPreview } from "@/components/link-in-bio-preview";
 
 function ProductCta({ product }: { product: Product }) {
   const href = `/cadastro?next=${encodeURIComponent(product.toolHref)}`;
@@ -102,6 +103,21 @@ export function ProductLandingTemplate({ product }: { product: Product }) {
           </div>
         </div>
       </section>
+
+      {product.slug === "link-in-bio" && (
+        <section className="product-section product-section-alt">
+          <div className="shell">
+            <div className="product-section-heading">
+              <span className="eyebrow">Demonstração</span>
+              <h2>Experimente criar sua página.</h2>
+              <p>
+                Edite os campos ao lado e veja o preview atualizar em tempo real.
+              </p>
+            </div>
+            <LinkInBioPreview />
+          </div>
+        </section>
+      )}
 
       {related.length > 0 && (
         <section className="product-section">
