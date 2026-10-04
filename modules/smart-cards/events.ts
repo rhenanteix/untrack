@@ -3,6 +3,12 @@ import {
   recordAnalyticsEvent,
   type RecordAnalyticsEventInput,
 } from "@/modules/analytics/service";
+import { resolveAttribution } from "@/modules/analytics/attribution";
+import {
+  publicAnalyticsContextCookies,
+  resolvePublicAnalyticsContext,
+  trustedCampaignContext,
+} from "@/modules/analytics/public-context";
 import type { z } from "zod";
 import { smartCardEventSchema } from "./schemas";
 
@@ -30,7 +36,7 @@ export async function recordPublicSmartCardEvent(
     where: { slug: input.slug, status: "published" },
     select: { id: true, workspaceId: true, campaignId: true },
   });
-  if (!card) return false;
+  if (!card) return { recorded: false, cookieHeaders: [] };
 
   let action: { id: string; type: string } | null = null;
   if (input.actionId) {
@@ -43,15 +49,33 @@ export async function recordPublicSmartCardEvent(
       },
       select: { id: true, type: true },
     });
-    if (!action) return false;
+    if (!action) return { recorded: false, cookieHeaders: [] };
   }
+  const context = resolvePublicAnalyticsContext(
+    headers,
+    { visitorId: input.visitorId, sessionId: input.sessionId },
+    {
+      utmSource: input.utmSource,
+      utmMedium: input.utmMedium,
+      utmCampaign: input.utmCampaign,
+      utmContent: input.utmContent,
+      utmTerm: input.utmTerm,
+    },
+  );
+  if (!context.trackingAllowed)
+    return { recorded: false, cookieHeaders: [] };
+  const attribution = resolveAttribution({
+    ...context.attribution,
+    referrer: headers.get("referer"),
+  });
+  const inherited = trustedCampaignContext(headers);
   const name: RecordAnalyticsEventInput["name"] =
     input.event === "card_view" || input.event === "nfc_open"
       ? "smart_card_view"
       : input.event === "card_share"
         ? "share_details_open"
         : input.event === "qr_scan"
-            ? "smart_card_qr_scan"
+          ? "qr_scan"
             : input.event === "apple_wallet_add_click"
               ? "apple_wallet_add_click"
               : input.event === "google_wallet_add_click"
@@ -73,16 +97,17 @@ export async function recordPublicSmartCardEvent(
     name,
     eventId: input.eventId,
     workspaceId: card.workspaceId,
-    visitorKey: input.visitorId,
-    sessionKey: input.sessionId,
+    visitorKey: context.identity.visitorId,
+    sessionKey: context.identity.sessionId,
     assetType: "smart_card",
     assetId: card.id,
-    elementType: action ? "action" : undefined,
-    elementId: action?.id,
-    campaignId: card.campaignId ?? undefined,
+    elementType: action ? "action" : input.event === "social_click" ? "social_link" : undefined,
+    elementId: action?.id ?? input.providerId,
+    campaignId: inherited.campaignId ?? card.campaignId ?? undefined,
     smartCardId: card.id,
     smartCardActionId: action?.id,
     path: `/c/${input.slug}`,
+    attribution: context.attribution,
     origin: "client",
     headers,
   });
@@ -116,5 +141,11 @@ export async function recordPublicSmartCardEvent(
       });
     }
   }
-  return result.recorded || result.duplicate;
+  return {
+    recorded: result.recorded || result.duplicate,
+    cookieHeaders: publicAnalyticsContextCookies(headers, context, attribution, {
+      campaignId: inherited.campaignId ?? card.campaignId ?? undefined,
+      qrContext: inherited.qrContext,
+    }),
+  };
 }

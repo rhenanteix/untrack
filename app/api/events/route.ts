@@ -5,6 +5,7 @@ import { enforceRateLimit } from "@/lib/rate-limit";
 import { enforceSameOrigin } from "@/lib/request-origin";
 import { universalEventNames } from "@/modules/analytics/event-types";
 import { recordAnalyticsEvent } from "@/modules/analytics/service";
+import { reportAnalyticsHealth } from "@/modules/analytics/health";
 
 const inputSchema = z
   .object({
@@ -40,6 +41,7 @@ export async function POST(request: Request) {
     );
     return new NextResponse(null, { status: 204, headers });
   } catch (error) {
+    reportAnalyticsHealth("events_rejected");
     return errorResponse(error);
   }
 }

@@ -2,6 +2,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { getPrisma } from "@/lib/prisma";
 import { recordAnalyticsEvent } from "@/modules/analytics/service";
 import { recordPublicSmartPageEvent } from "@/modules/smart-pages/events";
+import { resolveAttribution } from "@/modules/analytics/attribution";
+import {
+  publicAnalyticsContextCookies,
+  resolvePublicAnalyticsContext,
+} from "@/modules/analytics/public-context";
 
 vi.mock("@/lib/prisma", () => ({ getPrisma: vi.fn() }));
 vi.mock("@/modules/analytics/service", () => ({
@@ -47,7 +52,7 @@ describe("smart page analytics events", () => {
           "user-agent": "Mozilla Mobile Android",
         }),
       ),
-    ).resolves.toBe(true);
+    ).resolves.toMatchObject({ recorded: true });
 
     expect(recordAnalyticsEvent).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -73,7 +78,7 @@ describe("smart page analytics events", () => {
         { event: "smart_page_view", slug: "minha-pagina" },
         new Headers({ "user-agent": "Slackbot" }),
       ),
-    ).resolves.toBe(true);
+    ).resolves.toMatchObject({ recorded: true });
     expect(findFirst).toHaveBeenCalledOnce();
     expect(recordAnalyticsEvent).toHaveBeenCalledWith(
       expect.objectContaining({ headers: expect.any(Headers) }),
@@ -103,7 +108,7 @@ describe("smart page analytics events", () => {
         },
         new Headers({ "user-agent": "Mozilla Desktop" }),
       ),
-    ).resolves.toBe(true);
+    ).resolves.toMatchObject({ recorded: true });
 
     expect(findFirst).toHaveBeenCalledWith({
       where: expect.objectContaining({
@@ -111,13 +116,89 @@ describe("smart page analytics events", () => {
         smartPageId: "page_1",
         type: "product",
       }),
-      select: { id: true, type: true, link: { select: { campaignId: true } } },
+      select: {
+        id: true,
+        type: true,
+        link: { select: { campaignId: true, destinationUrl: true } },
+      },
     });
     expect(recordAnalyticsEvent).toHaveBeenCalledWith(
       expect.objectContaining({
         name: "product_click",
         elementId: "block_1",
       }),
+    );
+  });
+
+  it("keeps signed QR campaign and identity context through a Smart Page CTA", async () => {
+    const initialHeaders = new Headers();
+    const initial = resolvePublicAnalyticsContext(initialHeaders);
+    const attribution = resolveAttribution({
+      ...initial.attribution,
+      knownContext: { source: "qr", medium: "qr", channel: "qr" },
+    });
+    const cookie = publicAnalyticsContextCookies(
+      initialHeaders,
+      initial,
+      attribution,
+      { campaignId: "campaign_1", qrContext: "event_stand" },
+    )
+      .map((item) => item.split(";")[0])
+      .join("; ");
+    vi.mocked(getPrisma).mockReturnValue({
+      smartPage: {
+        findFirst: vi
+          .fn()
+          .mockResolvedValue({ id: "page_1", workspaceId: "workspace_1" }),
+      },
+      smartPageBlock: {
+        findFirst: vi.fn().mockResolvedValue({
+          id: "block_1",
+          type: "link",
+          link: { campaignId: null, destinationUrl: "https://example.com" },
+        }),
+      },
+    } as unknown as ReturnType<typeof getPrisma>);
+
+    await recordPublicSmartPageEvent(
+      { event: "smart_block_clicked", slug: "minha-pagina", blockId: "block_1" },
+      new Headers({ cookie }),
+    );
+
+    expect(recordAnalyticsEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        name: "link_click",
+        visitorKey: initial.identity.visitorId,
+        sessionKey: initial.identity.sessionId,
+        campaignId: "campaign_1",
+        attribution: expect.objectContaining({ trustedContext: expect.any(Object) }),
+      }),
+    );
+  });
+
+  it("classifies a WhatsApp block as a WhatsApp click", async () => {
+    vi.mocked(getPrisma).mockReturnValue({
+      smartPage: {
+        findFirst: vi
+          .fn()
+          .mockResolvedValue({ id: "page_1", workspaceId: "workspace_1" }),
+      },
+      smartPageBlock: {
+        findFirst: vi.fn().mockResolvedValue({
+          id: "block_1",
+          type: "whatsapp",
+          link: null,
+        }),
+      },
+    } as unknown as ReturnType<typeof getPrisma>);
+
+    await recordPublicSmartPageEvent(
+      { event: "smart_block_clicked", slug: "minha-pagina", blockId: "block_1" },
+      new Headers(),
+    );
+
+    expect(recordAnalyticsEvent).toHaveBeenCalledWith(
+      expect.objectContaining({ name: "whatsapp_click", elementId: "block_1" }),
     );
   });
 });

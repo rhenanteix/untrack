@@ -5,6 +5,10 @@ import {
   type AnalyticsEventName,
 } from "../analytics-events";
 import type { UniversalEventName } from "@/modules/analytics/event-types";
+import {
+  analyticsSessionCookieName,
+  analyticsVisitorCookieName,
+} from "@/modules/analytics/public-contract";
 
 export type { AnalyticsEventName };
 
@@ -45,6 +49,28 @@ type SmartCardEvent =
 const visitorStorageKey = "linkor:analytics:visitor";
 const sessionStorageKey = "linkor:analytics:session";
 
+function readBrowserCookie(name: string) {
+  const value = document.cookie
+    .split(";")
+    .map((item) => item.trim())
+    .find((item) => item.startsWith(`${name}=`));
+  if (!value) return undefined;
+  try {
+    return decodeURIComponent(value.slice(name.length + 1));
+  } catch {
+    return undefined;
+  }
+}
+
+function persistBrowserCookie(name: string, value: string, persistent = false) {
+  document.cookie = [
+    `${name}=${encodeURIComponent(value)}`,
+    "Path=/",
+    "SameSite=Lax",
+    ...(persistent ? ["Max-Age=31536000"] : []),
+  ].join("; ");
+}
+
 function publicIdentity(): PublicIdentity {
   if (typeof window === "undefined") return {};
   const navigatorWithPrivacy = navigator as Navigator & {
@@ -57,11 +83,17 @@ function publicIdentity(): PublicIdentity {
     return {};
   try {
     const visitorId =
-      window.localStorage.getItem(visitorStorageKey) ?? crypto.randomUUID();
+      readBrowserCookie(analyticsVisitorCookieName) ??
+      window.localStorage.getItem(visitorStorageKey) ??
+      crypto.randomUUID();
     const sessionId =
-      window.sessionStorage.getItem(sessionStorageKey) ?? crypto.randomUUID();
+      readBrowserCookie(analyticsSessionCookieName) ??
+      window.sessionStorage.getItem(sessionStorageKey) ??
+      crypto.randomUUID();
     window.localStorage.setItem(visitorStorageKey, visitorId);
     window.sessionStorage.setItem(sessionStorageKey, sessionId);
+    persistBrowserCookie(analyticsVisitorCookieName, visitorId, true);
+    persistBrowserCookie(analyticsSessionCookieName, sessionId);
     return { visitorId, sessionId };
   } catch {
     return {};
@@ -77,6 +109,10 @@ function utmContext() {
     utmContent: search.get("utm_content") ?? undefined,
     utmTerm: search.get("utm_term") ?? undefined,
   };
+}
+
+function publicTrackingContext() {
+  return { ...publicIdentity(), ...utmContext() };
 }
 
 function post(path: string, body: Record<string, unknown>) {
@@ -116,6 +152,8 @@ export const analytics = {
 
   identity: publicIdentity,
 
+  publicContext: publicTrackingContext,
+
   trackPublicEvent(
     event: UniversalEventName,
     context: { path?: string } = {},
@@ -125,8 +163,7 @@ export const analytics = {
       event,
       eventId: crypto.randomUUID(),
       path: context.path ?? window.location.pathname,
-      ...publicIdentity(),
-      ...utmContext(),
+      ...publicTrackingContext(),
     });
   },
 
@@ -137,7 +174,7 @@ export const analytics = {
       eventId: crypto.randomUUID(),
       slug,
       blockId,
-      ...publicIdentity(),
+      ...publicTrackingContext(),
     });
   },
 
@@ -158,7 +195,7 @@ export const analytics = {
       actionId,
       contactId,
       providerId,
-      ...publicIdentity(),
+      ...publicTrackingContext(),
     });
   },
 };

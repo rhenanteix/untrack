@@ -206,7 +206,7 @@ export function PublicSmartCard({
               ? String(formData.get("intent") ?? "")
               : undefined,
             source,
-            visitorId: analytics.identity().visitorId ?? crypto.randomUUID(),
+            ...analytics.publicContext(),
             consent: true,
           }),
         },

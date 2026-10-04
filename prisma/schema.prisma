@@ -123,6 +123,8 @@ model AnalyticsEvent {
   occurredAt       DateTime        @default(now())
   metadata         Json            @default("{}")
   workspaceId      String?
+  userId           String?
+  audienceContactId String?
   visitorId        String?
   sessionId        String?
   assetType        String?         @db.VarChar(40)
@@ -130,6 +132,7 @@ model AnalyticsEvent {
   elementType      String?         @db.VarChar(40)
   elementId        String?         @db.VarChar(255)
   campaignId       String?         @db.VarChar(255)
+  goalId           String?
   path             String?         @db.VarChar(2048)
   destinationUrl   String?         @db.VarChar(4096)
   smartPageId      String?
@@ -157,20 +160,28 @@ model AnalyticsEvent {
   browser          String?         @db.VarChar(20)
   isBot            Boolean         @default(false)
   botType          String?         @db.VarChar(20)
+  isTest           Boolean         @default(false)
   workspace        Workspace?      @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  user             User?           @relation(fields: [userId], references: [id], onDelete: SetNull)
+  audienceContact  AudienceContact? @relation(fields: [audienceContactId], references: [id], onDelete: SetNull)
   visitor          AnalyticsVisitor? @relation(fields: [visitorId], references: [id], onDelete: SetNull)
   analyticsSession AnalyticsSession? @relation(fields: [sessionId], references: [id], onDelete: SetNull)
   smartPage        SmartPage?      @relation(fields: [smartPageId], references: [id], onDelete: Cascade)
   smartPageBlock   SmartPageBlock? @relation(fields: [smartPageBlockId], references: [id], onDelete: Cascade)
   smartCard        SmartCard?      @relation(fields: [smartCardId], references: [id], onDelete: Cascade)
   smartCardAction  SmartCardAction? @relation(fields: [smartCardActionId], references: [id], onDelete: SetNull)
+  goal             AnalyticsGoal?  @relation("AnalyticsGoalCompletionEvents", fields: [goalId], references: [id], onDelete: SetNull)
   goalEvents       AnalyticsGoalEvent[]
 
   @@index([name, occurredAt])
   @@index([workspaceId, occurredAt])
   @@index([workspaceId, name, occurredAt])
+  @@index([workspaceId, isTest, occurredAt])
   @@index([assetId, occurredAt])
   @@index([campaignId, occurredAt])
+  @@index([goalId, occurredAt])
+  @@index([userId, occurredAt])
+  @@index([audienceContactId, occurredAt])
   @@index([visitorId, occurredAt])
   @@index([sessionId, occurredAt])
   @@index([smartPageId, day])
@@ -187,8 +198,14 @@ model AnalyticsVisitor {
   visitorHash       String   @db.VarChar(64)
   firstTouchSource  String?  @db.VarChar(253)
   firstTouchMedium  String?  @db.VarChar(120)
+  firstTouchChannel String?  @db.VarChar(40)
   firstTouchCampaign String? @db.VarChar(120)
   firstTouchAt      DateTime @default(now())
+  lastTouchSource   String?  @db.VarChar(253)
+  lastTouchMedium   String?  @db.VarChar(120)
+  lastTouchChannel  String?  @db.VarChar(40)
+  lastTouchCampaign String?  @db.VarChar(120)
+  lastTouchAt       DateTime @default(now())
   lastSeenAt        DateTime @default(now())
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
@@ -212,6 +229,7 @@ model AnalyticsSession {
   entryReferrer      String?  @db.VarChar(253)
   initialSource      String?  @db.VarChar(253)
   initialMedium      String?  @db.VarChar(120)
+  initialChannel     String?  @db.VarChar(40)
   initialCampaign    String?  @db.VarChar(120)
   workspace          Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   visitor            AnalyticsVisitor @relation(fields: [visitorId], references: [id], onDelete: Cascade)
@@ -235,6 +253,7 @@ model AnalyticsGoal {
   updatedAt   DateTime @updatedAt
   workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   events      AnalyticsGoalEvent[]
+  completionEvents AnalyticsEvent[] @relation("AnalyticsGoalCompletionEvents")
 
   @@unique([workspaceId, name])
   @@index([workspaceId, active, eventName])
@@ -305,6 +324,7 @@ model User {
   favorites Favorite[]
   recentResources RecentResource[]
   ownedSmartCards SmartCard[] @relation("SmartCardOwner")
+  analyticsEvents AnalyticsEvent[]
 }
 
 model Session {
@@ -475,6 +495,7 @@ model AudienceContact {
   workspace   Workspace             @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   exchanges   SmartCardContactExchange[]
   events      AudienceContactEvent[]
+  analyticsEvents AnalyticsEvent[]
 
   @@index([workspaceId, createdAt])
   @@index([workspaceId, email])
@@ -1189,6 +1210,7 @@ model QrAsset {
   encodedUrl String @db.VarChar(8192)
   visual Json
   campaignId String?
+  context String? @db.VarChar(80)
   redirectId String? @unique
   createdAt DateTime @default(now())
   workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)

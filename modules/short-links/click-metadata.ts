@@ -1,4 +1,6 @@
 export function clickMetadata(headers: Headers, now = new Date()) {
+  if (headers.get("dnt") === "1" || headers.get("sec-gpc") === "1")
+    return null;
   const agent = headers.get("user-agent") ?? "";
   if (
     /bot|crawler|spider|preview|facebookexternalhit|slack|whatsapp|telegram/i.test(

@@ -35,6 +35,31 @@ describe("analytics attribution", () => {
     });
   });
 
+  it("uses recognized referrers before QR context and preserves unknown referrals", () => {
+    expect(
+      resolveAttribution({
+        referrer: "https://web.whatsapp.com/",
+        knownContext: { source: "qr", medium: "qr", channel: "qr" },
+      }),
+    ).toEqual({
+      source: "whatsapp",
+      medium: "organic",
+      channel: "messaging",
+    });
+    expect(
+      resolveAttribution({
+        knownContext: { source: "qr", medium: "qr", channel: "qr" },
+      }),
+    ).toEqual({ source: "qr", medium: "qr", channel: "qr" });
+    expect(
+      resolveAttribution({ referrer: "https://partner.example/campaign" }),
+    ).toEqual({
+      source: "partner.example",
+      medium: "referral",
+      channel: "referral",
+    });
+  });
+
   it("extracts only UTM fields from a URL", () => {
     expect(
       extractUtmAttribution(

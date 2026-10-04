@@ -3,6 +3,12 @@ import {
   recordAnalyticsEvent,
   type RecordAnalyticsEventInput,
 } from "@/modules/analytics/service";
+import { resolveAttribution } from "@/modules/analytics/attribution";
+import {
+  publicAnalyticsContextCookies,
+  resolvePublicAnalyticsContext,
+  trustedCampaignContext,
+} from "@/modules/analytics/public-context";
 
 export const publicSmartPageEventNames = [
   "smart_page_view",
@@ -24,6 +30,11 @@ export async function recordPublicSmartPageEvent(
     visitorId?: string;
     sessionId?: string;
     blockId?: string;
+    utmSource?: string;
+    utmMedium?: string;
+    utmCampaign?: string;
+    utmContent?: string;
+    utmTerm?: string;
   },
   headers: Headers,
 ) {
@@ -32,17 +43,17 @@ export async function recordPublicSmartPageEvent(
     where: { slug: input.slug, status: "published" },
     select: { id: true, workspaceId: true },
   });
-  if (!page) return false;
+  if (!page) return { recorded: false, cookieHeaders: [] };
 
   const isBlockEvent = input.event !== "smart_page_view" && input.event !== "social_click";
   const isProductEvent = input.event.startsWith("link_in_bio_product_");
   let block: {
     id: string;
     type: string;
-    link: { campaignId: string | null } | null;
+    link: { campaignId: string | null; destinationUrl: string } | null;
   } | null = null;
   if (isBlockEvent) {
-    if (!input.blockId) return false;
+    if (!input.blockId) return { recorded: false, cookieHeaders: [] };
     block = await db.smartPageBlock.findFirst({
       where: {
         id: input.blockId,
@@ -51,10 +62,38 @@ export async function recordPublicSmartPageEvent(
         analyticsEnabled: true,
         ...(isProductEvent ? { type: "product" } : {}),
       },
-      select: { id: true, type: true, link: { select: { campaignId: true } } },
+      select: {
+        id: true,
+        type: true,
+        link: { select: { campaignId: true, destinationUrl: true } },
+      },
     });
-    if (!block) return false;
+    if (!block) return { recorded: false, cookieHeaders: [] };
   }
+  const context = resolvePublicAnalyticsContext(
+    headers,
+    { visitorId: input.visitorId, sessionId: input.sessionId },
+    {
+      utmSource: input.utmSource,
+      utmMedium: input.utmMedium,
+      utmCampaign: input.utmCampaign,
+      utmContent: input.utmContent,
+      utmTerm: input.utmTerm,
+    },
+  );
+  if (!context.trackingAllowed)
+    return { recorded: false, cookieHeaders: [] };
+  const attribution = resolveAttribution({
+    ...context.attribution,
+    referrer: headers.get("referer"),
+  });
+  const inherited = trustedCampaignContext(headers);
+  const destinationIsWhatsApp = Boolean(
+    block?.link?.destinationUrl &&
+      /^https:\/\/(?:wa\.me|(?:api\.|web\.)?whatsapp\.com)\//i.test(
+        block.link.destinationUrl,
+      ),
+  );
   const name: RecordAnalyticsEventInput["name"] =
     input.event === "smart_page_view"
       ? "smart_page_view"
@@ -63,7 +102,9 @@ export async function recordPublicSmartPageEvent(
         : input.event === "link_in_bio_product_click"
           ? "product_click"
           : input.event === "smart_block_clicked"
-            ? block?.type === "link"
+            ? block?.type === "whatsapp" || destinationIsWhatsApp
+              ? "whatsapp_click"
+              : block?.type === "link"
               ? "link_click"
               : "button_click"
             : input.event === "social_click"
@@ -73,18 +114,25 @@ export async function recordPublicSmartPageEvent(
     name,
     eventId: input.eventId,
     workspaceId: page.workspaceId,
-    visitorKey: input.visitorId,
-    sessionKey: input.sessionId,
+    visitorKey: context.identity.visitorId,
+    sessionKey: context.identity.sessionId,
     assetType: "smart_page",
     assetId: page.id,
     elementType: block ? "block" : input.event === "social_click" ? "social" : undefined,
     elementId: block?.id ?? (input.event === "social_click" ? input.blockId : undefined),
-    campaignId: block?.link?.campaignId ?? undefined,
+    campaignId: inherited.campaignId ?? block?.link?.campaignId ?? undefined,
     smartPageId: page.id,
     smartPageBlockId: block?.id,
     path: `/${input.slug}`,
+    attribution: context.attribution,
     origin: "client",
     headers,
   });
-  return result.recorded || result.duplicate;
+  return {
+    recorded: result.recorded || result.duplicate,
+    cookieHeaders: publicAnalyticsContextCookies(headers, context, attribution, {
+      campaignId: inherited.campaignId ?? block?.link?.campaignId ?? undefined,
+      qrContext: inherited.qrContext,
+    }),
+  };
 }

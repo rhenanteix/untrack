@@ -52,6 +52,8 @@ describe("universal analytics collector", () => {
         eventId: "8d71a6c0-d3a5-42d4-ae7e-383a0ad15ef6",
         name: "link_click",
         workspaceId: "workspace_1",
+        userId: "user_1",
+        audienceContactId: "contact_1",
         visitorKey: "d75f415d-9dbd-4a68-b6c2-975f32ed5b4c",
         sessionKey: "c9227788-a9fb-462e-93da-c6197c0a33a0",
         assetType: "link",
@@ -79,6 +81,10 @@ describe("universal analytics collector", () => {
         create: expect.objectContaining({
           firstTouchSource: "instagram",
           firstTouchMedium: "paid",
+          firstTouchChannel: "paid_social",
+          lastTouchSource: "instagram",
+          lastTouchMedium: "paid",
+          lastTouchChannel: "paid_social",
         }),
       }),
     );
@@ -88,6 +94,7 @@ describe("universal analytics collector", () => {
           visitorId: "visitor_1",
           initialSource: "instagram",
           initialMedium: "paid",
+          initialChannel: "paid_social",
         }),
       }),
     );
@@ -96,6 +103,8 @@ describe("universal analytics collector", () => {
         data: expect.objectContaining({
           visitorId: "visitor_1",
           sessionId: "session_1",
+          userId: "user_1",
+          audienceContactId: "contact_1",
           source: "instagram",
           channel: "paid_social",
           referrer: "example.com",
@@ -139,6 +148,34 @@ describe("universal analytics collector", () => {
     expect(tx.analyticsSession.update).not.toHaveBeenCalled();
   });
 
+  it("reuses an active session for a later interaction by the same visitor", async () => {
+    const tx = eventTransaction({
+      analyticsSession: {
+        findFirst: vi.fn().mockResolvedValue({
+          id: "session_active",
+          lastActivityAt: new Date(),
+        }),
+        create: vi.fn(),
+        update: vi.fn().mockResolvedValue({ id: "session_active" }),
+      },
+    });
+    await recordAnalyticsEvent({
+      name: "link_click",
+      workspaceId: "workspace_1",
+      visitorKey: "d75f415d-9dbd-4a68-b6c2-975f32ed5b4c",
+      sessionKey: "c9227788-a9fb-462e-93da-c6197c0a33a0",
+    });
+    expect(tx.analyticsSession.create).not.toHaveBeenCalled();
+    expect(tx.analyticsSession.update).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { id: "session_active" } }),
+    );
+    expect(tx.analyticsEvent.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ sessionId: "session_active" }),
+      }),
+    );
+  });
+
   it("marks bot traffic instead of discarding it", async () => {
     const tx = eventTransaction();
     await recordAnalyticsEvent({
@@ -174,6 +211,19 @@ describe("universal analytics collector", () => {
     });
   });
 
+  it("marks test events and excludes them from aggregate updates", async () => {
+    const tx = eventTransaction();
+    await recordAnalyticsEvent({
+      name: "smart_page_view",
+      workspaceId: "workspace_1",
+      isTest: true,
+    });
+    expect(tx.analyticsEvent.create).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ isTest: true }) }),
+    );
+    expect(aggregateAnalyticsEvent).not.toHaveBeenCalled();
+  });
+
   it("creates one conversion and a goal_completed event for a matching goal", async () => {
     const eventCreate = vi
       .fn()
@@ -191,6 +241,7 @@ describe("universal analytics collector", () => {
       workspaceId: "workspace_1",
       assetType: "smart_card",
       assetId: "card_1",
+      isTest: true,
     });
     expect(tx.analyticsGoalEvent.create).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -199,7 +250,11 @@ describe("universal analytics collector", () => {
     );
     expect(eventCreate).toHaveBeenLastCalledWith(
       expect.objectContaining({
-        data: expect.objectContaining({ name: "goal_completed", metadata: { goalId: "goal_1" } }),
+        data: expect.objectContaining({
+          name: "goal_completed",
+          metadata: { goalId: "goal_1" },
+          isTest: true,
+        }),
       }),
     );
   });

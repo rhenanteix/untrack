@@ -71,6 +71,7 @@ function eventWhere(actor: Actor, filters: ResolvedFilters) {
     workspaceId: actor.workspaceId,
     occurredAt: { gte: filters.from, lte: filters.to },
     isBot: false,
+    isTest: false,
     ...(filters.assetType ? { assetType: filters.assetType } : {}),
     ...(filters.assetId ? { assetId: filters.assetId } : {}),
     ...(filters.campaignId ? { campaignId: filters.campaignId } : {}),
@@ -370,6 +371,7 @@ export async function analyticsTime(actor: Actor, input: AnalyticsFilters) {
     Prisma.sql`"occurredAt" >= ${filters.from}`,
     Prisma.sql`"occurredAt" <= ${filters.to}`,
     Prisma.sql`"isBot" = false`,
+    Prisma.sql`"isTest" = false`,
   ];
   if (filters.assetType)
     conditions.push(Prisma.sql`"assetType" = ${filters.assetType}`);

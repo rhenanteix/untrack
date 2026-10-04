@@ -15,14 +15,16 @@ export async function POST(request: Request, context: Context) {
       request,
       `smart-card-contact:${slug}`,
     );
-    return NextResponse.json(
-      await captureSmartCardContact(
-        smartCardSlugSchema.parse(slug),
-        await readJson(request),
-        request.headers,
-      ),
-      { status: 201, headers },
+    const result = await captureSmartCardContact(
+      smartCardSlugSchema.parse(slug),
+      await readJson(request),
+      request.headers,
     );
+    const { analyticsCookieHeaders, ...payload } = result;
+    const response = NextResponse.json(payload, { status: 201, headers });
+    for (const cookie of analyticsCookieHeaders)
+      response.headers.append("Set-Cookie", cookie);
+    return response;
   } catch (error) {
     return errorResponse(error);
   }

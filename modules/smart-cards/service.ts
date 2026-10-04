@@ -1,9 +1,16 @@
+import { randomUUID } from "node:crypto";
 import { Prisma } from "@prisma/client";
 import { ApiError } from "@/lib/api-response";
 import { appUrl } from "@/lib/app-url";
 import { track } from "@/lib/analytics";
 import { getPrisma } from "@/lib/prisma";
 import { recordAnalyticsEvent } from "@/modules/analytics/service";
+import { resolveAttribution } from "@/modules/analytics/attribution";
+import {
+  publicAnalyticsContextCookies,
+  resolvePublicAnalyticsContext,
+  trustedCampaignContext,
+} from "@/modules/analytics/public-context";
 import { getAccountAccess } from "@/modules/billing/account-access";
 import { PAGE_SIZE } from "@/lib/pagination";
 import { createQrAsset } from "@/modules/untrack-qr/service";
@@ -24,7 +31,6 @@ import {
   smartCardUpdateSchema,
   type SmartCardActionInput,
 } from "./schemas";
-import { recordPublicSmartCardEvent } from "./events";
 
 const cardInclude = {
   actions: { orderBy: { position: "asc" as const } },
@@ -395,6 +401,23 @@ export async function captureSmartCardContact(
   const form = smartCardContactFormSchema.parse(
     card.contactForm ?? defaultSmartCardContactForm,
   );
+  const tracking = resolvePublicAnalyticsContext(
+    headers,
+    { visitorId: input.visitorId, sessionId: input.sessionId },
+    {
+      utmSource: input.utmSource,
+      utmMedium: input.utmMedium,
+      utmCampaign: input.utmCampaign,
+      utmContent: input.utmContent,
+      utmTerm: input.utmTerm,
+    },
+  );
+  const attribution = resolveAttribution({
+    ...tracking.attribution,
+    referrer: headers.get("referer"),
+  });
+  const inherited = trustedCampaignContext(headers);
+  const campaignId = inherited.campaignId ?? card.campaignId ?? undefined;
   const values = validContactValues(form, input.values);
   if (
     input.intent &&
@@ -483,11 +506,11 @@ export async function captureSmartCardContact(
         workspaceId: card.workspaceId,
         smartCardId: card.id,
         contactId: saved.id,
-        campaignId: card.campaignId,
-        source: input.source,
+        campaignId,
+        source: attribution.source,
         sourceLabel: input.sourceLabel ?? null,
         intent: input.intent ?? null,
-        context: json({ cardSlug: card.slug }),
+        context: json({ cardSlug: card.slug, channel: attribution.channel }),
         consentText: contactConsentText(card),
       },
     });
@@ -499,61 +522,60 @@ export async function captureSmartCardContact(
         metadata: json({
           smartCardId: card.id,
           exchangeId: exchange.id,
-          source: input.source,
+          source: attribution.source,
           intent: input.intent ?? null,
         }),
       },
     });
     return saved;
   });
-  await recordPublicSmartCardEvent(
-    {
-      event: "contact_form_open",
-      slug,
-      visitorId: input.visitorId,
-      source: input.source,
-    },
-    headers,
-  );
-  await Promise.all([
-    recordAnalyticsEvent({
-      name: "form_submit",
-      workspaceId: card.workspaceId,
-      visitorKey: input.visitorId,
-      assetType: "smart_card",
-      assetId: card.id,
-      campaignId: card.campaignId ?? undefined,
-      smartCardId: card.id,
-      path: `/c/${slug}`,
-      origin: "server",
+  if (tracking.trackingAllowed)
+    await Promise.all([
+      recordAnalyticsEvent({
+        eventId: randomUUID(),
+        name: "form_submit",
+        workspaceId: card.workspaceId,
+        visitorKey: tracking.identity.visitorId,
+        sessionKey: tracking.identity.sessionId,
+        audienceContactId: contact.id,
+        assetType: "smart_card",
+        assetId: card.id,
+        campaignId,
+        smartCardId: card.id,
+        path: `/c/${slug}`,
+        attribution: tracking.attribution,
+        origin: "server",
+        headers,
+      }),
+      recordAnalyticsEvent({
+        eventId: randomUUID(),
+        name: "lead_created",
+        workspaceId: card.workspaceId,
+        visitorKey: tracking.identity.visitorId,
+        sessionKey: tracking.identity.sessionId,
+        audienceContactId: contact.id,
+        assetType: "smart_card",
+        assetId: card.id,
+        campaignId,
+        smartCardId: card.id,
+        path: `/c/${slug}`,
+        attribution: tracking.attribution,
+        origin: "server",
+        headers,
+      }),
+    ]).catch((error) =>
+      console.error("Smart Card conversion analytics was not recorded", error),
+    );
+  return {
+    contact,
+    consentText: contactConsentText(card),
+    analyticsCookieHeaders: publicAnalyticsContextCookies(
       headers,
-    }),
-    recordAnalyticsEvent({
-      name: "lead_created",
-      workspaceId: card.workspaceId,
-      visitorKey: input.visitorId,
-      assetType: "smart_card",
-      assetId: card.id,
-      campaignId: card.campaignId ?? undefined,
-      smartCardId: card.id,
-      path: `/c/${slug}`,
-      origin: "server",
-      headers,
-    }),
-    recordAnalyticsEvent({
-      name: "share_details_submit",
-      workspaceId: card.workspaceId,
-      visitorKey: input.visitorId,
-      assetType: "smart_card",
-      assetId: card.id,
-      campaignId: card.campaignId ?? undefined,
-      smartCardId: card.id,
-      path: `/c/${slug}`,
-      origin: "server",
-      headers,
-    }),
-  ]);
-  return { contact, consentText: contactConsentText(card) };
+      tracking,
+      attribution,
+      { campaignId, qrContext: inherited.qrContext },
+    ),
+  };
 }
 
 export async function smartCardMetrics(actor: Actor, id: string, days: number) {

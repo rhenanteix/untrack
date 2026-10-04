@@ -79,24 +79,30 @@ opcional de `rolldown`, resolvida pelo npm conforme a plataforma.
 
 ## Variáveis de ambiente
 
-| Variável                   | Obrigatória  | Uso                                                         |
-| -------------------------- | ------------ | ----------------------------------------------------------- |
-| `NEXT_PUBLIC_APP_URL`      | recomendada  | URL pública/canônica, por exemplo `http://localhost:3000`   |
-| `UPSTASH_REDIS_REST_URL`   | produção     | endpoint REST do Redis Upstash                              |
-| `UPSTASH_REDIS_REST_TOKEN` | produção     | token REST do Redis Upstash                                 |
-| `DATABASE_URL`             | V2           | conexão PostgreSQL da aplicação                             |
-| `TEST_DATABASE_URL`        | E2E          | banco separado, com nome terminado em `_test`               |
-| `POSTGRES_PASSWORD`        | Docker local | senha do banco; gerada por `setup:local`                    |
-| `BETTER_AUTH_SECRET`       | V2           | segredo aleatório de pelo menos 32 caracteres               |
-| `BETTER_AUTH_URL`          | V2           | origem pública da autenticação, igual à origem da aplicação |
-| `ANALYTICS_PERSISTENCE`    | não          | `none` (padrão) ou `prisma` para persistir eventos          |
-| `ANALYTICS_CONSOLE`        | não          | `true` registra eventos no console quando Prisma está off   |
-| `RATE_LIMIT_REQUESTS`      | não          | requisições por janela, padrão `100`                        |
-| `RATE_LIMIT_WINDOW`        | não          | janela em segundos, padrão `3600`                           |
-| `WHATSAPP_INTELLIGENCE`    | não          | `false` desabilita o módulo WhatsApp Intelligence           |
+| Variável                            | Obrigatória  | Uso                                                         |
+| ----------------------------------- | ------------ | ----------------------------------------------------------- |
+| `NEXT_PUBLIC_APP_URL`               | recomendada  | URL pública/canônica, por exemplo `http://localhost:3000`   |
+| `UPSTASH_REDIS_REST_URL`            | produção     | endpoint REST do Redis Upstash                              |
+| `UPSTASH_REDIS_REST_TOKEN`          | produção     | token REST do Redis Upstash                                 |
+| `DATABASE_URL`                      | V2           | conexão PostgreSQL da aplicação                             |
+| `TEST_DATABASE_URL`                 | E2E          | banco separado, com nome terminado em `_test`               |
+| `POSTGRES_PASSWORD`                 | Docker local | senha do banco; gerada por `setup:local`                    |
+| `BETTER_AUTH_SECRET`                | V2           | segredo aleatório de pelo menos 32 caracteres               |
+| `BETTER_AUTH_URL`                   | V2           | origem pública da autenticação, igual à origem da aplicação |
+| `ANALYTICS_PERSISTENCE`             | não          | `none` (padrão) ou `prisma` para persistir eventos          |
+| `ANALYTICS_CONSOLE`                 | não          | `true` registra eventos no console quando Prisma está off   |
+| `ANALYTICS_SESSION_TIMEOUT_MINUTES` | não          | timeout da sessao analitica, de 5 a 240 minutos             |
+| `ANALYTICS_RETENTION_DAYS`          | não          | retencao de eventos brutos, de 30 a 1825 dias               |
+| `ANALYTICS_TEST_MODE`               | não          | `true` marca eventos de teste e os exclui das metricas      |
+| `RATE_LIMIT_REQUESTS`               | não          | requisições por janela, padrão `100`                        |
+| `RATE_LIMIT_WINDOW`                 | não          | janela em segundos, padrão `3600`                           |
+| `WHATSAPP_INTELLIGENCE`             | não          | `false` desabilita o módulo WhatsApp Intelligence           |
 
 A chave de persistência é `ANALYTICS_PERSISTENCE=prisma`. Não coloque segredos
 `UPSTASH_*` ou `DATABASE_URL` no cliente nem no repositório.
+
+A fundacao de eventos universais, atribuicao, identidade pseudonima e redirects
+rastreaveis esta documentada em [Event Tracking](docs/event-tracking.md).
 
 ### Persistência de contas e analytics
 

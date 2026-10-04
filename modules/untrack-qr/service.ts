@@ -6,7 +6,7 @@ import { ApiError } from "@/lib/api-response";
 import { track } from "@/lib/analytics";
 import { audit, assertReferences, reserveQuota, workspaceTransaction, type Actor } from "@/modules/workspaces/context";
 import { renderVerifiedQr, visualSchema } from "./render";
-export const qrAssetSchema = z.object({ name: z.string().trim().min(1).max(120), url: webUrlSchema, mode: z.enum(["static", "dynamic"]), visual: visualSchema, campaignId: z.string().nullable().optional() }).strict();
+export const qrAssetSchema = z.object({ name: z.string().trim().min(1).max(120), url: webUrlSchema, mode: z.enum(["static", "dynamic"]), visual: visualSchema, campaignId: z.string().nullable().optional(), context: z.string().trim().max(80).optional() }).strict();
 export async function createQrAsset(actor: Actor, raw: unknown) {
   const input = qrAssetSchema.parse(raw);
   const slug = randomBytes(12).toString("base64url");
@@ -21,7 +21,7 @@ export async function createQrAsset(actor: Actor, raw: unknown) {
       const distribution = await tx.shortLink.create({ data: { userId: actor.userId, workspaceId: actor.workspaceId, slug, domainKey: "platform", distribution: "qr", destinationUrl: input.url, title: input.name, campaignId: input.campaignId } });
       redirectId = distribution.id;
     }
-    const qr = await tx.qrAsset.create({ data: { workspaceId: actor.workspaceId, name: input.name, mode: input.mode, destinationUrl: input.url, encodedUrl, visual: rendered.visual, campaignId: input.campaignId, redirectId } });
+    const qr = await tx.qrAsset.create({ data: { workspaceId: actor.workspaceId, name: input.name, mode: input.mode, destinationUrl: input.url, encodedUrl, visual: rendered.visual, campaignId: input.campaignId, context: input.context, redirectId } });
     await audit(tx, actor, "qr.created", qr.id, { mode: qr.mode, redirectId, campaignId: qr.campaignId });
     return qr;
   });

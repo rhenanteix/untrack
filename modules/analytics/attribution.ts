@@ -9,6 +9,14 @@ export type Attribution = {
   term?: string;
 };
 
+export type ResolvedAttributionContext = Attribution & {
+  utmSource?: string;
+  utmMedium?: string;
+  utmCampaign?: string;
+  utmContent?: string;
+  utmTerm?: string;
+};
+
 export type AttributionInput = {
   utmSource?: string | null;
   utmMedium?: string | null;
@@ -16,6 +24,11 @@ export type AttributionInput = {
   utmContent?: string | null;
   utmTerm?: string | null;
   referrer?: string | null;
+  /** Server-verified context from the preceding first-party navigation. */
+  trustedContext?: ResolvedAttributionContext;
+  /** Asset context resolved on the server, for example a tracked QR code. */
+  knownContext?: Pick<Attribution, "source" | "medium" | "channel"> &
+    Partial<Pick<Attribution, "campaign" | "content" | "term">>;
 };
 
 const knownReferrerSources = [
@@ -70,6 +83,38 @@ function channelFor(source: string, medium: string | undefined): AnalyticsChanne
   return medium ? "other" : "referral";
 }
 
+function contextAttribution(
+  context:
+    | ResolvedAttributionContext
+    | (Pick<Attribution, "source" | "medium" | "channel"> &
+        Partial<Pick<Attribution, "campaign" | "content" | "term">>)
+    | undefined,
+) {
+  const source = normalize(context?.source);
+  const medium = normalize(context?.medium);
+  if (!source || !medium) return undefined;
+  return {
+    source,
+    medium,
+    channel: context?.channel ?? channelFor(source, medium),
+    ...(normalize(context?.campaign) ? { campaign: normalize(context?.campaign) } : {}),
+    ...(normalize(context?.content) ? { content: normalize(context?.content) } : {}),
+    ...(normalize(context?.term) ? { term: normalize(context?.term) } : {}),
+  } satisfies Attribution;
+}
+
+function referrerAttribution(referrer: string | null | undefined) {
+  const host = referrerHost(referrer);
+  if (!host) return undefined;
+  const known = knownReferrerSources.find(({ pattern }) => pattern.test(host));
+  if (!known) return undefined;
+  return {
+    source: known.source,
+    medium: "organic",
+    channel: channelFor(known.source, "organic"),
+  } satisfies Attribution;
+}
+
 /**
  * Resolves one stable acquisition record. Explicit UTMs always take precedence
  * over referrer inference; unknown direct visits are never fabricated as sources.
@@ -94,16 +139,22 @@ export function resolveAttribution(input: AttributionInput): Attribution {
     };
   }
 
+  const referrer = referrerAttribution(input.referrer);
+  if (referrer) return referrer;
+
+  const knownContext = contextAttribution(input.knownContext);
+  if (knownContext) return knownContext;
+
+  const trustedContext = contextAttribution(input.trustedContext);
+  if (trustedContext) return trustedContext;
+
   const host = referrerHost(input.referrer);
   if (!host)
     return { source: "direct", medium: "none", channel: "direct" };
-
-  const known = knownReferrerSources.find(({ pattern }) => pattern.test(host));
-  const source = known?.source ?? host;
   return {
-    source,
-    medium: known ? "organic" : "referral",
-    channel: channelFor(source, known ? "organic" : "referral"),
+    source: host,
+    medium: "referral",
+    channel: "referral",
   };
 }
 

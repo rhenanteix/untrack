@@ -6,22 +6,34 @@ import { appUrl } from "@/lib/app-url";
 import { clickMetadata } from "@/modules/short-links/click-metadata";
 import { publicLink } from "@/lib/short-links";
 import { track } from "@/lib/analytics";
-import { extractUtmAttribution } from "@/modules/analytics/attribution";
+import {
+  extractUtmAttribution,
+  resolveAttribution,
+  type AttributionInput,
+} from "@/modules/analytics/attribution";
+import {
+  publicAnalyticsContextCookies,
+  resolvePublicAnalyticsContext,
+  type PublicAnalyticsRequestContext,
+} from "@/modules/analytics/public-context";
 import { recordAnalyticsEvent } from "@/modules/analytics/service";
 import { cachedDestination } from "./cache";
+
+type QrRedirectContext = {
+  id: string;
+  campaignId: string | null;
+  context: string | null;
+};
 
 async function recordRedirectAnalytics(
   request: Request,
   link: ShortLink,
   distribution: "digital" | "qr" | "whatsapp",
+  tracking: PublicAnalyticsRequestContext,
+  attribution: AttributionInput,
+  qr: QrRedirectContext | null,
 ) {
-  const qr =
-    distribution === "qr"
-      ? await getPrisma().qrAsset.findFirst({
-          where: { redirectId: link.id, workspaceId: link.workspaceId },
-          select: { id: true },
-        })
-      : null;
+  if (!tracking.trackingAllowed) return;
   await recordAnalyticsEvent({
     name:
       distribution === "qr"
@@ -30,12 +42,15 @@ async function recordRedirectAnalytics(
           ? "whatsapp_click"
           : "link_click",
     workspaceId: link.workspaceId,
+    visitorKey: tracking.identity.visitorId,
+    sessionKey: tracking.identity.sessionId,
     assetType: qr ? "qr_code" : "link",
     assetId: qr?.id ?? link.id,
-    campaignId: link.campaignId ?? undefined,
+    campaignId: qr?.campaignId ?? link.campaignId ?? undefined,
     path: new URL(request.url).pathname,
     destinationUrl: link.destinationUrl,
-    attribution: extractUtmAttribution(request.url),
+    attribution,
+    metadata: qr?.context ? { qrContext: qr.context } : undefined,
     origin: "server",
     headers: request.headers,
   });
@@ -79,9 +94,40 @@ export async function redirectResponse(request: Request, slug: string, distribut
     }
   } else link = await publicLink(slug, hostname, distribution);
   if (!link) return new Response(unavailableMessage, { status: 404, headers: { "Cache-Control": "no-store" } });
-  if (countClick)
+  const qr =
+    countClick && distribution === "qr"
+      ? await getPrisma().qrAsset.findFirst({
+          where: { redirectId: link.id, workspaceId: link.workspaceId },
+          select: { id: true, campaignId: true, context: true },
+        }).catch(() => null)
+      : null;
+    const tracking = countClick
+      ? resolvePublicAnalyticsContext(
+          request.headers,
+          {},
+          {
+            ...extractUtmAttribution(request.url),
+            ...(distribution === "qr"
+              ? {
+                  knownContext: {
+                    source: "qr",
+                    medium: "qr",
+                    channel: "qr",
+                  },
+                }
+              : {}),
+          },
+        )
+      : undefined;
+    const attribution = tracking
+      ? { ...tracking.attribution, referrer: request.headers.get("referer") }
+      : undefined;
+    const resolvedAttribution = attribution
+      ? resolveAttribution(attribution)
+      : undefined;
+    if (tracking && attribution)
     after(() =>
-      recordRedirectAnalytics(request, link, distribution).catch((error) =>
+      recordRedirectAnalytics(request, link, distribution, tracking, attribution, qr).catch((error) =>
         console.error("Redirect analytics event was not recorded", error),
       ),
     );
@@ -95,5 +141,17 @@ export async function redirectResponse(request: Request, slug: string, distribut
     });
   // Explicit query policy: all incoming query parameters are ignored, including UTMs.
   const destination = await cachedDestination(link);
-  return new Response(null, { status: 302, headers: { Location: destination, "Cache-Control": "no-store, max-age=0", "CDN-Cache-Control": "no-store", "X-Robots-Tag": "noindex, nofollow", "Referrer-Policy": "no-referrer" } });
+  const headers = new Headers({ Location: destination, "Cache-Control": "no-store, max-age=0", "CDN-Cache-Control": "no-store", "X-Robots-Tag": "noindex, nofollow", "Referrer-Policy": "no-referrer" });
+  if (tracking && resolvedAttribution)
+    for (const cookie of publicAnalyticsContextCookies(
+      request.headers,
+      tracking,
+      resolvedAttribution,
+      {
+        campaignId: qr?.campaignId ?? link.campaignId ?? undefined,
+        qrContext: qr?.context ?? undefined,
+      },
+    ))
+      headers.append("Set-Cookie", cookie);
+  return new Response(null, { status: 302, headers });
 }

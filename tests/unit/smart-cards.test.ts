@@ -130,7 +130,7 @@ describe("Smart Card public analytics", () => {
           "user-agent": "Mozilla Mobile Android",
         }),
       ),
-    ).resolves.toBe(true);
+    ).resolves.toMatchObject({ recorded: true });
 
     expect(recordAnalyticsEvent).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -162,7 +162,7 @@ describe("Smart Card public analytics", () => {
         { event: "card_view", slug: "ana-silva", source: "direct" },
         new Headers({ "user-agent": "Slackbot" }),
       ),
-    ).resolves.toBe(true);
+    ).resolves.toMatchObject({ recorded: true });
     expect(findFirst).toHaveBeenCalledOnce();
     expect(recordAnalyticsEvent).toHaveBeenCalledWith(
       expect.objectContaining({ headers: expect.any(Headers) }),

@@ -4,13 +4,14 @@ import { getPrisma } from "@/lib/prisma";
 import { aggregateAnalyticsEvent } from "./aggregation";
 import { resolveAttribution, type AttributionInput } from "./attribution";
 import { classifyBot, classifyDevice } from "./device";
+import { reportAnalyticsHealth } from "./health";
+import { analyticsSessionTimeoutMinutes } from "./session";
 import type {
   AnalyticsAssetType,
   AnalyticsEventOrigin,
   UniversalEventName,
 } from "./event-types";
 
-const defaultSessionTimeoutMinutes = 30;
 const sensitiveMetadataKey = /email|phone|whatsapp|address|name|message|token|password/i;
 
 type AnalyticsMetadata = Record<string, string | number | boolean | null>;
@@ -18,6 +19,8 @@ type AnalyticsMetadata = Record<string, string | number | boolean | null>;
 export type RecordAnalyticsEventInput = {
   name: UniversalEventName;
   workspaceId?: string;
+  userId?: string;
+  audienceContactId?: string;
   eventId?: string;
   visitorKey?: string;
   sessionKey?: string;
@@ -35,6 +38,7 @@ export type RecordAnalyticsEventInput = {
   attribution?: AttributionInput;
   metadata?: AnalyticsMetadata;
   origin?: AnalyticsEventOrigin;
+  isTest?: boolean;
   occurredAt?: Date;
   headers?: Headers;
 };
@@ -44,13 +48,6 @@ export type RecordAnalyticsEventResult = {
   recorded: boolean;
   duplicate: boolean;
 };
-
-function sessionTimeoutMinutes() {
-  const configured = Number(process.env.ANALYTICS_SESSION_TIMEOUT_MINUTES);
-  return Number.isInteger(configured) && configured >= 5 && configured <= 240
-    ? configured
-    : defaultSessionTimeoutMinutes;
-}
 
 function hashIdentifier(value: string | undefined) {
   const secret = process.env.BETTER_AUTH_SECRET;
@@ -137,14 +134,27 @@ async function resolveIdentity(
     where: {
       workspaceId_visitorHash: { workspaceId: input.workspaceId, visitorHash },
     },
-    update: { lastSeenAt: occurredAt },
+    update: {
+      lastSeenAt: occurredAt,
+      lastTouchSource: firstTouch.source,
+      lastTouchMedium: firstTouch.medium,
+      lastTouchChannel: firstTouch.channel,
+      lastTouchCampaign: firstTouch.campaign,
+      lastTouchAt: occurredAt,
+    },
     create: {
       workspaceId: input.workspaceId,
       visitorHash,
       firstTouchSource: firstTouch.source,
       firstTouchMedium: firstTouch.medium,
+      firstTouchChannel: firstTouch.channel,
       firstTouchCampaign: firstTouch.campaign,
       firstTouchAt: occurredAt,
+      lastTouchSource: firstTouch.source,
+      lastTouchMedium: firstTouch.medium,
+      lastTouchChannel: firstTouch.channel,
+      lastTouchCampaign: firstTouch.campaign,
+      lastTouchAt: occurredAt,
       lastSeenAt: occurredAt,
     },
   });
@@ -152,7 +162,7 @@ async function resolveIdentity(
   if (!sessionHash) return { visitorId: visitor.id, visitorHash };
 
   const expiresBefore = new Date(
-    occurredAt.getTime() - sessionTimeoutMinutes() * 60_000,
+    occurredAt.getTime() - analyticsSessionTimeoutMinutes() * 60_000,
   );
   const previous = await tx.analyticsSession.findFirst({
     where: {
@@ -179,6 +189,7 @@ async function resolveIdentity(
             entryReferrer: referrer,
             initialSource: firstTouch.source,
             initialMedium: firstTouch.medium,
+            initialChannel: firstTouch.channel,
             initialCampaign: firstTouch.campaign,
           },
         });
@@ -197,9 +208,10 @@ async function recordMatchingGoals(
     path: string | undefined;
     device: ReturnType<typeof classifyDevice>;
     bot: ReturnType<typeof classifyBot>;
+    isTest: boolean;
   },
 ) {
-  const { attribution, bot, device, identity, input, occurredAt, path, referrer } = context;
+  const { attribution, bot, device, identity, input, occurredAt, path, referrer, isTest } = context;
   if (!input.workspaceId || input.name === "goal_completed") return 0;
   const goals = await tx.analyticsGoal.findMany({
     where: {
@@ -240,11 +252,14 @@ async function recordMatchingGoals(
         occurredAt,
         metadata: { goalId: goal.id },
         workspaceId: input.workspaceId,
+        userId: input.userId,
+        audienceContactId: input.audienceContactId,
         visitorId: identity.visitorId,
         sessionId: identity.sessionId,
         assetType: input.assetType,
         assetId: input.assetId,
         campaignId: input.campaignId,
+        goalId: goal.id,
         path,
         day: dateBucket(occurredAt),
         visitorHash: identity.visitorHash,
@@ -263,6 +278,7 @@ async function recordMatchingGoals(
         browser: device.browser,
         isBot: bot.isBot,
         botType: bot.botType,
+        isTest,
       },
     });
     completed += 1;
@@ -276,6 +292,7 @@ export async function recordAnalyticsEvent(
 ): Promise<RecordAnalyticsEventResult> {
   const eventId = input.eventId ?? randomUUID();
   const occurredAt = input.occurredAt ?? new Date();
+  const isTest = input.isTest || process.env.ANALYTICS_TEST_MODE === "true";
   const referrer = hostname(input.headers?.get("referer"));
   const attribution = resolveAttribution({
     ...input.attribution,
@@ -305,6 +322,8 @@ export async function recordAnalyticsEvent(
           occurredAt,
           metadata: cleanMetadata(input.metadata),
           workspaceId: input.workspaceId,
+          userId: input.userId,
+          audienceContactId: input.audienceContactId,
           visitorId: identity.visitorId,
           sessionId: identity.sessionId,
           assetType: input.assetType,
@@ -335,6 +354,7 @@ export async function recordAnalyticsEvent(
           browser: device.browser,
           isBot: bot.isBot,
           botType: bot.botType,
+          isTest,
         },
       });
       const completedGoals = await recordMatchingGoals(tx, event, {
@@ -346,25 +366,15 @@ export async function recordAnalyticsEvent(
         path,
         device,
         bot,
+        isTest,
       });
       return { eventId, recorded: true, duplicate: false, completedGoals };
     });
-    void aggregateAnalyticsEvent({
-      workspaceId: input.workspaceId,
-      occurredAt,
-      name: input.name,
-      assetType: input.assetType,
-      assetId: input.assetId,
-      source: attribution.source,
-      channel: attribution.channel,
-      campaignId: input.campaignId,
-      isBot: bot.isBot,
-    }).catch((error) => console.error("Analytics aggregation was not recorded", error));
-    for (let index = 0; index < persisted.completedGoals; index += 1)
+    if (!isTest) {
       void aggregateAnalyticsEvent({
         workspaceId: input.workspaceId,
         occurredAt,
-        name: "goal_completed",
+        name: input.name,
         assetType: input.assetType,
         assetId: input.assetId,
         source: attribution.source,
@@ -372,6 +382,25 @@ export async function recordAnalyticsEvent(
         campaignId: input.campaignId,
         isBot: bot.isBot,
       }).catch((error) => console.error("Analytics aggregation was not recorded", error));
+      for (let index = 0; index < persisted.completedGoals; index += 1)
+        void aggregateAnalyticsEvent({
+          workspaceId: input.workspaceId,
+          occurredAt,
+          name: "goal_completed",
+          assetType: input.assetType,
+          assetId: input.assetId,
+          source: attribution.source,
+          channel: attribution.channel,
+          campaignId: input.campaignId,
+          isBot: bot.isBot,
+        }).catch((error) => console.error("Analytics aggregation was not recorded", error));
+    }
+    reportAnalyticsHealth("events_received", {
+      eventName: input.name,
+      isTest,
+    });
+    if (bot.isBot)
+      reportAnalyticsHealth("bot_events", { eventName: input.name, isTest });
     return {
       eventId: persisted.eventId,
       recorded: persisted.recorded,
@@ -381,8 +410,17 @@ export async function recordAnalyticsEvent(
     if (
       error instanceof Prisma.PrismaClientKnownRequestError &&
       error.code === "P2002"
-    )
+    ) {
+      reportAnalyticsHealth("duplicate_events", {
+        eventName: input.name,
+        isTest,
+      });
       return { eventId, recorded: false, duplicate: true };
+    }
+    reportAnalyticsHealth("ingestion_errors", {
+      eventName: input.name,
+      isTest,
+    });
     throw error;
   }
 }
