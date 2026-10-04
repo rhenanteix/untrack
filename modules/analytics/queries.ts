@@ -1,8 +1,12 @@
 import { Prisma } from "@prisma/client";
 import { getPrisma } from "@/lib/prisma";
 import { getAccountAccessForUser } from "@/modules/billing/account-access";
-import { canUse, getAnalyticsHistoryDays } from "@/modules/billing/entitlements";
+import {
+  canUse,
+  getAnalyticsHistoryDays,
+} from "@/modules/billing/entitlements";
 import type { Actor } from "@/modules/workspaces/context";
+import { conversionRate } from "./conversion-rate";
 import type { AnalyticsAssetType } from "./event-types";
 
 const viewEvents = [
@@ -27,9 +31,12 @@ export type AnalyticsFilters = {
   assetType?: AnalyticsAssetType;
   assetId?: string;
   campaignId?: string;
+  goalId?: string;
+  source?: string;
+  channel?: string;
 };
 
-type ResolvedFilters = AnalyticsFilters & {
+export type ResolvedFilters = AnalyticsFilters & {
   from: Date;
   to: Date;
   historyDays: number;
@@ -49,7 +56,10 @@ function endOfDay(value: Date) {
   return result;
 }
 
-async function resolveFilters(actor: Actor, filters: AnalyticsFilters) {
+export async function resolveAnalyticsFilters(
+  actor: Actor,
+  filters: AnalyticsFilters,
+) {
   const access = await getAccountAccessForUser(actor.userId);
   const historyDays = getAnalyticsHistoryDays(access);
   const today = startOfDay(new Date());
@@ -66,7 +76,7 @@ async function resolveFilters(actor: Actor, filters: AnalyticsFilters) {
   } satisfies ResolvedFilters;
 }
 
-function eventWhere(actor: Actor, filters: ResolvedFilters) {
+export function eventWhere(actor: Actor, filters: ResolvedFilters) {
   return {
     workspaceId: actor.workspaceId,
     occurredAt: { gte: filters.from, lte: filters.to },
@@ -75,16 +85,34 @@ function eventWhere(actor: Actor, filters: ResolvedFilters) {
     ...(filters.assetType ? { assetType: filters.assetType } : {}),
     ...(filters.assetId ? { assetId: filters.assetId } : {}),
     ...(filters.campaignId ? { campaignId: filters.campaignId } : {}),
+    ...(filters.source ? { source: filters.source } : {}),
+    ...(filters.channel ? { channel: filters.channel } : {}),
+  };
+}
+
+export function conversionWhere(actor: Actor, filters: ResolvedFilters) {
+  return {
+    workspaceId: actor.workspaceId,
+    occurredAt: { gte: filters.from, lte: filters.to },
+    isBot: false,
+    isTest: false,
+    ...(filters.goalId ? { goalId: filters.goalId } : {}),
+    ...(filters.assetType ? { assetType: filters.assetType } : {}),
+    ...(filters.assetId ? { assetId: filters.assetId } : {}),
+    ...(filters.campaignId ? { campaignId: filters.campaignId } : {}),
+    ...(filters.source ? { source: filters.source } : {}),
+    ...(filters.channel ? { channel: filters.channel } : {}),
   };
 }
 
 async function totals(actor: Actor, filters: ResolvedFilters) {
   const db = getPrisma();
   const where = eventWhere(actor, filters);
+  const conversionsWhere = conversionWhere(actor, filters);
   const [views, clicks, conversions, visitors, sessions] = await Promise.all([
     db.analyticsEvent.count({ where: { ...where, name: { in: viewEvents } } }),
     db.analyticsEvent.count({ where: { ...where, name: { in: clickEvents } } }),
-    db.analyticsEvent.count({ where: { ...where, name: "goal_completed" } }),
+    db.analyticsConversion.count({ where: conversionsWhere }),
     db.analyticsEvent.groupBy({
       by: ["visitorHash"],
       where: { ...where, visitorHash: { not: null } },
@@ -101,9 +129,7 @@ async function totals(actor: Actor, filters: ResolvedFilters) {
     clicks,
     ctr: views ? Number(((clicks / views) * 100).toFixed(1)) : 0,
     conversions,
-    conversionRate: views
-      ? Number(((conversions / views) * 100).toFixed(1))
-      : 0,
+    conversionRate: conversionRate(conversions, visitors.length),
   };
 }
 
@@ -122,7 +148,7 @@ function change(current: number, previous: number) {
 }
 
 export async function analyticsOverview(actor: Actor, input: AnalyticsFilters) {
-  const filters = await resolveFilters(actor, input);
+  const filters = await resolveAnalyticsFilters(actor, input);
   const current = await totals(actor, filters);
   const previous = filters.advancedAnalytics
     ? await totals(actor, priorRange(filters))
@@ -139,20 +165,25 @@ export async function analyticsOverview(actor: Actor, input: AnalyticsFilters) {
       visitors: previous ? change(current.visitors, previous.visitors) : null,
       views: previous ? change(current.views, previous.views) : null,
       clicks: previous ? change(current.clicks, previous.clicks) : null,
-      conversions: previous ? change(current.conversions, previous.conversions) : null,
+      conversions: previous
+        ? change(current.conversions, previous.conversions)
+        : null,
     },
   };
 }
 
-export async function analyticsTimeseries(actor: Actor, input: AnalyticsFilters) {
-  const filters = await resolveFilters(actor, input);
-  const [rows, visitorRows] = await Promise.all([
+export async function analyticsTimeseries(
+  actor: Actor,
+  input: AnalyticsFilters,
+) {
+  const filters = await resolveAnalyticsFilters(actor, input);
+  const [rows, visitorRows, conversionRows] = await Promise.all([
     getPrisma().analyticsEvent.groupBy({
       by: ["day", "name"],
       where: {
         ...eventWhere(actor, filters),
         day: { not: null },
-        name: { in: [...viewEvents, ...clickEvents, "goal_completed"] },
+        name: { in: [...viewEvents, ...clickEvents] },
       },
       _count: { _all: true },
     }),
@@ -165,30 +196,74 @@ export async function analyticsTimeseries(actor: Actor, input: AnalyticsFilters)
         name: { in: viewEvents },
       },
     }),
+    getPrisma().analyticsConversion.groupBy({
+      by: ["day"],
+      where: { ...conversionWhere(actor, filters), day: { not: null } },
+      _count: { _all: true },
+    }),
   ]);
-  const byDay = new Map<string, { visitors: number; views: number; clicks: number; conversions: number }>();
+  const byDay = new Map<
+    string,
+    { visitors: number; views: number; clicks: number; conversions: number }
+  >();
   for (const row of rows) {
     if (!row.day) continue;
     const key = row.day.toISOString().slice(0, 10);
-    const values = byDay.get(key) ?? { visitors: 0, views: 0, clicks: 0, conversions: 0 };
+    const values = byDay.get(key) ?? {
+      visitors: 0,
+      views: 0,
+      clicks: 0,
+      conversions: 0,
+    };
     if (viewEvents.includes(row.name)) values.views += row._count._all;
     if (clickEvents.includes(row.name)) values.clicks += row._count._all;
-    if (row.name === "goal_completed") values.conversions += row._count._all;
     byDay.set(key, values);
   }
   for (const row of visitorRows) {
     if (!row.day || !row.visitorHash) continue;
     const key = row.day.toISOString().slice(0, 10);
-    const values = byDay.get(key) ?? { visitors: 0, views: 0, clicks: 0, conversions: 0 };
+    const values = byDay.get(key) ?? {
+      visitors: 0,
+      views: 0,
+      clicks: 0,
+      conversions: 0,
+    };
     values.visitors += 1;
     byDay.set(key, values);
   }
-  const points = [];
-  for (let day = startOfDay(filters.from); day <= filters.to; day.setUTCDate(day.getUTCDate() + 1)) {
-    const date = day.toISOString().slice(0, 10);
-    points.push({ date, ...(byDay.get(date) ?? { visitors: 0, views: 0, clicks: 0, conversions: 0 }) });
+  for (const row of conversionRows) {
+    if (!row.day) continue;
+    const key = row.day.toISOString().slice(0, 10);
+    const values = byDay.get(key) ?? {
+      visitors: 0,
+      views: 0,
+      clicks: 0,
+      conversions: 0,
+    };
+    values.conversions += row._count._all;
+    byDay.set(key, values);
   }
-  return { range: { from: filters.from.toISOString(), to: filters.to.toISOString() }, points };
+  const points = [];
+  for (
+    let day = startOfDay(filters.from);
+    day <= filters.to;
+    day.setUTCDate(day.getUTCDate() + 1)
+  ) {
+    const date = day.toISOString().slice(0, 10);
+    points.push({
+      date,
+      ...(byDay.get(date) ?? {
+        visitors: 0,
+        views: 0,
+        clicks: 0,
+        conversions: 0,
+      }),
+    });
+  }
+  return {
+    range: { from: filters.from.toISOString(), to: filters.to.toISOString() },
+    points,
+  };
 }
 
 async function dimensionBreakdown(
@@ -196,38 +271,65 @@ async function dimensionBreakdown(
   input: AnalyticsFilters,
   dimension: "source" | "channel",
 ) {
-  const filters = await resolveFilters(actor, input);
+  const filters = await resolveAnalyticsFilters(actor, input);
   const where = eventWhere(actor, filters);
   const db = getPrisma();
   const [visits, clicks, conversions] = await Promise.all([
     db.analyticsEvent.groupBy({
-      by: [dimension],
-      where: { ...where, name: { in: viewEvents }, [dimension]: { not: null } },
-      _count: { _all: true },
+      by: [dimension, "visitorHash"],
+      where: {
+        ...where,
+        name: { in: viewEvents },
+        [dimension]: { not: null },
+        visitorHash: { not: null },
+      },
     }),
     db.analyticsEvent.groupBy({
       by: [dimension],
-      where: { ...where, name: { in: clickEvents }, [dimension]: { not: null } },
+      where: {
+        ...where,
+        name: { in: clickEvents },
+        [dimension]: { not: null },
+      },
       _count: { _all: true },
     }),
-    db.analyticsEvent.groupBy({
+    db.analyticsConversion.groupBy({
       by: [dimension],
-      where: { ...where, name: "goal_completed", [dimension]: { not: null } },
+      where: { ...conversionWhere(actor, filters), [dimension]: { not: null } },
       _count: { _all: true },
     }),
   ]);
-  const items = new Map<string, { views: number; clicks: number; conversions: number }>();
+  const items = new Map<
+    string,
+    { visitors: number; clicks: number; conversions: number }
+  >();
   for (const row of visits) {
     const key = row[dimension];
-    if (key) items.set(key, { ...(items.get(key) ?? { clicks: 0, conversions: 0 }), views: row._count._all });
+    if (key) {
+      const values = items.get(key) ?? {
+        visitors: 0,
+        clicks: 0,
+        conversions: 0,
+      };
+      values.visitors += 1;
+      items.set(key, values);
+    }
   }
   for (const row of clicks) {
     const key = row[dimension];
-    if (key) items.set(key, { ...(items.get(key) ?? { views: 0, conversions: 0 }), clicks: row._count._all });
+    if (key)
+      items.set(key, {
+        ...(items.get(key) ?? { visitors: 0, conversions: 0 }),
+        clicks: row._count._all,
+      });
   }
   for (const row of conversions) {
     const key = row[dimension];
-    if (key) items.set(key, { ...(items.get(key) ?? { views: 0, clicks: 0 }), conversions: row._count._all });
+    if (key)
+      items.set(key, {
+        ...(items.get(key) ?? { visitors: 0, clicks: 0 }),
+        conversions: row._count._all,
+      });
   }
   const result = {
     range: { from: filters.from.toISOString(), to: filters.to.toISOString() },
@@ -235,12 +337,12 @@ async function dimensionBreakdown(
       .map(([name, values]) => ({
         name,
         ...values,
-        ctr: values.views ? Number(((values.clicks / values.views) * 100).toFixed(1)) : 0,
-        conversionRate: values.views
-          ? Number(((values.conversions / values.views) * 100).toFixed(1))
+        ctr: values.visitors
+          ? Number(((values.clicks / values.visitors) * 100).toFixed(1))
           : 0,
+        conversionRate: conversionRate(values.conversions, values.visitors),
       }))
-      .sort((left, right) => right.views - left.views),
+      .sort((left, right) => right.visitors - left.visitors),
   };
   return {
     ...result,
@@ -260,25 +362,86 @@ export function analyticsChannels(actor: Actor, input: AnalyticsFilters) {
 }
 
 export async function analyticsAssets(actor: Actor, input: AnalyticsFilters) {
-  const filters = await resolveFilters(actor, input);
-  const rows = await getPrisma().analyticsEvent.groupBy({
-    by: ["assetType", "assetId", "name"],
-    where: {
-      ...eventWhere(actor, filters),
-      assetType: { not: null },
-      assetId: { not: null },
-      name: { in: [...viewEvents, ...clickEvents, "goal_completed"] },
-    },
-    _count: { _all: true },
-  });
-  const assets = new Map<string, { assetType: string; assetId: string; views: number; clicks: number; conversions: number }>();
-  for (const row of rows) {
+  const filters = await resolveAnalyticsFilters(actor, input);
+  const db = getPrisma();
+  const [visitors, clicks, conversions] = await Promise.all([
+    db.analyticsEvent.groupBy({
+      by: ["assetType", "assetId", "visitorHash"],
+      where: {
+        ...eventWhere(actor, filters),
+        assetType: { not: null },
+        assetId: { not: null },
+        visitorHash: { not: null },
+        name: { in: viewEvents },
+      },
+    }),
+    db.analyticsEvent.groupBy({
+      by: ["assetType", "assetId"],
+      where: {
+        ...eventWhere(actor, filters),
+        assetType: { not: null },
+        assetId: { not: null },
+        name: { in: clickEvents },
+      },
+      _count: { _all: true },
+    }),
+    db.analyticsConversion.groupBy({
+      by: ["assetType", "assetId"],
+      where: {
+        ...conversionWhere(actor, filters),
+        assetType: { not: null },
+        assetId: { not: null },
+      },
+      _count: { _all: true },
+    }),
+  ]);
+  const assets = new Map<
+    string,
+    {
+      assetType: string;
+      assetId: string;
+      visitors: number;
+      clicks: number;
+      conversions: number;
+    }
+  >();
+  for (const row of visitors) {
     if (!row.assetType || !row.assetId) continue;
     const key = `${row.assetType}:${row.assetId}`;
-    const item = assets.get(key) ?? { assetType: row.assetType, assetId: row.assetId, views: 0, clicks: 0, conversions: 0 };
-    if (viewEvents.includes(row.name)) item.views += row._count._all;
-    if (clickEvents.includes(row.name)) item.clicks += row._count._all;
-    if (row.name === "goal_completed") item.conversions += row._count._all;
+    const item = assets.get(key) ?? {
+      assetType: row.assetType,
+      assetId: row.assetId,
+      visitors: 0,
+      clicks: 0,
+      conversions: 0,
+    };
+    item.visitors += 1;
+    assets.set(key, item);
+  }
+  for (const row of clicks) {
+    if (!row.assetType || !row.assetId) continue;
+    const key = `${row.assetType}:${row.assetId}`;
+    const item = assets.get(key) ?? {
+      assetType: row.assetType,
+      assetId: row.assetId,
+      visitors: 0,
+      clicks: 0,
+      conversions: 0,
+    };
+    item.clicks += row._count._all;
+    assets.set(key, item);
+  }
+  for (const row of conversions) {
+    if (!row.assetType || !row.assetId) continue;
+    const key = `${row.assetType}:${row.assetId}`;
+    const item = assets.get(key) ?? {
+      assetType: row.assetType,
+      assetId: row.assetId,
+      visitors: 0,
+      clicks: 0,
+      conversions: 0,
+    };
+    item.conversions += row._count._all;
     assets.set(key, item);
   }
   const result = {
@@ -286,12 +449,12 @@ export async function analyticsAssets(actor: Actor, input: AnalyticsFilters) {
     items: [...assets.values()]
       .map((item) => ({
         ...item,
-        ctr: item.views ? Number(((item.clicks / item.views) * 100).toFixed(1)) : 0,
-        conversionRate: item.views
-          ? Number(((item.conversions / item.views) * 100).toFixed(1))
+        ctr: item.visitors
+          ? Number(((item.clicks / item.visitors) * 100).toFixed(1))
           : 0,
+        conversionRate: conversionRate(item.conversions, item.visitors),
       }))
-      .sort((left, right) => right.views - left.views),
+      .sort((left, right) => right.visitors - left.visitors),
   };
   return {
     ...result,
@@ -300,8 +463,142 @@ export async function analyticsAssets(actor: Actor, input: AnalyticsFilters) {
   };
 }
 
-export async function analyticsLocations(actor: Actor, input: AnalyticsFilters) {
-  const filters = await resolveFilters(actor, input);
+export async function analyticsConversions(
+  actor: Actor,
+  input: AnalyticsFilters,
+) {
+  const filters = await resolveAnalyticsFilters(actor, input);
+  const items = await getPrisma().analyticsConversion.findMany({
+    where: conversionWhere(actor, filters),
+    include: {
+      goal: { select: { id: true, name: true, goalType: true } },
+      event: { select: { eventId: true, name: true } },
+    },
+    orderBy: { occurredAt: "desc" },
+    take: 100,
+  });
+  return {
+    range: { from: filters.from.toISOString(), to: filters.to.toISOString() },
+    items,
+  };
+}
+
+export async function analyticsCampaigns(
+  actor: Actor,
+  input: AnalyticsFilters,
+) {
+  const filters = await resolveAnalyticsFilters(actor, input);
+  const db = getPrisma();
+  const [visitorRows, clickRows, conversionRows, campaigns, primaryGoals] =
+    await Promise.all([
+      db.analyticsEvent.groupBy({
+        by: ["campaignId", "visitorHash"],
+        where: {
+          ...eventWhere(actor, filters),
+          campaignId: { not: null },
+          visitorHash: { not: null },
+          name: { in: viewEvents },
+        },
+      }),
+      db.analyticsEvent.groupBy({
+        by: ["campaignId"],
+        where: {
+          ...eventWhere(actor, filters),
+          campaignId: { not: null },
+          name: { in: clickEvents },
+        },
+        _count: { _all: true },
+      }),
+      db.analyticsConversion.groupBy({
+        by: ["campaignId"],
+        where: {
+          ...conversionWhere(actor, filters),
+          campaignId: { not: null },
+        },
+        _count: { _all: true },
+      }),
+      db.campaign.findMany({
+        where: { workspaceId: actor.workspaceId },
+        select: { id: true, name: true },
+      }),
+      db.analyticsGoal.findMany({
+        where: {
+          workspaceId: actor.workspaceId,
+          scopeType: "CAMPAIGN",
+          isPrimary: true,
+          status: { not: "ARCHIVED" },
+        },
+        select: { scopeId: true, id: true, name: true, goalType: true },
+      }),
+    ]);
+  const items = new Map<
+    string,
+    { visitors: number; clicks: number; conversions: number }
+  >();
+  for (const row of visitorRows) {
+    if (!row.campaignId) continue;
+    const item = items.get(row.campaignId) ?? {
+      visitors: 0,
+      clicks: 0,
+      conversions: 0,
+    };
+    item.visitors += 1;
+    items.set(row.campaignId, item);
+  }
+  for (const row of clickRows) {
+    if (!row.campaignId) continue;
+    const item = items.get(row.campaignId) ?? {
+      visitors: 0,
+      clicks: 0,
+      conversions: 0,
+    };
+    item.clicks += row._count._all;
+    items.set(row.campaignId, item);
+  }
+  for (const row of conversionRows) {
+    if (!row.campaignId) continue;
+    const item = items.get(row.campaignId) ?? {
+      visitors: 0,
+      clicks: 0,
+      conversions: 0,
+    };
+    item.conversions += row._count._all;
+    items.set(row.campaignId, item);
+  }
+  const names = new Map(
+    campaigns.map((campaign) => [campaign.id, campaign.name]),
+  );
+  const goals = new Map(
+    primaryGoals.flatMap((goal) =>
+      goal.scopeId
+        ? [
+            [
+              goal.scopeId,
+              { id: goal.id, name: goal.name, goalType: goal.goalType },
+            ],
+          ]
+        : [],
+    ),
+  );
+  return {
+    range: { from: filters.from.toISOString(), to: filters.to.toISOString() },
+    items: [...items.entries()]
+      .map(([campaignId, values]) => ({
+        campaignId,
+        name: names.get(campaignId) ?? campaignId,
+        ...values,
+        conversionRate: conversionRate(values.conversions, values.visitors),
+        primaryGoal: goals.get(campaignId) ?? null,
+      }))
+      .sort((left, right) => right.visitors - left.visitors),
+  };
+}
+
+export async function analyticsLocations(
+  actor: Actor,
+  input: AnalyticsFilters,
+) {
+  const filters = await resolveAnalyticsFilters(actor, input);
   if (!filters.advancedAnalytics)
     return {
       range: { from: filters.from.toISOString(), to: filters.to.toISOString() },
@@ -319,14 +616,24 @@ export async function analyticsLocations(actor: Actor, input: AnalyticsFilters) 
     range: { from: filters.from.toISOString(), to: filters.to.toISOString() },
     items: rows.flatMap((row) =>
       row.country && row._count._all >= 5
-        ? [{ country: row.country, region: row.region, city: row.city, events: row._count._all }]
+        ? [
+            {
+              country: row.country,
+              region: row.region,
+              city: row.city,
+              events: row._count._all,
+            },
+          ]
         : [],
     ),
   };
 }
 
-export async function analyticsTechnology(actor: Actor, input: AnalyticsFilters) {
-  const filters = await resolveFilters(actor, input);
+export async function analyticsTechnology(
+  actor: Actor,
+  input: AnalyticsFilters,
+) {
+  const filters = await resolveAnalyticsFilters(actor, input);
   if (!filters.advancedAnalytics)
     return {
       range: { from: filters.from.toISOString(), to: filters.to.toISOString() },
@@ -338,16 +645,26 @@ export async function analyticsTechnology(actor: Actor, input: AnalyticsFilters)
   const where = eventWhere(actor, filters);
   const db = getPrisma();
   const [devices, operatingSystems, browsers] = await Promise.all([
-    db.analyticsEvent.groupBy({ by: ["deviceType"], where: { ...where, deviceType: { not: null } }, _count: { _all: true } }),
-    db.analyticsEvent.groupBy({ by: ["os"], where: { ...where, os: { not: null } }, _count: { _all: true } }),
-    db.analyticsEvent.groupBy({ by: ["browser"], where: { ...where, browser: { not: null } }, _count: { _all: true } }),
+    db.analyticsEvent.groupBy({
+      by: ["deviceType"],
+      where: { ...where, deviceType: { not: null } },
+      _count: { _all: true },
+    }),
+    db.analyticsEvent.groupBy({
+      by: ["os"],
+      where: { ...where, os: { not: null } },
+      _count: { _all: true },
+    }),
+    db.analyticsEvent.groupBy({
+      by: ["browser"],
+      where: { ...where, browser: { not: null } },
+      _count: { _all: true },
+    }),
   ]);
   return {
     range: { from: filters.from.toISOString(), to: filters.to.toISOString() },
     devices: devices.flatMap((row) =>
-      row.deviceType
-        ? [{ name: row.deviceType, events: row._count._all }]
-        : [],
+      row.deviceType ? [{ name: row.deviceType, events: row._count._all }] : [],
     ),
     operatingSystems: operatingSystems.flatMap((row) =>
       row.os ? [{ name: row.os, events: row._count._all }] : [],
@@ -359,7 +676,7 @@ export async function analyticsTechnology(actor: Actor, input: AnalyticsFilters)
 }
 
 export async function analyticsTime(actor: Actor, input: AnalyticsFilters) {
-  const filters = await resolveFilters(actor, input);
+  const filters = await resolveAnalyticsFilters(actor, input);
   if (!filters.advancedAnalytics)
     return {
       range: { from: filters.from.toISOString(), to: filters.to.toISOString() },
@@ -402,7 +719,7 @@ export async function analyticsTime(actor: Actor, input: AnalyticsFilters) {
 }
 
 export async function analyticsJourneys(actor: Actor, input: AnalyticsFilters) {
-  const filters = await resolveFilters(actor, input);
+  const filters = await resolveAnalyticsFilters(actor, input);
   if (!filters.advancedAnalytics)
     return {
       range: { from: filters.from.toISOString(), to: filters.to.toISOString() },
@@ -412,16 +729,28 @@ export async function analyticsJourneys(actor: Actor, input: AnalyticsFilters) {
     };
   const events = await getPrisma().analyticsEvent.findMany({
     where: { ...eventWhere(actor, filters), sessionId: { not: null } },
-    select: { sessionId: true, source: true, name: true, assetType: true, occurredAt: true },
+    select: {
+      sessionId: true,
+      source: true,
+      name: true,
+      assetType: true,
+      occurredAt: true,
+    },
     orderBy: { occurredAt: "desc" },
     take: 5_000,
   });
   const journeys = new Map<string, { source: string; steps: string[] }>();
   for (const event of [...events].reverse()) {
     if (!event.sessionId) continue;
-    const journey = journeys.get(event.sessionId) ?? { source: event.source ?? "direct", steps: [] };
-    const step = event.assetType ? `${event.name}:${event.assetType}` : event.name;
-    if (journey.steps.at(-1) !== step && journey.steps.length < 5) journey.steps.push(step);
+    const journey = journeys.get(event.sessionId) ?? {
+      source: event.source ?? "direct",
+      steps: [],
+    };
+    const step = event.assetType
+      ? `${event.name}:${event.assetType}`
+      : event.name;
+    if (journey.steps.at(-1) !== step && journey.steps.length < 5)
+      journey.steps.push(step);
     journeys.set(event.sessionId, journey);
   }
   const items = new Map<string, number>();

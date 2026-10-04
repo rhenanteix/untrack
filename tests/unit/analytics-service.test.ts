@@ -29,10 +29,12 @@ function eventTransaction(overrides: Record<string, unknown> = {}) {
       update: vi.fn(),
     },
     analyticsEvent: {
-      create: vi.fn().mockResolvedValue({ id: "event_row_1", eventId: "event_1" }),
+      create: vi
+        .fn()
+        .mockResolvedValue({ id: "event_row_1", eventId: "event_1" }),
     },
     analyticsGoal: { findMany: vi.fn().mockResolvedValue([]) },
-    analyticsGoalEvent: {
+    analyticsConversion: {
       findUnique: vi.fn().mockResolvedValue(null),
       create: vi.fn(),
     },
@@ -114,9 +116,9 @@ describe("universal analytics collector", () => {
         }),
       }),
     );
-    expect(JSON.stringify(tx.analyticsEvent.create.mock.calls[0][0])).not.toContain(
-      "private@example.com",
-    );
+    expect(
+      JSON.stringify(tx.analyticsEvent.create.mock.calls[0][0]),
+    ).not.toContain("private@example.com");
     expect(aggregateAnalyticsEvent).toHaveBeenCalledWith(
       expect.objectContaining({
         name: "link_click",
@@ -219,7 +221,9 @@ describe("universal analytics collector", () => {
       isTest: true,
     });
     expect(tx.analyticsEvent.create).toHaveBeenCalledWith(
-      expect.objectContaining({ data: expect.objectContaining({ isTest: true }) }),
+      expect.objectContaining({
+        data: expect.objectContaining({ isTest: true }),
+      }),
     );
     expect(aggregateAnalyticsEvent).not.toHaveBeenCalled();
   });
@@ -228,11 +232,23 @@ describe("universal analytics collector", () => {
     const eventCreate = vi
       .fn()
       .mockResolvedValueOnce({ id: "event_row_1", eventId: "event_1" })
-      .mockResolvedValueOnce({ id: "goal_event_row", eventId: "event_1:goal:goal_1" });
+      .mockResolvedValueOnce({
+        id: "goal_event_row",
+        eventId: "event_1:goal:goal_1",
+      });
     const tx = eventTransaction({
       analyticsEvent: { create: eventCreate },
       analyticsGoal: {
-        findMany: vi.fn().mockResolvedValue([{ id: "goal_1" }]),
+        findMany: vi.fn().mockResolvedValue([
+          {
+            id: "goal_1",
+            workspaceId: "workspace_1",
+            goalType: "LEAD_CREATED",
+            scopeType: "WORKSPACE",
+            scopeId: null,
+            conditions: {},
+          },
+        ]),
       },
     });
     await recordAnalyticsEvent({
@@ -243,9 +259,15 @@ describe("universal analytics collector", () => {
       assetId: "card_1",
       isTest: true,
     });
-    expect(tx.analyticsGoalEvent.create).toHaveBeenCalledWith(
+    expect(tx.analyticsConversion.create).toHaveBeenCalledWith(
       expect.objectContaining({
-        data: expect.objectContaining({ goalId: "goal_1", eventId: "event_row_1" }),
+        data: expect.objectContaining({
+          goalId: "goal_1",
+          eventId: "event_row_1",
+          source: "direct",
+          medium: "none",
+          channel: "direct",
+        }),
       }),
     );
     expect(eventCreate).toHaveBeenLastCalledWith(

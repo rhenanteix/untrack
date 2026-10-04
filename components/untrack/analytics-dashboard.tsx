@@ -29,7 +29,7 @@ type Timeseries = {
 type Breakdown = {
   items: Array<{
     name: string;
-    views: number;
+    visitors: number;
     clicks: number;
     conversions: number;
     ctr: number;
@@ -41,7 +41,7 @@ type Assets = {
   items: Array<{
     assetType: string;
     assetId: string;
-    views: number;
+    visitors: number;
     clicks: number;
     conversions: number;
     ctr: number;
@@ -65,7 +65,10 @@ type Locations = {
 };
 
 type Time = { items: Array<{ weekday: number; hour: number; events: number }> };
-type Journeys = { sampled: boolean; items: Array<{ journey: string; sessions: number }> };
+type Journeys = {
+  sampled: boolean;
+  items: Array<{ journey: string; sessions: number }>;
+};
 
 const assetOptions = [
   ["", "Todos os ativos"],
@@ -130,7 +133,7 @@ function QueryTable({
             <thead>
               <tr>
                 <th>Origem</th>
-                <th>Visualizações</th>
+                <th>Visitantes</th>
                 <th>Cliques</th>
                 <th>Conversões</th>
                 <th>Taxa de conversão</th>
@@ -140,7 +143,7 @@ function QueryTable({
               {rows.slice(0, 8).map((row) => (
                 <tr key={row.name}>
                   <td>{row.name}</td>
-                  <td>{number(row.views)}</td>
+                  <td>{number(row.visitors)}</td>
                   <td>{number(row.clicks)}</td>
                   <td>{number(row.conversions)}</td>
                   <td>{percent(row.conversionRate)}</td>
@@ -156,7 +159,13 @@ function QueryTable({
   );
 }
 
-function TechnologyList({ title, items }: { title: string; items: Array<{ name: string; events: number }> }) {
+function TechnologyList({
+  title,
+  items,
+}: {
+  title: string;
+  items: Array<{ name: string; events: number }>;
+}) {
   const total = items.reduce((sum, item) => sum + item.events, 0);
   return (
     <div className="analytics-list">
@@ -166,7 +175,9 @@ function TechnologyList({ title, items }: { title: string; items: Array<{ name: 
           {items.map((item) => (
             <li key={item.name}>
               <span>{item.name}</span>
-              <strong>{total ? percent((item.events / total) * 100) : "0%"}</strong>
+              <strong>
+                {total ? percent((item.events / total) * 100) : "0%"}
+              </strong>
             </li>
           ))}
         </ul>
@@ -213,19 +224,31 @@ export function AnalyticsDashboard() {
       request<Time>("time"),
       request<Journeys>("journeys"),
     ])
-      .then(([nextOverview, nextSeries, nextSources, nextChannels, nextAssets, nextTechnology, nextLocations, nextTime, nextJourneys]) => {
-        if (controller.signal.aborted) return;
-        setError("");
-        setOverview(nextOverview);
-        setSeries(nextSeries);
-        setSources(nextSources);
-        setChannels(nextChannels);
-        setAssets(nextAssets);
-        setTechnology(nextTechnology);
-        setLocations(nextLocations);
-        setTime(nextTime);
-        setJourneys(nextJourneys);
-      })
+      .then(
+        ([
+          nextOverview,
+          nextSeries,
+          nextSources,
+          nextChannels,
+          nextAssets,
+          nextTechnology,
+          nextLocations,
+          nextTime,
+          nextJourneys,
+        ]) => {
+          if (controller.signal.aborted) return;
+          setError("");
+          setOverview(nextOverview);
+          setSeries(nextSeries);
+          setSources(nextSources);
+          setChannels(nextChannels);
+          setAssets(nextAssets);
+          setTechnology(nextTechnology);
+          setLocations(nextLocations);
+          setTime(nextTime);
+          setJourneys(nextJourneys);
+        },
+      )
       .catch((requestError: Error) => {
         if (!controller.signal.aborted) setError(requestError.message);
       })
@@ -242,8 +265,14 @@ export function AnalyticsDashboard() {
     });
   }
 
-  const highest = Math.max(...(series?.points.map((point) => point[metric]) ?? [0]), 1);
-  const timeMaximum = Math.max(...(time?.items.map((item) => item.events) ?? [0]), 1);
+  const highest = Math.max(
+    ...(series?.points.map((point) => point[metric]) ?? [0]),
+    1,
+  );
+  const timeMaximum = Math.max(
+    ...(time?.items.map((item) => item.events) ?? [0]),
+    1,
+  );
   const isEmpty = !loading && overview && !overview.views && !overview.clicks;
 
   return (
@@ -252,10 +281,15 @@ export function AnalyticsDashboard() {
         <div>
           <span className="eyebrow">Inteligência</span>
           <h1>Analytics</h1>
-          <p>Entenda como as pessoas encontram e interagem com seus conteúdos.</p>
+          <p>
+            Entenda como as pessoas encontram e interagem com seus conteúdos.
+          </p>
         </div>
         <div className="workspace-heading-actions">
-          <Link className="button button-secondary" href="/untrack/analytics/goals">
+          <Link
+            className="button button-secondary"
+            href="/untrack/analytics/goals"
+          >
             <FiTarget aria-hidden="true" /> Objetivos
           </Link>
         </div>
@@ -273,74 +307,344 @@ export function AnalyticsDashboard() {
               {days} dias
             </button>
           ))}
-          <button type="button" aria-pressed={period === 0} onClick={() => setPeriod(0)}>
+          <button
+            type="button"
+            aria-pressed={period === 0}
+            onClick={() => setPeriod(0)}
+          >
             Personalizado
           </button>
         </div>
         {period === 0 && (
           <div className="analytics-custom-dates">
-            <label>De<input type="date" value={range.from} onChange={(event) => setRange((current) => ({ ...current, from: event.target.value }))} /></label>
-            <label>Até<input type="date" value={range.to} onChange={(event) => setRange((current) => ({ ...current, to: event.target.value }))} /></label>
+            <label>
+              De
+              <input
+                type="date"
+                value={range.from}
+                onChange={(event) =>
+                  setRange((current) => ({
+                    ...current,
+                    from: event.target.value,
+                  }))
+                }
+              />
+            </label>
+            <label>
+              Até
+              <input
+                type="date"
+                value={range.to}
+                onChange={(event) =>
+                  setRange((current) => ({
+                    ...current,
+                    to: event.target.value,
+                  }))
+                }
+              />
+            </label>
           </div>
         )}
         <label className="analytics-asset-filter">
           <span>Ativo</span>
-          <select value={assetType} onChange={(event) => setAssetType(event.target.value)}>
-            {assetOptions.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+          <select
+            value={assetType}
+            onChange={(event) => setAssetType(event.target.value)}
+          >
+            {assetOptions.map(([value, label]) => (
+              <option key={value} value={value}>
+                {label}
+              </option>
+            ))}
           </select>
         </label>
       </div>
 
-      {loading && <p role="status" className="analytics-muted">Carregando Analytics...</p>}
-      {error && <p role="alert" className="form-error">{error}</p>}
+      {loading && (
+        <p role="status" className="analytics-muted">
+          Carregando Analytics...
+        </p>
+      )}
+      {error && (
+        <p role="alert" className="form-error">
+          {error}
+        </p>
+      )}
       {isEmpty && (
         <section className="workspace-empty-state">
           <h2>Ainda não temos dados suficientes.</h2>
-          <p>Compartilhe uma Smart Page, link, QR Code ou Smart Card para começar a medir interações reais.</p>
-          <div className="workspace-empty-actions"><Link className="button" href="/untrack/smart-pages">Ver Smart Pages</Link></div>
+          <p>
+            Compartilhe uma Smart Page, link, QR Code ou Smart Card para começar
+            a medir interações reais.
+          </p>
+          <div className="workspace-empty-actions">
+            <Link className="button" href="/untrack/smart-pages">
+              Ver Smart Pages
+            </Link>
+          </div>
         </section>
       )}
 
       {!loading && !error && overview && !isEmpty && (
         <>
           <dl className="workspace-kpis analytics-kpis">
-            <div><dt>Visitantes</dt><dd>{number(overview.visitors)}</dd><small>{comparison(overview.comparison.visitors)}</small></div>
-            <div><dt>Sessões</dt><dd>{number(overview.sessions)}</dd><small>Visitas identificadas no período</small></div>
-            <div><dt>Visualizações</dt><dd>{number(overview.views)}</dd><small>{comparison(overview.comparison.views)}</small></div>
-            <div><dt>Cliques</dt><dd>{number(overview.clicks)}</dd><small>{comparison(overview.comparison.clicks)}</small></div>
-            <div><dt>CTR</dt><dd>{percent(overview.ctr)}</dd><small>Cliques por visualização</small></div>
-            <div><dt>Conversões</dt><dd>{number(overview.conversions)}</dd><small>{comparison(overview.comparison.conversions)}</small></div>
-            <div><dt>Taxa de conversão</dt><dd>{percent(overview.conversionRate)}</dd><small>Conversões por visualização</small></div>
+            <div>
+              <dt>Visitantes</dt>
+              <dd>{number(overview.visitors)}</dd>
+              <small>{comparison(overview.comparison.visitors)}</small>
+            </div>
+            <div>
+              <dt>Sessões</dt>
+              <dd>{number(overview.sessions)}</dd>
+              <small>Visitas identificadas no período</small>
+            </div>
+            <div>
+              <dt>Visualizações</dt>
+              <dd>{number(overview.views)}</dd>
+              <small>{comparison(overview.comparison.views)}</small>
+            </div>
+            <div>
+              <dt>Cliques</dt>
+              <dd>{number(overview.clicks)}</dd>
+              <small>{comparison(overview.comparison.clicks)}</small>
+            </div>
+            <div>
+              <dt>CTR</dt>
+              <dd>{percent(overview.ctr)}</dd>
+              <small>Cliques por visualização</small>
+            </div>
+            <div>
+              <dt>Conversões</dt>
+              <dd>{number(overview.conversions)}</dd>
+              <small>{comparison(overview.comparison.conversions)}</small>
+            </div>
+            <div>
+              <dt>Taxa de conversão</dt>
+              <dd>{percent(overview.conversionRate)}</dd>
+              <small>Conversões por visitante único</small>
+            </div>
           </dl>
 
           <section className="workspace-panel analytics-performance">
             <div className="workspace-panel-heading">
-              <div><h2>Desempenho</h2><p>Atividade real no período selecionado.</p></div>
-              <label className="analytics-metric"><span>Métrica</span><select value={metric} onChange={(event) => setMetric(event.target.value as keyof typeof eventLabels)}>{Object.entries(eventLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
+              <div>
+                <h2>Desempenho</h2>
+                <p>Atividade real no período selecionado.</p>
+              </div>
+              <label className="analytics-metric">
+                <span>Métrica</span>
+                <select
+                  value={metric}
+                  onChange={(event) =>
+                    setMetric(event.target.value as keyof typeof eventLabels)
+                  }
+                >
+                  {Object.entries(eventLabels).map(([value, label]) => (
+                    <option key={value} value={value}>
+                      {label}
+                    </option>
+                  ))}
+                </select>
+              </label>
             </div>
             <ol className="dashboard-chart-bars analytics-chart-bars">
-              {series?.points.map((point) => <li key={point.date} title={`${point.date}: ${number(point[metric])}`}><span style={{ height: `${Math.max((point[metric] / highest) * 100, 2)}%` }} /><small>{point.date.slice(5)}</small></li>)}
+              {series?.points.map((point) => (
+                <li
+                  key={point.date}
+                  title={`${point.date}: ${number(point[metric])}`}
+                >
+                  <span
+                    style={{
+                      height: `${Math.max((point[metric] / highest) * 100, 2)}%`,
+                    }}
+                  />
+                  <small>{point.date.slice(5)}</small>
+                </li>
+              ))}
             </ol>
           </section>
 
           <div className="workspace-overview-grid">
-            <QueryTable title="Aquisição" caption="De onde vieram as visualizações." rows={sources?.items ?? []} />
-            <QueryTable title="Canais" caption="Agrupamento determinístico do tráfego." rows={channels?.items ?? []} />
+            <QueryTable
+              title="Aquisição"
+              caption="De onde vieram as visualizações."
+              rows={sources?.items ?? []}
+            />
+            <QueryTable
+              title="Canais"
+              caption="Agrupamento determinístico do tráfego."
+              rows={channels?.items ?? []}
+            />
           </div>
 
           <section className="workspace-panel analytics-table-panel">
-            <div className="workspace-panel-heading"><div><h2>Conteúdo</h2><p>Performance por ativo no período selecionado.</p></div></div>
-            {assets?.items.length ? <div className="analytics-table-wrap"><table className="analytics-table"><thead><tr><th>Ativo</th><th>Visualizações</th><th>Cliques</th><th>CTR</th><th>Conversões</th></tr></thead><tbody>{assets.items.slice(0, 12).map((asset) => <tr key={`${asset.assetType}:${asset.assetId}`}><td><span className="analytics-asset-type">{asset.assetType.replace("_", " ")}</span><small>{asset.assetId}</small></td><td>{number(asset.views)}</td><td>{number(asset.clicks)}</td><td>{percent(asset.ctr)}</td><td>{number(asset.conversions)}</td></tr>)}</tbody></table></div> : <p className="analytics-muted">Ainda não há ativos com atividade neste período.</p>}
+            <div className="workspace-panel-heading">
+              <div>
+                <h2>Conteúdo</h2>
+                <p>Performance por ativo no período selecionado.</p>
+              </div>
+            </div>
+            {assets?.items.length ? (
+              <div className="analytics-table-wrap">
+                <table className="analytics-table">
+                  <thead>
+                    <tr>
+                      <th>Ativo</th>
+                      <th>Visitantes</th>
+                      <th>Cliques</th>
+                      <th>CTR</th>
+                      <th>Conversões</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {assets.items.slice(0, 12).map((asset) => (
+                      <tr key={`${asset.assetType}:${asset.assetId}`}>
+                        <td>
+                          <span className="analytics-asset-type">
+                            {asset.assetType.replace("_", " ")}
+                          </span>
+                          <small>{asset.assetId}</small>
+                        </td>
+                        <td>{number(asset.visitors)}</td>
+                        <td>{number(asset.clicks)}</td>
+                        <td>{percent(asset.ctr)}</td>
+                        <td>{number(asset.conversions)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <p className="analytics-muted">
+                Ainda não há ativos com atividade neste período.
+              </p>
+            )}
           </section>
 
           <div className="workspace-overview-grid">
-            <section className="workspace-panel"><div className="workspace-panel-heading"><div><h2>Tecnologia</h2><p>Dispositivos e navegadores informados pelo acesso.</p></div></div><div className="analytics-technology"><TechnologyList title="Dispositivos" items={technology?.devices ?? []} /><TechnologyList title="Sistemas" items={technology?.operatingSystems ?? []} /><TechnologyList title="Browsers" items={technology?.browsers ?? []} /></div></section>
-            <section className="workspace-panel"><div className="workspace-panel-heading"><div><h2>Localização</h2><p>Dados aproximados com amostra mínima.</p></div></div>{locations?.items.length ? <ul className="analytics-location-list">{locations.items.slice(0, 8).map((location) => <li key={`${location.country}:${location.region}:${location.city}`}><span>{[location.city, location.region, location.country].filter(Boolean).join(", ")}</span><strong>{number(location.events)}</strong></li>)}</ul> : <p className="analytics-muted">Ainda não há volume suficiente para mostrar localização.</p>}</section>
+            <section className="workspace-panel">
+              <div className="workspace-panel-heading">
+                <div>
+                  <h2>Tecnologia</h2>
+                  <p>Dispositivos e navegadores informados pelo acesso.</p>
+                </div>
+              </div>
+              <div className="analytics-technology">
+                <TechnologyList
+                  title="Dispositivos"
+                  items={technology?.devices ?? []}
+                />
+                <TechnologyList
+                  title="Sistemas"
+                  items={technology?.operatingSystems ?? []}
+                />
+                <TechnologyList
+                  title="Browsers"
+                  items={technology?.browsers ?? []}
+                />
+              </div>
+            </section>
+            <section className="workspace-panel">
+              <div className="workspace-panel-heading">
+                <div>
+                  <h2>Localização</h2>
+                  <p>Dados aproximados com amostra mínima.</p>
+                </div>
+              </div>
+              {locations?.items.length ? (
+                <ul className="analytics-location-list">
+                  {locations.items.slice(0, 8).map((location) => (
+                    <li
+                      key={`${location.country}:${location.region}:${location.city}`}
+                    >
+                      <span>
+                        {[location.city, location.region, location.country]
+                          .filter(Boolean)
+                          .join(", ")}
+                      </span>
+                      <strong>{number(location.events)}</strong>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="analytics-muted">
+                  Ainda não há volume suficiente para mostrar localização.
+                </p>
+              )}
+            </section>
           </div>
 
-          <section className="workspace-panel analytics-time-panel"><div className="workspace-panel-heading"><div><h2>Horários</h2><p>Atividade por dia da semana e hora do dia.</p></div></div><div className="analytics-heatmap" role="img" aria-label="Heatmap de atividade por dia e hora">{[0, 1, 2, 3, 4, 5, 6].flatMap((weekday) => Array.from({ length: 24 }, (_, hour) => { const events = time?.items.find((item) => item.weekday === weekday && item.hour === hour)?.events ?? 0; return <span key={`${weekday}:${hour}`} title={`${["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"][weekday]} ${hour}h: ${number(events)}`} style={{ opacity: events ? Math.max(events / timeMaximum, 0.12) : 0.04 }} />; }))}</div><div className="analytics-heatmap-labels"><span>Dom</span><span>Seg</span><span>Ter</span><span>Qua</span><span>Qui</span><span>Sex</span><span>Sáb</span></div></section>
+          <section className="workspace-panel analytics-time-panel">
+            <div className="workspace-panel-heading">
+              <div>
+                <h2>Horários</h2>
+                <p>Atividade por dia da semana e hora do dia.</p>
+              </div>
+            </div>
+            <div
+              className="analytics-heatmap"
+              role="img"
+              aria-label="Heatmap de atividade por dia e hora"
+            >
+              {[0, 1, 2, 3, 4, 5, 6].flatMap((weekday) =>
+                Array.from({ length: 24 }, (_, hour) => {
+                  const events =
+                    time?.items.find(
+                      (item) => item.weekday === weekday && item.hour === hour,
+                    )?.events ?? 0;
+                  return (
+                    <span
+                      key={`${weekday}:${hour}`}
+                      title={`${["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"][weekday]} ${hour}h: ${number(events)}`}
+                      style={{
+                        opacity: events
+                          ? Math.max(events / timeMaximum, 0.12)
+                          : 0.04,
+                      }}
+                    />
+                  );
+                }),
+              )}
+            </div>
+            <div className="analytics-heatmap-labels">
+              <span>Dom</span>
+              <span>Seg</span>
+              <span>Ter</span>
+              <span>Qua</span>
+              <span>Qui</span>
+              <span>Sex</span>
+              <span>Sáb</span>
+            </div>
+          </section>
 
-          <section className="workspace-panel"><div className="workspace-panel-heading"><div><h2>Jornadas</h2><p>Sequências agregadas, sem expor pessoas individualmente.</p></div></div>{journeys?.items.length ? <ol className="analytics-journeys">{journeys.items.map((item) => <li key={item.journey}><span>{item.journey.replaceAll("_", " ")}</span><strong>{number(item.sessions)}</strong></li>)}</ol> : <p className="analytics-muted">Ainda não há jornadas com mais de uma interação.</p>}{journeys?.sampled && <p className="analytics-muted">Mostrando uma amostra recente de jornadas para preservar o tempo de resposta.</p>}</section>
+          <section className="workspace-panel">
+            <div className="workspace-panel-heading">
+              <div>
+                <h2>Jornadas</h2>
+                <p>Sequências agregadas, sem expor pessoas individualmente.</p>
+              </div>
+            </div>
+            {journeys?.items.length ? (
+              <ol className="analytics-journeys">
+                {journeys.items.map((item) => (
+                  <li key={item.journey}>
+                    <span>{item.journey.replaceAll("_", " ")}</span>
+                    <strong>{number(item.sessions)}</strong>
+                  </li>
+                ))}
+              </ol>
+            ) : (
+              <p className="analytics-muted">
+                Ainda não há jornadas com mais de uma interação.
+              </p>
+            )}
+            {journeys?.sampled && (
+              <p className="analytics-muted">
+                Mostrando uma amostra recente de jornadas para preservar o tempo
+                de resposta.
+              </p>
+            )}
+          </section>
         </>
       )}
     </div>

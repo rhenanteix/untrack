@@ -13,6 +13,7 @@ describe("analytics overview", () => {
     vi.mocked(getPrisma).mockReturnValue({
       user: { findUniqueOrThrow: vi.fn().mockResolvedValue({ plan: "free", trial: null }) },
       analyticsEvent: { count, groupBy },
+      analyticsConversion: { count },
     } as unknown as ReturnType<typeof getPrisma>);
 
     const result = await analyticsOverview(

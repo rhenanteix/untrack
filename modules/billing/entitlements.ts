@@ -15,6 +15,7 @@ export const PREMIUM_FEATURES = [
   "trackingPixels",
   "webhooks",
   "advancedGoals",
+  "goals",
 ] as const;
 
 export type PremiumFeature = (typeof PREMIUM_FEATURES)[number];
@@ -24,7 +25,8 @@ export type UsageMetric =
   | "smartCards"
   | "qrCodes"
   | "campaigns"
-  | "audienceContacts";
+  | "audienceContacts"
+  | "goals";
 
 const usageResources: Record<UsageMetric, Resource> = {
   links: "shortLinks",
@@ -33,6 +35,7 @@ const usageResources: Record<UsageMetric, Resource> = {
   qrCodes: "qrCodes",
   campaigns: "campaigns",
   audienceContacts: "audienceContacts",
+  goals: "goals",
 };
 
 const planEntitlements: Record<
@@ -41,7 +44,10 @@ const planEntitlements: Record<
 > = {
   free: {
     analyticsHistoryDays: 7,
-    features: Object.fromEntries(PREMIUM_FEATURES.map((feature) => [feature, false])) as Record<PremiumFeature, boolean>,
+    features: {
+      ...Object.fromEntries(PREMIUM_FEATURES.map((feature) => [feature, false])),
+      goals: true,
+    } as Record<PremiumFeature, boolean>,
   },
   premium: {
     analyticsHistoryDays: 365,
@@ -81,7 +87,7 @@ export type WorkspaceUsage = Record<UsageMetric, number>;
 
 export async function getUsage(workspaceId: string): Promise<WorkspaceUsage> {
   const db = getPrisma();
-  const [links, smartPages, smartCards, qrCodes, campaigns, audienceContacts] =
+  const [links, smartPages, smartCards, qrCodes, campaigns, audienceContacts, goals] =
     await Promise.all([
       db.shortLink.count({ where: { workspaceId } }),
       db.smartPage.count({ where: { workspaceId } }),
@@ -89,6 +95,9 @@ export async function getUsage(workspaceId: string): Promise<WorkspaceUsage> {
       db.qrAsset.count({ where: { workspaceId } }),
       db.campaign.count({ where: { workspaceId } }),
       db.audienceContact.count({ where: { workspaceId } }),
+      db.analyticsGoal.count({
+        where: { workspaceId, status: { not: "ARCHIVED" } },
+      }),
     ]);
-  return { links, smartPages, smartCards, qrCodes, campaigns, audienceContacts };
+  return { links, smartPages, smartCards, qrCodes, campaigns, audienceContacts, goals };
 }

@@ -1406,12 +1406,145 @@
   font: inherit;
   font-size: 18px;
 }
+.analytics-goal-wizard {
+  margin-bottom: 18px;
+}
+.analytics-goal-choices {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+.analytics-goal-choice {
+  min-height: 92px;
+  padding: 13px;
+  border: 1px solid var(--ws-line);
+  border-radius: 7px;
+  background: #fff;
+  color: var(--ws-ink);
+  cursor: pointer;
+  text-align: left;
+  font: inherit;
+}
+.analytics-goal-choice:hover,
+.analytics-goal-choice[aria-pressed="true"] {
+  border-color: var(--ws-green);
+  background: var(--ws-accent-soft);
+}
+.analytics-goal-choice strong,
+.analytics-goal-choice span {
+  display: block;
+}
+.analytics-goal-choice span {
+  margin-top: 5px;
+  color: var(--ws-muted);
+  font-size: 12px;
+  line-height: 1.35;
+}
+.analytics-goal-step {
+  display: grid;
+  gap: 14px;
+}
+.analytics-goal-select {
+  display: grid;
+  max-width: 480px;
+  gap: 6px;
+  color: var(--ws-muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+.analytics-goal-select input,
+.analytics-goal-select select {
+  min-height: 40px;
+  border: 1px solid var(--ws-line);
+  border-radius: 6px;
+  padding: 8px 10px;
+  background: #fff;
+  color: var(--ws-ink);
+  font: inherit;
+}
+.analytics-goal-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--ws-ink);
+  font-size: 13px;
+}
+.analytics-goal-suggestions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 14px 0;
+}
+.analytics-goal-suggestion {
+  border: 1px solid var(--ws-line);
+  border-radius: 5px;
+  padding: 7px 10px;
+  background: #fff;
+  color: var(--ws-green);
+  cursor: pointer;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 750;
+}
+.analytics-goal-suggestion:hover {
+  border-color: var(--ws-green);
+  background: var(--ws-accent-soft);
+}
+.analytics-goal-wizard-actions,
+.analytics-goal-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.analytics-goal-wizard-actions {
+  justify-content: flex-end;
+}
+.analytics-goal-summary {
+  max-width: 620px;
+  margin: 0;
+  color: var(--ws-muted);
+  font-size: 14px;
+  line-height: 1.55;
+}
+.analytics-goal-summary strong {
+  color: var(--ws-ink);
+}
+.analytics-goal-status {
+  display: inline-flex;
+  min-width: 66px;
+  justify-content: center;
+  border-radius: 999px;
+  padding: 4px 7px;
+  font-size: 10px;
+  font-weight: 800;
+}
+.analytics-goal-status-active {
+  background: #e6f5de;
+  color: #276a35;
+}
+.analytics-goal-status-paused {
+  background: #fff2cc;
+  color: #89610c;
+}
+.analytics-goal-status-archived {
+  background: #edf0eb;
+  color: var(--ws-muted);
+}
+.analytics-primary-button {
+  color: #89610c;
+}
+.analytics-primary-button svg {
+  fill: currentColor;
+}
 @media (max-width: 900px) {
   .analytics-kpis {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
   .analytics-technology,
   .analytics-goal-form {
+    grid-template-columns: 1fr;
+  }
+  .analytics-goal-choices {
     grid-template-columns: 1fr;
   }
 }

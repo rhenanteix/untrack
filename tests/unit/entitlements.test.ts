@@ -12,6 +12,8 @@ describe("LinkOr plan entitlements", () => {
     const premium = { effectivePlan: "premium" as const };
     expect(getLimit(free, "links")).toBe(10);
     expect(getLimit(free, "smartPages")).toBe(1);
+    expect(getLimit(free, "goals")).toBe(1);
+    expect(canUse(free, "goals")).toBe(true);
     expect(canUse(free, "advancedAnalytics")).toBe(false);
     expect(canUse(premium, "advancedAnalytics")).toBe(true);
     expect(canUse(premium, "advancedThemes")).toBe(true);
@@ -27,6 +29,7 @@ describe("LinkOr plan entitlements", () => {
       qrCodes: 0,
       campaigns: 0,
       audienceContacts: 0,
+      goals: 0,
     };
     expect(hasReachedLimit({ effectivePlan: "free" }, "links", usage)).toBe(true);
     expect(hasReachedLimit({ effectivePlan: "premium" }, "links", usage)).toBe(false);

@@ -99,6 +99,56 @@ the user selected the CTA or redirect; it never means a message was sent or a
 conversation happened. Smart Page WhatsApp blocks and Smart Card WhatsApp
 actions emit that same canonical event.
 
+## Goals And Conversions
+
+Goals turn a user-selected event into a result without changing the event
+itself:
+
+```text
+AnalyticsEvent -> GoalEngine -> AnalyticsConversion -> Analytics queries
+```
+
+`AnalyticsGoal` is workspace-scoped and stores a friendly name, type, event
+name, status, scope, optional simple conditions, and whether it is the primary
+goal for that scope. V1 supports `LINK_CLICK`, `WHATSAPP_CLICK`,
+`FORM_SUBMIT`, `LEAD_CREATED`, `QR_SCAN`, `PAGE_VIEW`, and `BUTTON_CLICK`.
+Future commerce types are intentionally not accepted by the creation API.
+
+Goals can apply to a whole workspace, one campaign, one asset, or one element.
+Conditions are internal JSON limited to `assetType`, `elementType`, and
+`elementId`; the V1 UI exposes only compatible asset/campaign choices. Every
+scope is resolved against the current workspace before a Goal can be saved.
+
+`GoalEngine` runs inside the transaction that persists a source event. It only
+queries active Goals indexed by workspace, status, and event name, then checks
+scope and conditions. `goal_completed` is an internal analytics event for
+compatibility, but it is ignored by the engine to prevent a completion loop.
+
+Each `AnalyticsConversion` retains its source `AnalyticsEvent` foreign key,
+Goal, visitor/session, campaign, asset, last-touch attribution, first-touch
+attribution, date bucket, and test/bot markers. The unique pair
+`goalId + eventId` makes retries idempotent. Archiving a Goal never deletes
+these records; it only prevents future matches.
+
+`whatsapp_click` can satisfy a WhatsApp-contact Goal only after the workspace
+chooses that Goal. It does not imply a lead or a sent message. Likewise,
+`qr_scan` can satisfy a QR Goal but does not imply a lead or sale. A submitted
+form and a created lead remain separate events and Goal types.
+
+Conversion rate uses one formula in overview, sources, channels, assets,
+campaigns, and the Goal list:
+
+```text
+conversion rate = conversions / unique visitors in the same selected scope
+```
+
+`GET /api/workspace/analytics/goals` returns Goals and their scoped conversion
+metrics. `GET /api/workspace/analytics/conversions` returns conversion records
+with `from`, `to`, `goalId`, `campaignId`, `assetType`, `assetId`, `source`, and
+`channel` filters. The general Analytics route supports the same common
+filters and `view=campaigns` for campaign visitors, clicks, conversions, CVR,
+and primary Goal.
+
 ## Security And Privacy
 
 - Public asset routes resolve ownership by published slug/action/block on the
@@ -119,7 +169,9 @@ actions emit that same canonical event.
 Workspace isolation is enforced by server-side asset resolution and all private
 analytics queries filter `workspaceId`. PostgreSQL row-level security is not
 enabled in the current Prisma deployment model; do not add policies without a
-per-request database-role design.
+per-request database-role design. Goal creation validates that every campaign,
+asset, or element belongs to the actor workspace; GoalEngine also rejects a
+candidate whose workspace differs from the source event.
 
 ## Operations
 
@@ -149,9 +201,10 @@ only limit analytics visibility.
 ## Verification
 
 Focused unit coverage includes UTM/referrer/QR attribution, bot/device
-classification, session reuse/expiry, idempotency, goal completion, signed
-context, QR redirects, Smart Page context propagation, Smart Page WhatsApp
-clicks, and Smart Card events.
+classification, session reuse/expiry, idempotency, signed context, QR
+redirects, Smart Page context propagation, Smart Page WhatsApp clicks, Smart
+Card events, and scoped Goal completion for WhatsApp, QR, duplicate events,
+paused Goals, attribution, and cross-workspace isolation.
 
 Run:
 

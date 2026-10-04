@@ -4,6 +4,7 @@ import { getPrisma } from "@/lib/prisma";
 import { aggregateAnalyticsEvent } from "./aggregation";
 import { resolveAttribution, type AttributionInput } from "./attribution";
 import { classifyBot, classifyDevice } from "./device";
+import { GoalEngine } from "./goal-engine";
 import { reportAnalyticsHealth } from "./health";
 import { analyticsSessionTimeoutMinutes } from "./session";
 import type {
@@ -193,97 +194,15 @@ async function resolveIdentity(
             initialCampaign: firstTouch.campaign,
           },
         });
-  return { visitorId: visitor.id, visitorHash, sessionId: session.id };
-}
-
-async function recordMatchingGoals(
-  tx: Prisma.TransactionClient,
-  event: { id: string; eventId: string },
-  context: {
-    input: RecordAnalyticsEventInput;
-    identity: { visitorId?: string; visitorHash?: string; sessionId?: string };
-    occurredAt: Date;
-    attribution: ReturnType<typeof resolveAttribution>;
-    referrer: string | undefined;
-    path: string | undefined;
-    device: ReturnType<typeof classifyDevice>;
-    bot: ReturnType<typeof classifyBot>;
-    isTest: boolean;
-  },
-) {
-  const { attribution, bot, device, identity, input, occurredAt, path, referrer, isTest } = context;
-  if (!input.workspaceId || input.name === "goal_completed") return 0;
-  const goals = await tx.analyticsGoal.findMany({
-    where: {
-      workspaceId: input.workspaceId,
-      active: true,
-      eventName: input.name,
-      AND: [
-        { OR: [{ assetType: null }, { assetType: input.assetType ?? null }] },
-        { OR: [{ assetId: null }, { assetId: input.assetId ?? null }] },
-      ],
-    },
-  });
-  let completed = 0;
-  for (const goal of goals) {
-    const existing = await tx.analyticsGoalEvent.findUnique({
-      where: { goalId_eventId: { goalId: goal.id, eventId: event.id } },
-      select: { id: true },
-    });
-    if (existing) continue;
-    await tx.analyticsGoalEvent.create({
-      data: {
-        workspaceId: input.workspaceId,
-        goalId: goal.id,
-        eventId: event.id,
-        visitorId: identity.visitorId,
-        sessionId: identity.sessionId,
-        assetType: input.assetType,
-        assetId: input.assetId,
-        campaignId: input.campaignId,
-        occurredAt,
-      },
-    });
-    await tx.analyticsEvent.create({
-      data: {
-        eventId: `${event.eventId}:goal:${goal.id}`,
-        name: "goal_completed",
-        origin: "server",
-        occurredAt,
-        metadata: { goalId: goal.id },
-        workspaceId: input.workspaceId,
-        userId: input.userId,
-        audienceContactId: input.audienceContactId,
-        visitorId: identity.visitorId,
-        sessionId: identity.sessionId,
-        assetType: input.assetType,
-        assetId: input.assetId,
-        campaignId: input.campaignId,
-        goalId: goal.id,
-        path,
-        day: dateBucket(occurredAt),
-        visitorHash: identity.visitorHash,
-        referrer,
-        device: legacyDevice(device.deviceType),
-        source: attribution.source,
-        medium: attribution.medium,
-        channel: attribution.channel,
-        utmSource: input.attribution?.utmSource?.slice(0, 120),
-        utmMedium: input.attribution?.utmMedium?.slice(0, 120),
-        utmCampaign: input.attribution?.utmCampaign?.slice(0, 120),
-        utmContent: input.attribution?.utmContent?.slice(0, 120),
-        utmTerm: input.attribution?.utmTerm?.slice(0, 120),
-        deviceType: device.deviceType,
-        os: device.os,
-        browser: device.browser,
-        isBot: bot.isBot,
-        botType: bot.botType,
-        isTest,
-      },
-    });
-    completed += 1;
-  }
-  return completed;
+  return {
+    visitorId: visitor.id,
+    visitorHash,
+    sessionId: session.id,
+    firstTouchSource: visitor.firstTouchSource,
+    firstTouchMedium: visitor.firstTouchMedium,
+    firstTouchChannel: visitor.firstTouchChannel,
+    firstTouchCampaign: visitor.firstTouchCampaign,
+  };
 }
 
 /** Records a pseudonymous universal event and treats repeated event IDs as idempotent. */
@@ -357,17 +276,34 @@ export async function recordAnalyticsEvent(
           isTest,
         },
       });
-      const completedGoals = await recordMatchingGoals(tx, event, {
-        input,
-        identity,
-        occurredAt,
-        attribution,
-        referrer,
-        path,
-        device,
-        bot,
-        isTest,
-      });
+      const completedGoals = input.workspaceId
+        ? await GoalEngine.record(tx, event, {
+            name: input.name,
+            workspaceId: input.workspaceId,
+            userId: input.userId,
+            audienceContactId: input.audienceContactId,
+            assetType: input.assetType,
+            assetId: input.assetId,
+            elementType: input.elementType,
+            elementId: input.elementId,
+            campaignId: input.campaignId,
+            path,
+            attribution,
+            ...identity,
+            occurredAt,
+            referrer,
+            device,
+            bot,
+            isTest,
+            utm: {
+              source: input.attribution?.utmSource,
+              medium: input.attribution?.utmMedium,
+              campaign: input.attribution?.utmCampaign,
+              content: input.attribution?.utmContent,
+              term: input.attribution?.utmTerm,
+            },
+          })
+        : 0;
       return { eventId, recorded: true, duplicate: false, completedGoals };
     });
     if (!isTest) {

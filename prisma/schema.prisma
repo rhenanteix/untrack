@@ -99,6 +99,29 @@ enum WhatsappLinkStatus {
   ARCHIVED
 }
 
+enum AnalyticsGoalType {
+  LINK_CLICK
+  WHATSAPP_CLICK
+  FORM_SUBMIT
+  LEAD_CREATED
+  QR_SCAN
+  PAGE_VIEW
+  BUTTON_CLICK
+}
+
+enum AnalyticsGoalStatus {
+  ACTIVE
+  PAUSED
+  ARCHIVED
+}
+
+enum AnalyticsGoalScopeType {
+  WORKSPACE
+  CAMPAIGN
+  ASSET
+  ELEMENT
+}
+
 enum CollectionKind {
   manual
   smart
@@ -171,7 +194,7 @@ model AnalyticsEvent {
   smartCard        SmartCard?      @relation(fields: [smartCardId], references: [id], onDelete: Cascade)
   smartCardAction  SmartCardAction? @relation(fields: [smartCardActionId], references: [id], onDelete: SetNull)
   goal             AnalyticsGoal?  @relation("AnalyticsGoalCompletionEvents", fields: [goalId], references: [id], onDelete: SetNull)
-  goalEvents       AnalyticsGoalEvent[]
+  conversions      AnalyticsConversion[]
 
   @@index([name, occurredAt])
   @@index([workspaceId, occurredAt])
@@ -212,7 +235,7 @@ model AnalyticsVisitor {
   workspace         Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   sessions          AnalyticsSession[]
   events            AnalyticsEvent[]
-  goalEvents        AnalyticsGoalEvent[]
+  conversions       AnalyticsConversion[]
 
   @@unique([workspaceId, visitorHash])
   @@index([workspaceId, lastSeenAt])
@@ -234,53 +257,71 @@ model AnalyticsSession {
   workspace          Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   visitor            AnalyticsVisitor @relation(fields: [visitorId], references: [id], onDelete: Cascade)
   events             AnalyticsEvent[]
-  goalEvents         AnalyticsGoalEvent[]
+  conversions        AnalyticsConversion[]
 
   @@index([workspaceId, sessionHash, lastActivityAt])
   @@index([visitorId, startedAt])
 }
 
 model AnalyticsGoal {
-  id          String   @id @default(cuid())
-  workspaceId String
-  name        String   @db.VarChar(120)
-  description String?  @db.VarChar(500)
-  eventName   String   @db.VarChar(80)
-  assetType   String?  @db.VarChar(40)
-  assetId     String?  @db.VarChar(255)
-  active      Boolean  @default(true)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  events      AnalyticsGoalEvent[]
-  completionEvents AnalyticsEvent[] @relation("AnalyticsGoalCompletionEvents")
+  id               String                  @id @default(cuid())
+  workspaceId      String
+  name             String                  @db.VarChar(120)
+  description      String?                 @db.VarChar(500)
+  goalType         AnalyticsGoalType
+  status           AnalyticsGoalStatus     @default(ACTIVE)
+  scopeType        AnalyticsGoalScopeType  @default(WORKSPACE)
+  scopeId          String?                 @db.VarChar(255)
+  eventName        String                  @db.VarChar(80)
+  conditions       Json                    @default("{}")
+  isPrimary        Boolean                 @default(false)
+  createdAt        DateTime                @default(now())
+  updatedAt        DateTime                @updatedAt
+  workspace        Workspace               @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  conversions      AnalyticsConversion[]
+  completionEvents AnalyticsEvent[]        @relation("AnalyticsGoalCompletionEvents")
 
   @@unique([workspaceId, name])
-  @@index([workspaceId, active, eventName])
+  @@index([workspaceId, status, eventName])
+  @@index([workspaceId, scopeType, scopeId])
 }
 
-model AnalyticsGoalEvent {
-  id          String   @id @default(cuid())
-  workspaceId String
-  goalId      String
-  eventId     String
-  visitorId   String?
-  sessionId   String?
-  assetType   String?  @db.VarChar(40)
-  assetId     String?  @db.VarChar(255)
-  campaignId  String?  @db.VarChar(255)
-  occurredAt  DateTime @default(now())
-  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  goal        AnalyticsGoal @relation(fields: [goalId], references: [id], onDelete: Cascade)
-  event       AnalyticsEvent @relation(fields: [eventId], references: [id], onDelete: Cascade)
-  visitor     AnalyticsVisitor? @relation(fields: [visitorId], references: [id], onDelete: SetNull)
-  session     AnalyticsSession? @relation(fields: [sessionId], references: [id], onDelete: SetNull)
+model AnalyticsConversion {
+  id                 String   @id @default(cuid())
+  workspaceId        String
+  goalId             String
+  eventId            String
+  visitorId          String?
+  sessionId          String?
+  campaignId         String?  @db.VarChar(255)
+  assetType          String?  @db.VarChar(40)
+  assetId            String?  @db.VarChar(255)
+  source             String?  @db.VarChar(253)
+  medium             String?  @db.VarChar(120)
+  channel            String?  @db.VarChar(40)
+  firstTouchSource   String?  @db.VarChar(253)
+  firstTouchMedium   String?  @db.VarChar(120)
+  firstTouchChannel  String?  @db.VarChar(40)
+  firstTouchCampaign String?  @db.VarChar(120)
+  metadata           Json     @default("{}")
+  occurredAt         DateTime @default(now())
+  day                DateTime? @db.Date
+  isBot              Boolean  @default(false)
+  isTest             Boolean  @default(false)
+  workspace          Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  goal               AnalyticsGoal @relation(fields: [goalId], references: [id], onDelete: Cascade)
+  event              AnalyticsEvent @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  visitor            AnalyticsVisitor? @relation(fields: [visitorId], references: [id], onDelete: SetNull)
+  session            AnalyticsSession? @relation(fields: [sessionId], references: [id], onDelete: SetNull)
 
   @@unique([goalId, eventId])
   @@index([workspaceId, occurredAt])
   @@index([goalId, occurredAt])
   @@index([visitorId, occurredAt])
   @@index([sessionId, occurredAt])
+  @@index([workspaceId, source, occurredAt])
+  @@index([workspaceId, campaignId, occurredAt])
+  @@index([workspaceId, day])
 }
 
 model AnalyticsAggregate {
@@ -753,7 +794,7 @@ model Workspace {
   analyticsVisitors AnalyticsVisitor[]
   analyticsSessions AnalyticsSession[]
   analyticsGoals AnalyticsGoal[]
-  analyticsGoalEvents AnalyticsGoalEvent[]
+  analyticsConversions AnalyticsConversion[]
   analyticsAggregates AnalyticsAggregate[]
   projects Project[]
   tags Tag[]

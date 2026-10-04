@@ -4,6 +4,7 @@ import { errorResponse } from "@/lib/api-response";
 import { analyticsAssetTypes } from "@/modules/analytics/event-types";
 import {
   analyticsAssets,
+  analyticsCampaigns,
   analyticsChannels,
   analyticsJourneys,
   analyticsLocations,
@@ -16,12 +17,41 @@ import {
 import { requireActor } from "@/modules/workspaces/context";
 
 const searchSchema = z.object({
-  view: z.enum(["overview", "timeseries", "sources", "channels", "assets", "locations", "technology", "time", "journeys"]).default("overview"),
+  view: z
+    .enum([
+      "overview",
+      "timeseries",
+      "sources",
+      "channels",
+      "assets",
+      "campaigns",
+      "locations",
+      "technology",
+      "time",
+      "journeys",
+    ])
+    .default("overview"),
   from: z.coerce.date().optional(),
   to: z.coerce.date().optional(),
   assetType: z.enum(analyticsAssetTypes).optional(),
   assetId: z.string().min(1).max(255).optional(),
   campaignId: z.string().min(1).max(255).optional(),
+  goalId: z.string().min(1).max(255).optional(),
+  source: z.string().trim().min(1).max(253).optional(),
+  channel: z
+    .enum([
+      "direct",
+      "organic_search",
+      "paid_search",
+      "organic_social",
+      "paid_social",
+      "email",
+      "messaging",
+      "referral",
+      "qr",
+      "other",
+    ])
+    .optional(),
 });
 
 export async function GET(request: Request) {
@@ -35,6 +65,9 @@ export async function GET(request: Request) {
       assetType: input.assetType,
       assetId: input.assetId,
       campaignId: input.campaignId,
+      goalId: input.goalId,
+      source: input.source,
+      channel: input.channel,
     };
     const data = await {
       overview: analyticsOverview,
@@ -42,12 +75,15 @@ export async function GET(request: Request) {
       sources: analyticsSources,
       channels: analyticsChannels,
       assets: analyticsAssets,
+      campaigns: analyticsCampaigns,
       locations: analyticsLocations,
       technology: analyticsTechnology,
       time: analyticsTime,
       journeys: analyticsJourneys,
     }[input.view](actor, filters);
-    return NextResponse.json(data, { headers: { "Cache-Control": "private, no-store" } });
+    return NextResponse.json(data, {
+      headers: { "Cache-Control": "private, no-store" },
+    });
   } catch (error) {
     return errorResponse(error);
   }
