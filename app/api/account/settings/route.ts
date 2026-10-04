@@ -5,6 +5,7 @@ import { getPrisma } from "@/lib/prisma";
 import { enforceRateLimit } from "@/lib/rate-limit";
 import { enforceSameOrigin } from "@/lib/request-origin";
 import { requireUser } from "@/lib/session";
+import { getAccountAccessForUser } from "@/modules/billing/account-access";
 import { webUrlSchema } from "@/modules/validation/url-validation";
 import {
   actorFor,
@@ -38,7 +39,7 @@ const workspaceSchema = z
   })
   .strict();
 
-const settingsSchema = z
+export const settingsSchema = z
   .object({
     profile: profileSchema.optional(),
     workspace: workspaceSchema.optional(),
@@ -61,21 +62,24 @@ const workspaceSelect = {
   timezone: true,
   locale: true,
   notifications: true,
-  plan: true,
 } as const;
 
 export async function GET(request: Request) {
   try {
     const user = await requireUser(request);
     const actor = await actorFor(user.id, request.headers);
-    const workspace = await getPrisma().workspace.findUniqueOrThrow({
-      where: { id: actor.workspaceId },
-      select: workspaceSelect,
-    });
+    const [workspace, access] = await Promise.all([
+      getPrisma().workspace.findUniqueOrThrow({
+        where: { id: actor.workspaceId },
+        select: workspaceSelect,
+      }),
+      getAccountAccessForUser(user.id),
+    ]);
     return NextResponse.json(
       {
         profile: { name: user.name, email: user.email, image: user.image },
         workspace,
+        access,
         canManage: actor.role === "owner" || actor.role === "admin",
       },
       { headers: { "Cache-Control": "private, no-store" } },

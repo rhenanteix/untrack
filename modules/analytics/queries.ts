@@ -1,5 +1,6 @@
 import { Prisma } from "@prisma/client";
 import { getPrisma } from "@/lib/prisma";
+import { getAccountAccessForUser } from "@/modules/billing/account-access";
 import { canUse, getAnalyticsHistoryDays } from "@/modules/billing/entitlements";
 import type { Actor } from "@/modules/workspaces/context";
 import type { AnalyticsAssetType } from "./event-types";
@@ -49,11 +50,8 @@ function endOfDay(value: Date) {
 }
 
 async function resolveFilters(actor: Actor, filters: AnalyticsFilters) {
-  const workspace = await getPrisma().workspace.findUniqueOrThrow({
-    where: { id: actor.workspaceId },
-    select: { plan: true },
-  });
-  const historyDays = getAnalyticsHistoryDays(workspace.plan);
+  const access = await getAccountAccessForUser(actor.userId);
+  const historyDays = getAnalyticsHistoryDays(access);
   const today = startOfDay(new Date());
   const earliest = new Date(today);
   earliest.setUTCDate(earliest.getUTCDate() - historyDays + 1);
@@ -64,7 +62,7 @@ async function resolveFilters(actor: Actor, filters: AnalyticsFilters) {
     from: requestedFrom < earliest ? earliest : requestedFrom,
     to: requestedTo,
     historyDays,
-    advancedAnalytics: canUse(workspace.plan, "advancedAnalytics"),
+    advancedAnalytics: canUse(access, "advancedAnalytics"),
   } satisfies ResolvedFilters;
 }
 

@@ -12,12 +12,12 @@ export async function createQrAsset(actor: Actor, raw: unknown) {
   const slug = randomBytes(12).toString("base64url");
   const encodedUrl = input.mode === "static" ? input.url : new URL(`/q/${slug}`, appUrl()).href;
   const rendered = await renderVerifiedQr(encodedUrl, input.visual);
-  const qr = await workspaceTransaction(actor, "write", async (tx, plan) => {
+  const qr = await workspaceTransaction(actor, "write", async (tx, access) => {
     await assertReferences(tx, actor.workspaceId, { campaignId: input.campaignId });
-    await reserveQuota(tx, actor.workspaceId, plan, "qrCodes");
+    await reserveQuota(tx, actor.workspaceId, access, "qrCodes");
     let redirectId: string | undefined;
     if (input.mode === "dynamic") {
-      await reserveQuota(tx, actor.workspaceId, plan, "dynamicQr");
+      await reserveQuota(tx, actor.workspaceId, access, "dynamicQr");
       const distribution = await tx.shortLink.create({ data: { userId: actor.userId, workspaceId: actor.workspaceId, slug, domainKey: "platform", distribution: "qr", destinationUrl: input.url, title: input.name, campaignId: input.campaignId } });
       redirectId = distribution.id;
     }

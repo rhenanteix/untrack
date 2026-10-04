@@ -1,6 +1,6 @@
-import type { Plan } from "@prisma/client";
 import { ApiError } from "@/lib/api-response";
-export type PlanType = Plan;
+import type { AccountAccess } from "./account-access";
+export type PlanType = AccountAccess["basePlan"];
 
 export const LINKOR_PREMIUM_PLAN = {
   name: "LinkOr Premium",
@@ -17,15 +17,15 @@ export const premiumPrice = new Intl.NumberFormat("pt-BR", {
 export const SMART_PAGES_PRODUCT = LINKOR_PREMIUM_PLAN;
 export const smartPagesPrice = premiumPrice;
 
-export function isPremium(plan: Plan) {
-  return plan === "premium";
+export function isPremium(access: Pick<AccountAccess, "effectivePlan">) {
+  return access.effectivePlan === "premium";
 }
 
-export function requirePremium(plan: Plan) {
-  if (!isPremium(plan))
+export function requirePremium(access: Pick<AccountAccess, "effectivePlan">) {
+  if (!isPremium(access))
     throw new ApiError(
       403,
       "PREMIUM_REQUIRED",
-      "Este recurso faz parte do LinkOr Premium. A cobrança ainda não está disponível; consulte o plano do workspace.",
+      "Este recurso faz parte do LinkOr Premium. Seu período de teste pode ter terminado; conheça o plano Premium para continuar.",
     );
 }

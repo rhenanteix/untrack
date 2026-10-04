@@ -8,38 +8,28 @@ const db = new PrismaClient();
 async function main() {
   const email = process.argv[2];
   if (!email) {
-    const workspaces = await db.workspace.findMany({
-      include: { members: { include: { user: true } } },
-    });
+    const users = await db.user.findMany({ orderBy: { email: "asc" } });
     console.log("Uso: node scripts/grant-premium.mjs <email>");
-    console.log("Workspaces disponíveis:");
-    for (const ws of workspaces) {
-      for (const m of ws.members) {
-        console.log(`  ${m.user.email}  =>  ${ws.id}  (${ws.plan})`);
-      }
-    }
+    console.log("Contas disponíveis:");
+    for (const user of users) console.log(`  ${user.email}  (${user.plan})`);
     await db.$disconnect();
     return;
   }
 
-  const membership = await db.workspaceMember.findFirst({
-    where: { user: { email } },
-    include: { workspace: true },
-  });
-
-  if (!membership) {
+  const user = await db.user.findUnique({ where: { email } });
+  if (!user) {
     console.log(`Usuário ${email} não encontrado.`);
     await db.$disconnect();
     process.exit(1);
   }
 
-  const updated = await db.workspace.update({
-    where: { id: membership.workspaceId },
-    data: { plan: "pro" },
+  const updated = await db.user.update({
+    where: { id: user.id },
+    data: { plan: "premium" },
   });
 
   console.log(
-    `Workspace ${updated.id} de ${email} atualizado para plano: ${updated.plan}`,
+    `Conta ${updated.id} de ${email} atualizada para plano: ${updated.plan}`,
   );
   await db.$disconnect();
 }

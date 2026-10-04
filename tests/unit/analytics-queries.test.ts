@@ -11,7 +11,7 @@ describe("analytics overview", () => {
     const count = vi.fn().mockResolvedValue(3);
     const groupBy = vi.fn().mockResolvedValue([]);
     vi.mocked(getPrisma).mockReturnValue({
-      workspace: { findUniqueOrThrow: vi.fn().mockResolvedValue({ plan: "free" }) },
+      user: { findUniqueOrThrow: vi.fn().mockResolvedValue({ plan: "free", trial: null }) },
       analyticsEvent: { count, groupBy },
     } as unknown as ReturnType<typeof getPrisma>);
 

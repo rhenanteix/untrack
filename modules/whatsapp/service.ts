@@ -181,7 +181,7 @@ export async function createWhatsappLink(actor: Actor, raw: unknown) {
   const input = createWhatsappLinkSchema.parse(raw);
   const phoneNumber = normalizeWhatsAppPhone(input.phoneNumber);
   const message = validateWhatsAppMessage(input.message);
-  const link = await workspaceTransaction(actor, "write", async (tx, plan) => {
+  const link = await workspaceTransaction(actor, "write", async (tx, access) => {
     await assertReferences(tx, actor.workspaceId, { campaignId: input.campaignId });
     await assertProject(tx, actor.workspaceId, input.projectId);
     if (!input.allowDuplicate)
@@ -193,8 +193,8 @@ export async function createWhatsappLink(actor: Actor, raw: unknown) {
         input.campaignId,
       );
     const slug = await availableSlug(tx);
-    await reserveQuota(tx, actor.workspaceId, plan, "whatsappLinks");
-    await reserveQuota(tx, actor.workspaceId, plan, "shortLinks");
+    await reserveQuota(tx, actor.workspaceId, access, "whatsappLinks");
+    await reserveQuota(tx, actor.workspaceId, access, "shortLinks");
     const smartLink = await tx.shortLink.create({
       data: {
         userId: actor.userId,
@@ -244,7 +244,7 @@ export async function createWhatsappLink(actor: Actor, raw: unknown) {
 
 export async function updateWhatsappLink(actor: Actor, id: string, raw: unknown) {
   const input = updateWhatsappLinkSchema.parse(raw);
-  const result = await workspaceTransaction(actor, "write", async (tx, plan) => {
+  const result = await workspaceTransaction(actor, "write", async (tx, access) => {
     const before = await tx.whatsappLink.findFirst({
       where: { id, workspaceId: actor.workspaceId },
       include: { smartLink: true },
@@ -264,7 +264,7 @@ export async function updateWhatsappLink(actor: Actor, id: string, raw: unknown)
       await assertNoDuplicate(tx, actor.workspaceId, phoneNumber, message, campaignId, id);
     const status = input.status ?? before.status;
     if (before.status === "ARCHIVED" && status !== "ARCHIVED")
-      await reserveQuota(tx, actor.workspaceId, plan, "whatsappLinks");
+      await reserveQuota(tx, actor.workspaceId, access, "whatsappLinks");
     if (before.status !== "ARCHIVED" && status === "ARCHIVED")
       await releaseQuota(tx, actor.workspaceId, "whatsappLinks");
     const link = await tx.whatsappLink.update({

@@ -4,6 +4,7 @@ import { appUrl } from "@/lib/app-url";
 import { track } from "@/lib/analytics";
 import { getPrisma } from "@/lib/prisma";
 import { recordAnalyticsEvent } from "@/modules/analytics/service";
+import { getAccountAccess } from "@/modules/billing/account-access";
 import { PAGE_SIZE } from "@/lib/pagination";
 import { createQrAsset } from "@/modules/untrack-qr/service";
 import { exportQr, renderVerifiedQr } from "@/modules/untrack-qr/render";
@@ -127,9 +128,9 @@ export async function createSmartCard(actor: Actor, raw: unknown) {
     const card = await workspaceTransaction(
       actor,
       "write",
-      async (tx, plan) => {
+      async (tx, access) => {
         await assertReferences(tx, actor.workspaceId, { campaignId });
-        await reserveQuota(tx, actor.workspaceId, plan, "smartCards");
+        await reserveQuota(tx, actor.workspaceId, access, "smartCards");
         const card = await tx.smartCard.create({
           data: {
             ...cardData,
@@ -451,14 +452,26 @@ export async function captureSmartCardContact(
         },
       });
     } else {
-      const workspace = await tx.workspace.findUniqueOrThrow({
-        where: { id: card.workspaceId },
-        select: { plan: true },
+      await tx.$queryRaw`SELECT "id" FROM "User" WHERE "id" = ${card.ownerId} FOR UPDATE`;
+      const owner = await tx.user.findUniqueOrThrow({
+        where: { id: card.ownerId },
+        select: {
+          plan: true,
+          trial: {
+            select: {
+              status: true,
+              startedAt: true,
+              expiresAt: true,
+              usedAt: true,
+              cancelledAt: true,
+            },
+          },
+        },
       });
       await reserveQuota(
         tx,
         card.workspaceId,
-        workspace.plan,
+        getAccountAccess(owner),
         "audienceContacts",
       );
       saved = await tx.audienceContact.create({

@@ -502,12 +502,14 @@ test("live card customization, upload isolation, reorder and downgrade", async (
     fullPage: true,
   });
   const workspace = await (await context.request.get("/api/workspaces")).json();
-  await testDatabase((db) =>
-    db.workspace.update({
-      where: { id: workspace.activeId },
-      data: { plan: "free" },
-    }),
-  );
+  await testDatabase(async (db) => {
+    const owner = await db.workspaceMember.findFirst({
+      where: { workspaceId: workspace.activeId, role: "owner" },
+      select: { userId: true },
+    });
+    if (!owner) throw new Error("Workspace de teste sem owner.");
+    await db.user.update({ where: { id: owner.userId }, data: { plan: "free" } });
+  });
   expect(
     (
       await context.request.patch(`/api/smart-pages/${record.id}`, {

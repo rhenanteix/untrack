@@ -7,6 +7,7 @@ import { WorkspaceLoadError } from "@/components/untrack/load-error";
 import { workspaceLoadError } from "@/modules/workspaces/load-error";
 import { DashboardEventTracker } from "@/components/untrack/dashboard-event-tracker";
 import { DashboardHome } from "@/components/untrack/dashboard-home";
+import { getAccountAccessForUser } from "@/modules/billing/account-access";
 export const metadata = {
   title: "Visão geral",
   robots: { index: false, follow: false },
@@ -171,18 +172,22 @@ export default async function AccountPage({
   const requestHeaders = await headers();
   const session = await sessionFromHeaders(requestHeaders);
   if (!session) redirect("/entrar?next=/conta");
-  const data = await overview(session.user.id, requestHeaders, days);
+  const [data, access] = await Promise.all([
+    overview(session.user.id, requestHeaders, days),
+    getAccountAccessForUser(session.user.id),
+  ]);
   if (!data.ok) return <WorkspaceLoadError {...data.error} />;
   const canWrite = data.actor.role !== "viewer";
   const series = clickSeries(days, data.clickDays);
   const userName = session.user.name.trim().split(/\s+/, 1)[0] || "por aqui";
   return (
     <>
-      <DashboardEventTracker />
+      <DashboardEventTracker access={access} />
       <DashboardHome
         canWrite={canWrite}
         greeting={greeting()}
         userName={userName}
+        access={access}
         days={days}
         assets={{
           links: data.links,

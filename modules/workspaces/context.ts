@@ -3,6 +3,10 @@ import { getPrisma } from "@/lib/prisma";
 import { ApiError } from "@/lib/api-response";
 import { requireUser } from "@/lib/session";
 import {
+  getAccountAccess,
+  type AccountAccess,
+} from "@/modules/billing/account-access";
+import {
   assertPermission,
   PLAN_LIMITS,
   type Permission,
@@ -83,7 +87,7 @@ export async function workspaceTransaction<T>(
   permission: Permission,
   work: (
     tx: Prisma.TransactionClient,
-    plan: keyof typeof PLAN_LIMITS,
+    access: AccountAccess,
   ) => Promise<T>,
 ): Promise<T> {
   return getPrisma().$transaction(
@@ -105,10 +109,23 @@ export async function workspaceTransaction<T>(
           "Associação ao workspace não encontrada.",
         );
       assertPermission(member.role, permission);
-      const workspace = await tx.workspace.findUniqueOrThrow({
-        where: { id: actor.workspaceId },
+      await tx.$queryRaw`SELECT "id" FROM "User" WHERE "id" = ${actor.userId} FOR UPDATE`;
+      const account = await tx.user.findUniqueOrThrow({
+        where: { id: actor.userId },
+        select: {
+          plan: true,
+          trial: {
+            select: {
+              status: true,
+              startedAt: true,
+              expiresAt: true,
+              usedAt: true,
+              cancelledAt: true,
+            },
+          },
+        },
       });
-      return work(tx, workspace.plan);
+      return work(tx, getAccountAccess(account));
     },
     { maxWait: 15000, timeout: 15000 },
   );
@@ -116,12 +133,13 @@ export async function workspaceTransaction<T>(
 export async function reserveQuota(
   tx: Prisma.TransactionClient,
   workspaceId: string,
-  plan: keyof typeof PLAN_LIMITS,
+  access: Pick<AccountAccess, "effectivePlan">,
   resource: Resource,
   quantity = 1,
 ) {
   if (!Number.isSafeInteger(quantity) || quantity < 0)
     throw new Error("Invalid quota quantity");
+  const plan = access.effectivePlan;
   await tx.workspaceUsage.upsert({
     where: { workspaceId_resource: { workspaceId, resource } },
     update: {},

@@ -34,13 +34,20 @@ import { SignOutButton } from "@/components/sign-out-button";
 import { BrandLogo } from "@/components/brand-logo";
 import { authClient } from "@/lib/client/auth";
 import { analytics } from "@/lib/client/analytics";
+import type { AccountAccess } from "@/modules/billing/account-access";
 import { ActionStatus, apiRequest, useAction } from "./shared";
 import { CreateLauncher } from "./create-launcher";
 
 interface Membership {
   role: string;
-  workspace: { id: string; name: string; plan: string };
+  workspace: { id: string; name: string };
 }
+
+type WorkspaceResponse = {
+  items: Membership[];
+  activeId: string | null;
+  access: AccountAccess;
+};
 
 type NavigationItem = { href: string; label: string; icon: IconType };
 type NavigationGroup = { label: string; items: NavigationItem[] };
@@ -80,11 +87,6 @@ const groups: NavigationGroup[] = [
   },
 ];
 
-const planNames: Record<string, string> = {
-  free: "Plano Free",
-  premium: "Premium",
-};
-
 const WorkspaceContext = createContext<Membership | undefined>(undefined);
 
 export function useWorkspace() {
@@ -100,6 +102,13 @@ function initials(name: string) {
       .join("")
       .toUpperCase() || "UT"
   );
+}
+
+function accountLabel(access: AccountAccess | null) {
+  if (!access) return "";
+  if (access.accessSource === "trial")
+    return `Teste Premium · ${access.daysRemaining ?? 0} ${access.daysRemaining === 1 ? "dia" : "dias"}`;
+  return access.basePlan === "premium" ? "Premium" : "Plano Free";
 }
 
 function subscribeToSidebarPreference(listener: () => void) {
@@ -139,7 +148,6 @@ function WorkspaceSwitcher({
         </span>
         <span className="workspace-switcher-copy">
           <strong>{current?.workspace.name ?? "Seu workspace"}</strong>
-          <small>{current ? planNames[current.workspace.plan] : ""}</small>
         </span>
         <FiChevronDown
           className="workspace-switcher-chevron"
@@ -159,7 +167,6 @@ function WorkspaceSwitcher({
             >
               <span>
                 <strong>{item.workspace.name}</strong>
-                <small>{planNames[item.workspace.plan]}</small>
               </span>
               {item.workspace.id === active ? (
                 <span
@@ -214,7 +221,7 @@ function UserMenu({ name, plan }: { name: string; plan: string }) {
       <div className="workspace-user-popover">
         <Link href="/settings/account">Minha conta</Link>
         <Link
-          href="/upgrade"
+          href="/settings/plan"
           onClick={() => analytics.track("upgrade_clicked")}
         >
           Meu plano
@@ -231,6 +238,7 @@ function UserMenu({ name, plan }: { name: string; plan: string }) {
 export function WorkspaceShell({ children }: { children: ReactNode }) {
   const [memberships, setMemberships] = useState<Membership[]>([]);
   const [active, setActive] = useState<string | null>(null);
+  const [access, setAccess] = useState<AccountAccess | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [openedAt, setOpenedAt] = useState<string | null>(null);
@@ -250,12 +258,10 @@ export function WorkspaceShell({ children }: { children: ReactNode }) {
     setLoading(true);
     setError("");
     try {
-      const data = await apiRequest<{
-        items: Membership[];
-        activeId: string | null;
-      }>("/api/workspaces");
+      const data = await apiRequest<WorkspaceResponse>("/api/workspaces");
       setMemberships(data.items);
       setActive(data.activeId);
+      setAccess(data.access);
     } catch (loadError) {
       setError(
         loadError instanceof Error
@@ -269,14 +275,12 @@ export function WorkspaceShell({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     const controller = new AbortController();
-    apiRequest<{ items: Membership[]; activeId: string | null }>(
-      "/api/workspaces",
-      { signal: controller.signal },
-    )
+    apiRequest<WorkspaceResponse>("/api/workspaces", { signal: controller.signal })
       .then((data) => {
         if (!controller.signal.aborted) {
           setMemberships(data.items);
           setActive(data.activeId);
+          setAccess(data.access);
         }
       })
       .catch((loadError: Error) => {
@@ -354,7 +358,7 @@ export function WorkspaceShell({ children }: { children: ReactNode }) {
   }
 
   const canWrite = current ? current.role !== "viewer" : false;
-  const plan = current ? planNames[current.workspace.plan] : "";
+  const plan = accountLabel(access);
 
   return (
     <WorkspaceContext.Provider value={current}>
@@ -474,7 +478,7 @@ export function WorkspaceShell({ children }: { children: ReactNode }) {
               </div>
             ))}
           </nav>
-          {current?.workspace.plan === "free" ? (
+          {access?.effectivePlan === "free" ? (
             <Link className="workspace-premium-card" href="/upgrade">
               <strong>LinkOr Premium</strong>
               <span>Analytics avançado, domínio próprio e muito mais.</span>

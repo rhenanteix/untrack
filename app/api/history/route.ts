@@ -43,11 +43,11 @@ export async function POST(request: Request) {
     const actor = await requireActor(request);
     await enforceRateLimit(request, `history:${actor.userId}`);
     const input = historyImportSchema.parse(await readJson(request));
-    const result = await workspaceTransaction(actor, "write", async (tx, plan) => {
+    const result = await workspaceTransaction(actor, "write", async (tx, access) => {
       const existing = await tx.linkHistory.findMany({ where: { workspaceId: actor.workspaceId, userId: actor.userId, importKey: { in: input.items.map((item) => item.id) } }, select: { importKey: true } });
       const keys = new Set(existing.map((item) => item.importKey));
       const fresh = input.items.filter((item) => { if (keys.has(item.id)) return false; keys.add(item.id); return true; });
-      await reserveQuota(tx, actor.workspaceId, plan, "history", fresh.length);
+      await reserveQuota(tx, actor.workspaceId, access, "history", fresh.length);
       const result = await tx.linkHistory.createMany({ data: fresh.map((item) => ({ workspaceId: actor.workspaceId, userId: actor.userId, importKey: item.id, originalUrl: item.originalUrl, resultUrl: item.cleanUrl, kind: "clean", createdAt: new Date(item.createdAt) })) });
       await audit(tx, actor, "history.imported", actor.workspaceId, { count: result.count });
       return result;

@@ -7,8 +7,8 @@ export async function saveCloudHistory(request: Request, originalUrl: string, re
   enforceSameOrigin(request);
   const actor = await actorFor(session.user.id, request.headers);
   if (actor.role === "viewer") return false;
-  await workspaceTransaction(actor, "write", async (tx, plan) => {
-    await reserveQuota(tx, actor.workspaceId, plan, "history");
+  await workspaceTransaction(actor, "write", async (tx, access) => {
+    await reserveQuota(tx, actor.workspaceId, access, "history");
     const history = await tx.linkHistory.create({ data: { userId: actor.userId, workspaceId: actor.workspaceId, originalUrl, resultUrl, kind } });
     await audit(tx, actor, "history.created", history.id, { kind });
   });

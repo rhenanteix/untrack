@@ -396,10 +396,10 @@ export async function getCampaign(actor: Actor, id: string) {
 }
 
 export async function createCampaign(actor: Actor, input: CreateCampaignInput) {
-  const campaign = await workspaceTransaction(actor, "write", async (tx, plan) => {
+  const campaign = await workspaceTransaction(actor, "write", async (tx, access) => {
     const data = createCampaignSchema.parse(input);
     await assertCampaignInputReferences(tx, actor.workspaceId, data);
-    await reserveQuota(tx, actor.workspaceId, plan, "campaigns");
+    await reserveQuota(tx, actor.workspaceId, access, "campaigns");
     const campaign = await tx.campaign.create({
       data: { ...data, workspaceId: actor.workspaceId },
       include: { client: true, responsible: true },
@@ -419,9 +419,9 @@ export async function createCampaignFromBuilder(
   raw: CampaignBuilderInput,
 ) {
   const input = campaignBuilderSchema.parse(raw);
-  return workspaceTransaction(actor, "write", async (tx, plan) => {
+  return workspaceTransaction(actor, "write", async (tx, access) => {
     await assertCampaignInputReferences(tx, actor.workspaceId, input);
-    await reserveQuota(tx, actor.workspaceId, plan, "campaigns");
+    await reserveQuota(tx, actor.workspaceId, access, "campaigns");
     const campaign = await tx.campaign.create({
       data: {
         workspaceId: actor.workspaceId,

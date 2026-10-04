@@ -13,10 +13,15 @@ export async function testDatabase<T>(
   }
 }
 export async function grantTestPremium(workspaceId: string) {
-  await testDatabase((db) =>
-    db.workspace.update({
-      where: { id: workspaceId },
+  await testDatabase(async (db) => {
+    const owner = await db.workspaceMember.findFirst({
+      where: { workspaceId, role: "owner" },
+      select: { userId: true },
+    });
+    if (!owner) throw new Error("Workspace de teste sem owner.");
+    await db.user.update({
+      where: { id: owner.userId },
       data: { plan: "premium" },
-    }),
-  );
+    });
+  });
 }

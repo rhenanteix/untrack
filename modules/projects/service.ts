@@ -86,9 +86,9 @@ export async function getProject(actor: Actor, id: string) {
 
 export async function createProject(actor: Actor, raw: unknown) {
   const input = createProjectSchema.parse(raw);
-  return workspaceTransaction(actor, "write", async (tx, plan) => {
+  return workspaceTransaction(actor, "write", async (tx, access) => {
     const slug = await availableSlug(tx, actor.workspaceId, input.name);
-    await reserveQuota(tx, actor.workspaceId, plan, "projects");
+    await reserveQuota(tx, actor.workspaceId, access, "projects");
     const project = await tx.project.create({
       data: { ...input, slug, workspaceId: actor.workspaceId },
       include: { _count: { select: { resources: true } } },

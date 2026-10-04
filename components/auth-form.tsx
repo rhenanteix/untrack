@@ -6,13 +6,16 @@ import { useRouter } from "next/navigation";
 import { BrandLogo } from "@/components/brand-logo";
 import { authClient } from "@/lib/client/auth";
 import { analytics } from "@/lib/client/analytics";
+import { apiRequest } from "@/lib/client/api";
 
 export function AuthForm({
   mode,
   returnTo,
+  startTrial = false,
 }: {
   mode: "login" | "register";
   returnTo: string;
+  startTrial?: boolean;
 }) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
@@ -50,7 +53,15 @@ export function AuthForm({
         );
       }
       if (register) analytics.track("signup_completed");
-      router.replace(register ? `/onboarding?next=${encodeURIComponent(returnTo)}` : returnTo);
+      if (register && startTrial) {
+        await apiRequest("/api/account/trial", { method: "POST" });
+        analytics.track("trial_started");
+      }
+      router.replace(
+        register
+          ? `/onboarding?next=${encodeURIComponent(returnTo)}${startTrial ? "&trial=started" : ""}`
+          : returnTo,
+      );
       router.refresh();
     } catch (cause) {
       setError(

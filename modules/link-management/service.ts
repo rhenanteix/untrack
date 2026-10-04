@@ -13,11 +13,11 @@ export async function createManagedLink(actor: Actor, raw: unknown) {
   if (input.expiresAt && new Date(input.expiresAt) <= new Date()) throw new ApiError(400, "INVALID_EXPIRATION", "A expiração deve estar no futuro.");
   for (let attempt = 0; attempt < 5; attempt++) {
     try {
-      const link = await workspaceTransaction(actor, "write", async (tx, plan) => {
+      const link = await workspaceTransaction(actor, "write", async (tx, access) => {
         await assertReferences(tx, actor.workspaceId, { folderId: input.folderId, campaignId: input.campaignId });
         const domain = input.domainId ? await tx.customDomain.findFirst({ where: { id: input.domainId, workspaceId: actor.workspaceId, status: "active" } }) : null;
         if (input.domainId && !domain) throw new ApiError(422, "DOMAIN_NOT_ACTIVE", "Domínio não está ativo neste workspace.");
-        await reserveQuota(tx, actor.workspaceId, plan, "shortLinks");
+        await reserveQuota(tx, actor.workspaceId, access, "shortLinks");
         const link = await tx.shortLink.create({ data: { userId: actor.userId, workspaceId: actor.workspaceId, slug: input.slug ?? randomBytes(8).toString("base64url").slice(0, 10), domainKey: domain?.hostname ?? "platform", destinationUrl: input.url, title: input.title, description: input.description, expiresAt: input.expiresAt ? new Date(input.expiresAt) : null, tags: input.tags, folderId: input.folderId, campaignId: input.campaignId } });
         await audit(tx, actor, "shortLink.created", link.id, { destinationUrl: link.destinationUrl, slug: link.slug });
         return link;

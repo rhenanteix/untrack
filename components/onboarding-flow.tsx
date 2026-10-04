@@ -43,7 +43,13 @@ function socialUrl(option: { prefix: string }, value: string) {
     : `https://${value}`;
 }
 
-export function OnboardingFlow({ returnTo }: { returnTo: string }) {
+export function OnboardingFlow({
+  returnTo,
+  trialStarted = false,
+}: {
+  returnTo: string;
+  trialStarted?: boolean;
+}) {
   const router = useRouter();
   const [step, setStep] = useState<1 | 2>(1);
   const [firstAction, setFirstAction] = useState<FirstAction | null>(null);
@@ -96,6 +102,7 @@ export function OnboardingFlow({ returnTo }: { returnTo: string }) {
       {step === 1 ? (
         <>
           <span className="eyebrow">Bem-vindo ao LinkOr</span>
+          {trialStarted ? <p className="status-success" role="status">Seu teste Premium começou. Você tem 30 dias para explorar todos os recursos.</p> : null}
           <h1 id="onboarding-title">O que você quer fazer primeiro?</h1>
           <p>Escolha um ativo para começar. Você poderá criar os outros depois.</p>
           <div className="onboarding-goals">

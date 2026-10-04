@@ -288,11 +288,14 @@ model User {
   email         String        @unique
   emailVerified Boolean       @default(false)
   image         String?
+  plan          Plan          @default(free)
   onboarding    Json          @default("{}")
   createdAt     DateTime      @default(now())
   updatedAt     DateTime      @updatedAt
   sessions      Session[]
   accounts      Account[]
+  subscriptions UserSubscription[]
+  trial         UserTrial?
   links         ShortLink[]
   history       LinkHistory[]
   memberships   WorkspaceMember[]
@@ -646,6 +649,54 @@ enum Plan {
   premium
 }
 
+enum TrialStatus {
+  none
+  active
+  expired
+  cancelled
+}
+
+enum SubscriptionStatus {
+  pending
+  active
+  past_due
+  cancelled
+  expired
+}
+
+model UserSubscription {
+  id                     String             @id @default(cuid())
+  userId                 String
+  plan                   Plan
+  status                 SubscriptionStatus @default(pending)
+  provider               String?            @db.VarChar(80)
+  providerCustomerId     String?            @db.VarChar(255)
+  providerSubscriptionId String?            @unique @db.VarChar(255)
+  startedAt              DateTime?          @db.Timestamptz(3)
+  currentPeriodEnd       DateTime?          @db.Timestamptz(3)
+  cancelledAt            DateTime?          @db.Timestamptz(3)
+  createdAt              DateTime           @default(now())
+  updatedAt              DateTime           @updatedAt
+  user                   User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, status])
+}
+
+model UserTrial {
+  id          String      @id @default(cuid())
+  userId      String      @unique
+  status      TrialStatus @default(none)
+  startedAt   DateTime?    @db.Timestamptz(3)
+  expiresAt   DateTime?    @db.Timestamptz(3)
+  usedAt      DateTime?    @db.Timestamptz(3)
+  cancelledAt DateTime?    @db.Timestamptz(3)
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+  user        User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([status, expiresAt])
+}
+
 model Workspace {
   id String @id @default(cuid())
   name String @db.VarChar(120)
@@ -654,7 +705,6 @@ model Workspace {
   timezone String @default("America/Sao_Paulo") @db.VarChar(80)
   locale String @default("pt-BR") @db.VarChar(12)
   notifications Json @default("{}")
-  plan Plan @default(free)
   governance Json @default("{}")
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

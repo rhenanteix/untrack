@@ -6,15 +6,19 @@ import { getPrisma } from "@/lib/prisma";
 import { ApiError, errorResponse, readJson } from "@/lib/api-response";
 import { enforceSameOrigin } from "@/lib/request-origin";
 import { enforceRateLimit } from "@/lib/rate-limit";
+import { getAccountAccessForUser } from "@/modules/billing/account-access";
 import { actorFor, ensurePersonalWorkspace } from "@/modules/workspaces/context";
 export async function GET(request: Request) {
   try {
     const user = await requireUser(request);
     await ensurePersonalWorkspace(user.id);
-    const items = await getPrisma().workspaceMember.findMany({ where: { userId: user.id }, include: { workspace: { select: { id: true, name: true, plan: true } } }, orderBy: { createdAt: "asc" } });
+    const [items, access] = await Promise.all([
+      getPrisma().workspaceMember.findMany({ where: { userId: user.id }, include: { workspace: { select: { id: true, name: true } } }, orderBy: { createdAt: "asc" } }),
+      getAccountAccessForUser(user.id),
+    ]);
     let activeId: string | null = null;
     try { activeId = (await actorFor(user.id, request.headers)).workspaceId; } catch { /* Removed membership: allow selecting a remaining workspace. */ }
-    return NextResponse.json({ items, activeId }, { headers: { "Cache-Control": "private, no-store" } });
+    return NextResponse.json({ items, activeId, access }, { headers: { "Cache-Control": "private, no-store" } });
   } catch (error) { return errorResponse(error); }
 }
 export async function POST(request: Request) {

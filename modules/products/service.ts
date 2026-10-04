@@ -87,9 +87,9 @@ export async function getProduct(actor: Actor, id: string) {
 export async function createProduct(actor: Actor, raw: unknown) {
   const input = productInputSchema.parse(raw);
   try {
-    return await workspaceTransaction(actor, "write", async (tx, plan) => {
-      requirePremium(plan);
-      await reserveQuota(tx, actor.workspaceId, plan, "products");
+    return await workspaceTransaction(actor, "write", async (tx, access) => {
+      requirePremium(access);
+      await reserveQuota(tx, actor.workspaceId, access, "products");
       const product = await tx.product.create({
         data: { ...productData(input), workspaceId: actor.workspaceId },
       });
@@ -108,8 +108,8 @@ export async function updateProduct(actor: Actor, id: string, raw: unknown) {
   const input = productUpdateSchema.parse(raw);
   const { images, metadata, ...productFields } = input;
   try {
-    return await workspaceTransaction(actor, "write", async (tx, plan) => {
-      requirePremium(plan);
+    return await workspaceTransaction(actor, "write", async (tx, access) => {
+      requirePremium(access);
       const existing = await tx.product.findFirst({
         where: { id, workspaceId: actor.workspaceId },
       });

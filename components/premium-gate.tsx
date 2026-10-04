@@ -4,16 +4,19 @@ import Link from "next/link";
 import { useState } from "react";
 import { FiLock, FiX } from "react-icons/fi";
 import { analytics } from "@/lib/client/analytics";
+import type { AccountAccess } from "@/modules/billing/account-access";
 
 type PremiumGateProps = {
   feature: string;
   description: string;
+  trialStatus?: AccountAccess["trialStatus"];
   children?: React.ReactNode;
 };
 
 export function PremiumGate({
   feature,
   description,
+  trialStatus,
   children,
 }: PremiumGateProps) {
   const [open, setOpen] = useState(false);
@@ -47,7 +50,7 @@ export function PremiumGate({
             </button>
             <span className="eyebrow">Recurso Premium</span>
             <h2 id="premium-gate-title">{feature}</h2>
-            <p>{description}</p>
+            <p>{trialStatus === "expired" ? "Seu período de teste terminou. Faça upgrade para continuar utilizando este recurso." : description}</p>
             <p>Disponível no LinkOr Premium por R$29,90/mês.</p>
             <div className="premium-gate-actions">
               <Link href="/upgrade" onClick={() => analytics.track("upgrade_clicked")}>

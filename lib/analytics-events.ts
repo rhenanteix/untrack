@@ -74,8 +74,18 @@ export const ANALYTICS_EVENTS = [
   "upgrade_clicked",
   "upgrade_viewed",
   "premium_feature_clicked",
+  "trial_started",
+  "trial_feature_used",
+  "trial_7_days_remaining",
+  "trial_3_days_remaining",
+  "trial_expired",
+  "trial_feature_used",
+  "trial_7_days_remaining",
+  "trial_3_days_remaining",
+  "trial_expired",
   "checkout_started",
   "subscription_started",
+  "premium_subscription_started",
 ] as const;
 
 export type AnalyticsEventName = (typeof ANALYTICS_EVENTS)[number];
@@ -117,6 +127,7 @@ export const CLIENT_ANALYTICS_EVENTS = [
   "upgrade_clicked",
   "upgrade_viewed",
   "premium_feature_clicked",
+  "trial_started",
 ] as const satisfies ReadonlyArray<AnalyticsEventName>;
 
 export const ANALYTICS_PATHS = [
@@ -146,6 +157,8 @@ export const ANALYTICS_PATHS = [
   "/untrack/link-health",
   "/untrack/usage",
   "/upgrade",
+  "/teste-premium",
+  "/settings/plan",
   "/onboarding",
   "/entrar",
   "/cadastro",

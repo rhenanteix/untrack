@@ -12,9 +12,9 @@ export const domainSchema = z.object({ hostname: z.string().trim().toLowerCase()
 export async function createDomain(actor: Actor, raw: unknown) {
   const input = domainSchema.parse(raw);
   if (input.hostname === appUrl().hostname) throw new ApiError(400, "RESERVED_DOMAIN", "O domínio da aplicação já é gerenciado pela plataforma.");
-  return workspaceTransaction(actor, "manage", async (tx, plan) => {
+  return workspaceTransaction(actor, "manage", async (tx, access) => {
     if (await tx.customDomain.findUnique({ where: { hostname: input.hostname } })) throw new ApiError(409, "DOMAIN_EXISTS", "Domínio já associado a um workspace.");
-    await reserveQuota(tx, actor.workspaceId, plan, "domains");
+    await reserveQuota(tx, actor.workspaceId, access, "domains");
     const domain = await tx.customDomain.create({ data: { workspaceId: actor.workspaceId, hostname: input.hostname, token: randomBytes(24).toString("hex") } });
     await audit(tx, actor, "domain.created", domain.id, { hostname: domain.hostname });
     return domain;

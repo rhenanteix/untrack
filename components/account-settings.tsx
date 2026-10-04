@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { SignOutButton } from "@/components/sign-out-button";
 import { apiRequest } from "@/lib/client/api";
+import type { AccountAccess } from "@/modules/billing/account-access";
 
 type AccountSettingsProps = {
   profile: { name: string; email: string; image: string | null };
@@ -15,8 +16,8 @@ type AccountSettingsProps = {
     timezone: string;
     locale: string;
     notifications: boolean;
-    plan: "free" | "premium";
   };
+  accountAccess: AccountAccess;
   canManage: boolean;
   usage: Record<string, number>;
   limits: Record<string, number>;
@@ -25,6 +26,7 @@ type AccountSettingsProps = {
 export function AccountSettings({
   profile,
   workspace,
+  accountAccess,
   canManage,
   usage,
   limits,
@@ -142,11 +144,19 @@ export function AccountSettings({
         </section>
         <section className="workspace-panel account-settings-wide">
           <h2>Plano</h2>
-          <p className="workspace-data-note">Plano atual: <strong>{workspace.plan === "premium" ? "Premium" : "Free"}</strong></p>
+          <p className="workspace-data-note">Plano atual: <strong>{accountAccess.basePlan === "premium" ? "Premium" : "Free"}</strong></p>
+          {accountAccess.accessSource === "trial" && accountAccess.trialExpiresAt ? (
+            <p className="workspace-data-note">
+              <strong>Teste Premium</strong> ativo até {accountAccess.trialExpiresAt.toLocaleDateString("pt-BR")} ({accountAccess.daysRemaining} {accountAccess.daysRemaining === 1 ? "dia" : "dias"} restantes).
+            </p>
+          ) : null}
+          {accountAccess.trialStatus === "expired" ? (
+            <p className="workspace-data-note">Seu teste Premium terminou. Seus dados continuam seguros no plano Free.</p>
+          ) : null}
           <dl className="account-usage-list">
             {Object.entries(limits).map(([resource, limit]) => <div key={resource}><dt>{resource}</dt><dd>{usage[resource] ?? 0} de {limit}</dd></div>)}
           </dl>
-          {workspace.plan === "free" ? <Link className="button" href="/upgrade">Conhecer Premium</Link> : null}
+          <Link className="button" href="/settings/plan">Ver meu plano</Link>
         </section>
         <section className="workspace-panel account-settings-wide account-danger-zone">
           <h2>Danger Zone</h2>

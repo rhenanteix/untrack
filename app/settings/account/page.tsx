@@ -7,6 +7,7 @@ import {
   getUsage,
   type UsageMetric,
 } from "@/modules/billing/entitlements";
+import { getAccountAccessForUser } from "@/modules/billing/account-access";
 import { sessionFromHeaders } from "@/lib/session";
 import { actorFor } from "@/modules/workspaces/context";
 import { getPrisma } from "@/lib/prisma";
@@ -30,7 +31,7 @@ export default async function AccountSettingsPage() {
   const session = await sessionFromHeaders(requestHeaders);
   if (!session) redirect("/entrar?next=/settings/account");
   const actor = await actorFor(session.user.id, requestHeaders);
-  const [workspace, usage] = await Promise.all([
+  const [workspace, usage, accountAccess] = await Promise.all([
     getPrisma().workspace.findUniqueOrThrow({
       where: { id: actor.workspaceId },
       select: {
@@ -40,10 +41,10 @@ export default async function AccountSettingsPage() {
         timezone: true,
         locale: true,
         notifications: true,
-        plan: true,
       },
     }),
     getUsage(actor.workspaceId),
+    getAccountAccessForUser(session.user.id),
   ]);
   const notifications =
     typeof workspace.notifications === "object" &&
@@ -51,7 +52,7 @@ export default async function AccountSettingsPage() {
     !Array.isArray(workspace.notifications) &&
     (workspace.notifications as Record<string, unknown>).product === true;
   const limits = Object.fromEntries(
-    usageMetrics.map((metric) => [metric, getLimit(workspace.plan, metric)]),
+    usageMetrics.map((metric) => [metric, getLimit(accountAccess, metric)]),
   );
   return (
     <AccountSettings
@@ -61,6 +62,7 @@ export default async function AccountSettingsPage() {
         image: session.user.image ?? null,
       }}
       workspace={{ ...workspace, notifications }}
+      accountAccess={accountAccess}
       canManage={actor.role === "owner" || actor.role === "admin"}
       usage={usage}
       limits={limits}

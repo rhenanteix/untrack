@@ -36,8 +36,8 @@ export async function createAnalyticsGoal(
   actor: Actor,
   input: z.infer<typeof analyticsGoalInputSchema>,
 ) {
-  return workspaceTransaction(actor, "write", async (tx, plan) => {
-    if (!canUse(plan, "advancedGoals"))
+  return workspaceTransaction(actor, "write", async (tx, access) => {
+    if (!canUse(access, "advancedGoals"))
       throw new ApiError(
         403,
         "PREMIUM_REQUIRED",

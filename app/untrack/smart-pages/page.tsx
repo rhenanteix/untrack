@@ -1,5 +1,6 @@
 import { libraryFilters } from "@/modules/workspaces/library-filters";
 import { isPremium } from "@/modules/billing/plans";
+import { getAccountAccessForUser } from "@/modules/billing/account-access";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { PremiumGate } from "@/components/premium-gate";
@@ -23,7 +24,7 @@ async function loadPageData(
 ) {
   try {
     const actor = await actorFor(userId, requestHeaders);
-    const [initial, managedLinks, products, workspace] = await Promise.all([
+    const [initial, managedLinks, products, access] = await Promise.all([
       listSmartPages(actor, filters.page, filters.search),
       getPrisma().shortLink.findMany({
         where: { workspaceId: actor.workspaceId, distribution: "digital" },
@@ -45,12 +46,9 @@ async function loadPageData(
         take: 100,
         select: { id: true, name: true, status: true },
       }),
-      getPrisma().workspace.findUniqueOrThrow({
-        where: { id: actor.workspaceId },
-        select: { plan: true },
-      }),
+      getAccountAccessForUser(userId),
     ]);
-    return { ok: true as const, actor, initial, managedLinks, products, workspace };
+    return { ok: true as const, actor, initial, managedLinks, products, access };
   } catch (error) {
     const failure = workspaceLoadError(error);
     if (!["WORKSPACE_FORBIDDEN", "INVALID_WORKSPACE"].includes(failure.code))
@@ -79,8 +77,8 @@ export default async function SmartPagesPage({
   if (!session) redirect("/entrar?next=/untrack/smart-pages");
   const data = await loadPageData(requestHeaders, session.user.id, filters);
   if (!data.ok) return <WorkspaceLoadError {...data.error} />;
-  const { actor, initial, managedLinks, products, workspace } = data;
-  const premium = isPremium(workspace.plan);
+  const { actor, initial, managedLinks, products, access } = data;
+  const premium = isPremium(access);
   return (
     <>
       {!premium && (
@@ -94,6 +92,7 @@ export default async function SmartPagesPage({
           <PremiumGate
             feature="Personalização avançada"
             description="Adicione imagens próprias, produtos e recursos visuais avançados à sua Smart Page."
+            trialStatus={access.trialStatus}
           />
         </section>
       )}

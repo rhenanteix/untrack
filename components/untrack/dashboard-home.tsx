@@ -15,6 +15,7 @@ import { WorkspaceCommandPalette } from "./workspace-command-palette";
 import { SetupChecklist } from "./setup-checklist";
 import { CreateLauncher } from "./create-launcher";
 import { SignOutButton } from "@/components/sign-out-button";
+import type { AccountAccess } from "@/modules/billing/account-access";
 
 const periods = [7, 30, 90] as const;
 
@@ -43,6 +44,7 @@ export type DashboardHomeProps = {
   canWrite: boolean;
   greeting: string;
   userName: string;
+  access: AccountAccess;
   days: Period;
   assets: {
     links: number;
@@ -98,6 +100,28 @@ function DashboardHeader({
       </div>
     </header>
   );
+}
+
+function TrialNotice({ access }: Pick<DashboardHomeProps, "access">) {
+  if (access.accessSource === "trial" && access.trialExpiresAt)
+    return (
+      <section className="dashboard-card" aria-label="Teste Premium">
+        <span className="eyebrow">Teste Premium</span>
+        <h2>{access.daysRemaining} {access.daysRemaining === 1 ? "dia restante" : "dias restantes"}</h2>
+        <p>Explore todos os recursos Premium até {access.trialExpiresAt.toLocaleDateString("pt-BR")}.</p>
+        <Link className="dashboard-text-link" href="/upgrade" data-analytics-event="trial_feature_used">Ver recursos Premium <FiArrowRight aria-hidden="true" /></Link>
+      </section>
+    );
+  if (access.trialStatus === "expired")
+    return (
+      <section className="dashboard-card" aria-label="Teste Premium encerrado">
+        <span className="eyebrow">Teste Premium</span>
+        <h2>Seu teste terminou.</h2>
+        <p>Seus dados continuam seguros e sua conta voltou para o plano Free.</p>
+        <Link className="dashboard-text-link" href="/upgrade">Conhecer Premium <FiArrowRight aria-hidden="true" /></Link>
+      </section>
+    );
+  return null;
 }
 
 function AssetCard({
@@ -278,6 +302,7 @@ export function DashboardHome({
   canWrite,
   greeting,
   userName,
+  access,
   days,
   assets,
   metrics,
@@ -300,6 +325,7 @@ export function DashboardHome({
           greeting={greeting}
           userName={userName}
         />
+        <TrialNotice access={access} />
         <SetupChecklist items={checklist} />
         <section className="dashboard-welcome" aria-labelledby="welcome-heading">
           <FiLink aria-hidden="true" />
@@ -328,6 +354,7 @@ export function DashboardHome({
         greeting={greeting}
         userName={userName}
       />
+      <TrialNotice access={access} />
       <SetupChecklist items={checklist} />
 
       <section className="dashboard-section" aria-labelledby="assets-heading">

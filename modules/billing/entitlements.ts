@@ -1,6 +1,7 @@
 import type { Plan } from "@prisma/client";
 import { getPrisma } from "@/lib/prisma";
 import { PLAN_LIMITS, type Resource } from "@/modules/workspaces/policy";
+import type { AccountAccess } from "./account-access";
 
 export const PREMIUM_FEATURES = [
   "advancedAnalytics",
@@ -48,24 +49,32 @@ const planEntitlements: Record<
   },
 };
 
-export function canUse(plan: Plan, feature: PremiumFeature) {
-  return planEntitlements[plan].features[feature];
+export function canUse(
+  access: Pick<AccountAccess, "effectivePlan">,
+  feature: PremiumFeature,
+) {
+  return planEntitlements[access.effectivePlan].features[feature];
 }
 
-export function getLimit(plan: Plan, metric: UsageMetric) {
-  return PLAN_LIMITS[plan][usageResources[metric]];
+export function getLimit(
+  access: Pick<AccountAccess, "effectivePlan">,
+  metric: UsageMetric,
+) {
+  return PLAN_LIMITS[access.effectivePlan][usageResources[metric]];
 }
 
-export function getAnalyticsHistoryDays(plan: Plan) {
-  return planEntitlements[plan].analyticsHistoryDays;
+export function getAnalyticsHistoryDays(
+  access: Pick<AccountAccess, "effectivePlan">,
+) {
+  return planEntitlements[access.effectivePlan].analyticsHistoryDays;
 }
 
 export function hasReachedLimit(
-  plan: Plan,
+  access: Pick<AccountAccess, "effectivePlan">,
   metric: UsageMetric,
   usage: Pick<WorkspaceUsage, UsageMetric>,
 ) {
-  return usage[metric] >= getLimit(plan, metric);
+  return usage[metric] >= getLimit(access, metric);
 }
 
 export type WorkspaceUsage = Record<UsageMetric, number>;

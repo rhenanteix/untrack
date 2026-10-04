@@ -8,12 +8,15 @@ import {
 
 describe("LinkOr plan entitlements", () => {
   it("keeps Free useful while gating advanced features to Premium", () => {
-    expect(getLimit("free", "links")).toBe(10);
-    expect(getLimit("free", "smartPages")).toBe(1);
-    expect(canUse("free", "advancedAnalytics")).toBe(false);
-    expect(canUse("premium", "advancedAnalytics")).toBe(true);
-    expect(getAnalyticsHistoryDays("free")).toBe(7);
-    expect(getAnalyticsHistoryDays("premium")).toBe(365);
+    const free = { effectivePlan: "free" as const };
+    const premium = { effectivePlan: "premium" as const };
+    expect(getLimit(free, "links")).toBe(10);
+    expect(getLimit(free, "smartPages")).toBe(1);
+    expect(canUse(free, "advancedAnalytics")).toBe(false);
+    expect(canUse(premium, "advancedAnalytics")).toBe(true);
+    expect(canUse(premium, "advancedThemes")).toBe(true);
+    expect(getAnalyticsHistoryDays(free)).toBe(7);
+    expect(getAnalyticsHistoryDays(premium)).toBe(365);
   });
 
   it("reports when a real usage summary reaches a plan limit", () => {
@@ -25,7 +28,7 @@ describe("LinkOr plan entitlements", () => {
       campaigns: 0,
       audienceContacts: 0,
     };
-    expect(hasReachedLimit("free", "links", usage)).toBe(true);
-    expect(hasReachedLimit("premium", "links", usage)).toBe(false);
+    expect(hasReachedLimit({ effectivePlan: "free" }, "links", usage)).toBe(true);
+    expect(hasReachedLimit({ effectivePlan: "premium" }, "links", usage)).toBe(false);
   });
 });

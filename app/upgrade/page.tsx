@@ -3,9 +3,7 @@ import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { UpgradePage } from "@/components/upgrade-page";
 import { sessionFromHeaders } from "@/lib/session";
-import { isPremium } from "@/modules/billing/plans";
-import { actorFor } from "@/modules/workspaces/context";
-import { getPrisma } from "@/lib/prisma";
+import { getAccountAccessForUser } from "@/modules/billing/account-access";
 
 export const metadata: Metadata = {
   title: "LinkOr Premium",
@@ -16,10 +14,6 @@ export default async function UpgradeRoute() {
   const requestHeaders = await headers();
   const session = await sessionFromHeaders(requestHeaders);
   if (!session) redirect("/cadastro?next=/upgrade");
-  const actor = await actorFor(session.user.id, requestHeaders);
-  const workspace = await getPrisma().workspace.findUniqueOrThrow({
-    where: { id: actor.workspaceId },
-    select: { plan: true },
-  });
-  return <UpgradePage premium={isPremium(workspace.plan)} />;
+  const access = await getAccountAccessForUser(session.user.id);
+  return <UpgradePage access={access} />;
 }

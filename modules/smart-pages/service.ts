@@ -141,8 +141,8 @@ export async function createSmartPage(actor: Actor, raw: unknown) {
     const page = await workspaceTransaction(
       actor,
       "write",
-      async (tx, plan) => {
-        await reserveQuota(tx, actor.workspaceId, plan, "smartPages");
+      async (tx, access) => {
+        await reserveQuota(tx, actor.workspaceId, access, "smartPages");
         const page = await tx.smartPage.create({
           data: { ...input, socialLinks, workspaceId: actor.workspaceId },
         });

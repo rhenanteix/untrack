@@ -1,9 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
+import Link from "next/link";
 import { FiCheck } from "react-icons/fi";
 import { BrandLogo } from "@/components/brand-logo";
 import { analytics } from "@/lib/client/analytics";
+import type { AccountAccess } from "@/modules/billing/account-access";
 
 const premiumBenefits = [
   "Analytics avançado",
@@ -12,8 +14,7 @@ const premiumBenefits = [
   "SEO, QR Codes, exportações, pixels e tracking avançados",
 ];
 
-export function UpgradePage({ premium }: { premium: boolean }) {
-  const [notice, setNotice] = useState("");
+export function UpgradePage({ access }: { access: AccountAccess }) {
 
   useEffect(() => {
     analytics.track("upgrade_viewed");
@@ -47,23 +48,26 @@ export function UpgradePage({ premium }: { premium: boolean }) {
               </li>
             ))}
           </ul>
-          {premium ? (
-            <p role="status">Seu workspace já usa o LinkOr Premium.</p>
+          {access.accessSource === "subscription" ? (
+            <p role="status">Sua conta usa o LinkOr Premium.</p>
+          ) : access.accessSource === "trial" ? (
+            <p role="status">
+              Seu Teste Premium está ativo por mais {access.daysRemaining} {access.daysRemaining === 1 ? "dia" : "dias"}.
+            </p>
           ) : (
-            <button
-              className="button"
-              type="button"
-              onClick={() => {
-                analytics.track("upgrade_clicked", { location: "upgrade" });
-                setNotice(
-                  "A cobrança ainda não está conectada. Nenhuma compra será realizada agora.",
-                );
-              }}
-            >
-              Começar Premium
-            </button>
+            <>
+              <Link
+                className="button"
+                href="/teste-premium"
+                onClick={() => analytics.track("upgrade_clicked", { location: "upgrade" })}
+              >
+                Começar teste Premium
+              </Link>
+              <p role="status">
+                Premium ainda não está disponível para compra. Nenhuma cobrança será realizada agora.
+              </p>
+            </>
           )}
-          {notice ? <p role="status">{notice}</p> : null}
         </article>
       </div>
     </section>

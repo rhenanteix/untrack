@@ -105,8 +105,8 @@ describe("Smart Page customization", () => {
     ).toBe(false);
   });
   it("requires Premium only for advanced features without enabling charges", () => {
-    expect(() => requirePremium("free")).toThrow();
-    expect(() => requirePremium("premium")).not.toThrow();
+    expect(() => requirePremium({ effectivePlan: "free" })).toThrow();
+    expect(() => requirePremium({ effectivePlan: "premium" })).not.toThrow();
     expect(SMART_PAGES_PRODUCT).toMatchObject({
       priceInCents: 2990,
       checkoutEnabled: false,

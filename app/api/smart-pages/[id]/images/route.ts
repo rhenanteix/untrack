@@ -24,8 +24,8 @@ export async function POST(
     const image = await workspaceTransaction(
       actor,
       "write",
-      async (tx, plan) => {
-        requirePremium(plan);
+      async (tx, access) => {
+        requirePremium(access);
         const page = await tx.smartPage.findFirst({
           where: { id, workspaceId: actor.workspaceId },
         });

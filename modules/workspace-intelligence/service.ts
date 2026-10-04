@@ -246,7 +246,7 @@ export async function listCollections(actor: Actor, projectId?: string | null) {
 
 export async function createCollection(actor: Actor, raw: unknown) {
   const input = createCollectionSchema.parse(raw);
-  return workspaceTransaction(actor, "write", async (tx, plan) => {
+  return workspaceTransaction(actor, "write", async (tx, access) => {
     if (input.projectId) {
       const project = await tx.project.findFirst({
         where: { id: input.projectId, workspaceId: actor.workspaceId },
@@ -254,7 +254,7 @@ export async function createCollection(actor: Actor, raw: unknown) {
       if (!project)
         throw new ApiError(404, "PROJECT_NOT_FOUND", "Projeto não encontrado.");
     }
-    await reserveQuota(tx, actor.workspaceId, plan, "collections");
+    await reserveQuota(tx, actor.workspaceId, access, "collections");
     const value = await tx.collection.create({
       data: { ...input, workspaceId: actor.workspaceId },
       include: { _count: { select: { resources: true } } },
