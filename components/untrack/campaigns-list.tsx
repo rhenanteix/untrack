@@ -39,9 +39,7 @@ type CampaignResult = {
 
 const statusLabel: Record<string, string> = {
   draft: "Rascunho",
-  scheduled: "Agendada",
   active: "Ativa",
-  paused: "Pausada",
   completed: "Finalizada",
   archived: "Arquivada",
 };
@@ -50,8 +48,8 @@ const filters = [
   ["", "Todas"],
   ["active", "Ativas"],
   ["draft", "Rascunhos"],
-  ["scheduled", "Agendadas"],
   ["completed", "Finalizadas"],
+  ["archived", "Arquivadas"],
 ] as const;
 
 function campaignPeriod(campaign: Campaign) {

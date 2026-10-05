@@ -1,7 +1,14 @@
 "use client";
 
 import Link from "next/link";
-import { use, useCallback, useEffect, useState, type FormEvent } from "react";
+import {
+  startTransition,
+  use,
+  useCallback,
+  useEffect,
+  useState,
+  type FormEvent,
+} from "react";
 import {
   FiActivity,
   FiAlertTriangle,
@@ -15,6 +22,7 @@ import {
   FiPlus,
   FiTarget,
 } from "react-icons/fi";
+import { analytics } from "@/lib/client/analytics";
 import { apiRequest } from "./shared";
 
 type Asset = {
@@ -73,7 +81,11 @@ type Campaign = {
     createdAt: string;
     recoveredAt: string | null;
   }[];
-  metrics: { clicks: number; daily: { date: string; clicks: number }[] };
+  metrics: {
+    clicks: number;
+    contacts: number;
+    daily: { date: string; clicks: number }[];
+  };
   activities: {
     id: string;
     action: string;
@@ -81,16 +93,61 @@ type Campaign = {
     details: unknown;
     actor: { name: string };
   }[];
+  primaryGoal: {
+    id: string;
+    name: string;
+    goalType: string;
+    status: string;
+  } | null;
+};
+
+type CampaignInsights = {
+  overview: {
+    visitors: number;
+    sessions: number;
+    clicks: number;
+    conversions: number;
+    conversionRate: number;
+  };
+  distributions: {
+    items: {
+      id: string;
+      name: string;
+      type: string;
+      status: string;
+      channel: { id: string; name: string; type: string };
+      visitors: number;
+      interactions: number;
+      conversions: number;
+      conversionRate: number;
+    }[];
+  };
+  goals: {
+    items: {
+      goalId: string;
+      conversions: number;
+      conversionRate: number;
+    }[];
+  };
+};
+
+type GoalOption = {
+  id: string;
+  name: string;
+  status: "ACTIVE" | "PAUSED" | "ARCHIVED";
 };
 
 type Tab =
-  "overview" | "distribution" | "performance" | "monitoring" | "history";
+  | "overview"
+  | "distribution"
+  | "analytics"
+  | "monitoring"
+  | "settings"
+  | "history";
 
 const statusLabel: Record<string, string> = {
   draft: "Rascunho",
-  scheduled: "Agendada",
   active: "Ativa",
-  paused: "Pausada",
   completed: "Finalizada",
   archived: "Arquivada",
 };
@@ -123,6 +180,15 @@ function formatDate(value: string | null, includeYear = false) {
 function campaignPeriod(campaign: Campaign) {
   if (!campaign.startDate && !campaign.endDate) return "Sem período definido";
   return `${campaign.startDate ? formatDate(campaign.startDate, true) : "Início livre"} — ${formatDate(campaign.endDate, true)}`;
+}
+
+function formatPercentage(value: number) {
+  return (
+    new Intl.NumberFormat("pt-BR", {
+      maximumFractionDigits: 1,
+      minimumFractionDigits: 1,
+    }).format(value) + "%"
+  );
 }
 
 function activityLabel(action: string) {
@@ -498,6 +564,9 @@ export function CampaignDashboard({
 }) {
   const params = use(paramsPromise);
   const [campaign, setCampaign] = useState<Campaign | null>(null);
+  const [insights, setInsights] = useState<CampaignInsights | null>(null);
+  const [goalOptions, setGoalOptions] = useState<GoalOption[]>([]);
+  const [primaryGoalId, setPrimaryGoalId] = useState("");
   const [tab, setTab] = useState<Tab>("overview");
   const [error, setError] = useState("");
   const [showChannelDialog, setShowChannelDialog] = useState(false);
@@ -509,36 +578,59 @@ export function CampaignDashboard({
       const response = await apiRequest<{ campaign: Campaign }>(
         `/api/campaigns?campaignId=${params.id}`,
       );
-      setCampaign(response.campaign);
-      setError("");
+      startTransition(() => {
+        setCampaign(response.campaign);
+        setPrimaryGoalId(response.campaign.primaryGoal?.id ?? "");
+        setError("");
+      });
+      const query = new URLSearchParams({ campaignId: response.campaign.id });
+      if (response.campaign.startDate)
+        query.set("from", response.campaign.startDate);
+      if (response.campaign.endDate) query.set("to", response.campaign.endDate);
+      try {
+        const [overview, distributions, goals] = await Promise.all([
+          apiRequest<CampaignInsights["overview"]>(
+            `/api/workspace/analytics?view=overview&${query}`,
+          ),
+          apiRequest<CampaignInsights["distributions"]>(
+            `/api/workspace/analytics?view=distributions&${query}`,
+          ),
+          apiRequest<CampaignInsights["goals"]>(
+            `/api/workspace/analytics?view=goals&${query}`,
+          ),
+        ]);
+        startTransition(() => setInsights({ overview, distributions, goals }));
+      } catch (analyticsError) {
+        console.error("Campaign analytics was not loaded", analyticsError);
+      }
+      try {
+        const goals = await apiRequest<GoalOption[]>(
+          "/api/workspace/analytics/goals",
+        );
+        startTransition(() =>
+          setGoalOptions(goals.filter((goal) => goal.status === "ACTIVE")),
+        );
+      } catch (goalsError) {
+        console.error("Campaign goals were not loaded", goalsError);
+      }
     } catch (requestError) {
-      setError(
-        requestError instanceof Error
-          ? requestError.message
-          : "Não foi possível carregar a campanha.",
+      startTransition(() =>
+        setError(
+          requestError instanceof Error
+            ? requestError.message
+            : "Não foi possível carregar a campanha.",
+        ),
       );
     }
   }, [params.id]);
 
   useEffect(() => {
-    const controller = new AbortController();
-    apiRequest<{ campaign: Campaign }>(
-      `/api/campaigns?campaignId=${params.id}`,
-      {
-        signal: controller.signal,
-      },
-    )
-      .then((response) => {
-        if (!controller.signal.aborted) {
-          setCampaign(response.campaign);
-          setError("");
-        }
-      })
-      .catch((requestError: Error) => {
-        if (!controller.signal.aborted) setError(requestError.message);
-      });
-    return () => controller.abort();
-  }, [params.id]);
+    void loadCampaign();
+  }, [loadCampaign]);
+
+  useEffect(() => {
+    if (tab === "analytics") analytics.track("campaign_analytics_viewed");
+  }, [tab]);
 
   async function runChecklist() {
     setBusy(true);
@@ -561,6 +653,28 @@ export function CampaignDashboard({
         body: JSON.stringify({ campaignId: params.id, channelId }),
       });
       await loadCampaign();
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function savePrimaryGoal() {
+    setBusy(true);
+    try {
+      await apiRequest("/api/campaigns", {
+        method: "PATCH",
+        body: JSON.stringify({
+          id: params.id,
+          data: { primaryGoalId: primaryGoalId || null },
+        }),
+      });
+      await loadCampaign();
+    } catch (requestError) {
+      setError(
+        requestError instanceof Error
+          ? requestError.message
+          : "Não foi possível atualizar o objetivo principal.",
+      );
     } finally {
       setBusy(false);
     }
@@ -613,11 +727,30 @@ export function CampaignDashboard({
   const unhealthy = campaign.monitoringChecks.filter(
     (check) => check.status === "down" || check.status === "degraded",
   );
+  const interactions = insights
+    ? insights.distributions.items.reduce(
+        (total, distribution) => total + distribution.interactions,
+        0,
+      ) || insights.overview.clicks
+    : 0;
+  const hasTraffic = Boolean(
+    insights &&
+    (insights.overview.visitors ||
+      insights.overview.sessions ||
+      interactions ||
+      insights.overview.conversions),
+  );
+  const primaryGoalMetric = campaign.primaryGoal
+    ? insights?.goals.items.find(
+        (goal) => goal.goalId === campaign.primaryGoal?.id,
+      )
+    : undefined;
   const tabs: { id: Tab; label: string }[] = [
     { id: "overview", label: "Visão geral" },
     { id: "distribution", label: "Distribuição" },
-    { id: "performance", label: "Desempenho" },
+    { id: "analytics", label: "Analytics" },
     { id: "monitoring", label: "Monitoramento" },
+    { id: "settings", label: "Configurações" },
     { id: "history", label: "Histórico" },
   ];
 
@@ -645,9 +778,23 @@ export function CampaignDashboard({
         <div className="campaign-header-actions">
           <Link
             className="button button-secondary"
+            href={`/untrack/analytics?campaign=${campaign.id}`}
+          >
+            Ver analytics
+          </Link>
+          <Link
+            className="button button-secondary"
             href={`/untrack/analytics/journey?campaign=${campaign.id}`}
+            onClick={() => analytics.track("campaign_journey_viewed")}
           >
             Ver jornada
+          </Link>
+          <Link
+            className="button button-secondary"
+            href={`/untrack/audience?campaign=${campaign.id}`}
+            onClick={() => analytics.track("campaign_audience_viewed")}
+          >
+            Ver Audience
           </Link>
           <button
             className="button button-secondary"
@@ -693,28 +840,52 @@ export function CampaignDashboard({
               </div>
               <span>Dados registrados</span>
             </div>
-            <dl className="campaign-results">
-              <div>
-                <dt>Visualizações</dt>
-                <dd>—</dd>
-                <small>Indisponível sem impressão rastreada</small>
+            {!insights ? (
+              <p role="status">Carregando os resultados da campanha...</p>
+            ) : !hasTraffic ? (
+              <div className="campaign-empty-state">
+                <span>
+                  <FiActivity aria-hidden="true" />
+                </span>
+                <h2>Sua campanha ainda não recebeu acessos.</h2>
+                <p>Distribua um link ou QR rastreável para começar a medir.</p>
+                <button
+                  className="button"
+                  type="button"
+                  onClick={() => setTab("distribution")}
+                >
+                  Distribuir campanha
+                </button>
               </div>
-              <div>
-                <dt>Visitantes únicos</dt>
-                <dd>—</dd>
-                <small>Indisponível no tracking atual</small>
-              </div>
-              <div>
-                <dt>Cliques</dt>
-                <dd>{campaign.metrics.clicks}</dd>
-                <small>Links da campanha</small>
-              </div>
-              <div>
-                <dt>CTR</dt>
-                <dd>—</dd>
-                <small>Requer impressões rastreadas</small>
-              </div>
-            </dl>
+            ) : (
+              <dl className="campaign-results">
+                <div>
+                  <dt>Visitantes</dt>
+                  <dd>{insights.overview.visitors}</dd>
+                  <small>Pessoas identificadas pelo tracking</small>
+                </div>
+                <div>
+                  <dt>Interações</dt>
+                  <dd>{interactions}</dd>
+                  <small>Cliques, QR e formulários</small>
+                </div>
+                <div>
+                  <dt>Contatos</dt>
+                  <dd>{campaign.metrics.contacts}</dd>
+                  <small>Identificados na campanha</small>
+                </div>
+                <div>
+                  <dt>Conversões</dt>
+                  <dd>{insights.overview.conversions}</dd>
+                  <small>Goals concluídos</small>
+                </div>
+                <div>
+                  <dt>CVR</dt>
+                  <dd>{formatPercentage(insights.overview.conversionRate)}</dd>
+                  <small>Conversões por visitante</small>
+                </div>
+              </dl>
+            )}
           </section>
           <section className="campaign-overview-grid">
             <div className="workspace-panel">
@@ -796,7 +967,7 @@ export function CampaignDashboard({
               <button
                 className="text-button"
                 type="button"
-                onClick={() => setTab("performance")}
+                onClick={() => setTab("analytics")}
               >
                 Ver desempenho
               </button>
@@ -827,6 +998,28 @@ export function CampaignDashboard({
               </p>
             )}
           </section>
+          {campaign.primaryGoal && (
+            <section className="workspace-panel">
+              <div className="campaign-section-heading">
+                <div>
+                  <span className="workspace-section-kicker">
+                    Objetivo principal
+                  </span>
+                  <h2>{campaign.primaryGoal.name}</h2>
+                </div>
+              </div>
+              {primaryGoalMetric ? (
+                <p>
+                  {primaryGoalMetric.conversions} conversões ·{" "}
+                  {formatPercentage(primaryGoalMetric.conversionRate)} CVR
+                </p>
+              ) : (
+                <p>
+                  Este objetivo ainda não recebeu conversões nesta campanha.
+                </p>
+              )}
+            </section>
+          )}
           <section className="campaign-overview-grid">
             <div className="workspace-panel">
               <div className="campaign-section-heading">
@@ -1029,7 +1222,7 @@ export function CampaignDashboard({
         </section>
       )}
 
-      {tab === "performance" && (
+      {tab === "analytics" && (
         <section className="campaign-dashboard-stack">
           <div className="campaign-section-heading">
             <div>
@@ -1041,28 +1234,48 @@ export function CampaignDashboard({
               </p>
             </div>
           </div>
-          <dl className="campaign-results">
-            <div>
-              <dt>Cliques</dt>
-              <dd>{campaign.metrics.clicks}</dd>
-              <small>Links rastreáveis</small>
+          {!insights ? (
+            <p role="status">Carregando os resultados da campanha...</p>
+          ) : !hasTraffic ? (
+            <div className="campaign-empty-state">
+              <span>
+                <FiActivity aria-hidden="true" />
+              </span>
+              <h2>Ainda não há dados para analisar.</h2>
+              <p>
+                Os resultados aparecem quando alguém usa um ponto de
+                distribuição.
+              </p>
             </div>
-            <div>
-              <dt>QR scans</dt>
-              <dd>—</dd>
-              <small>Disponível quando houver leitura de QR</small>
-            </div>
-            <div>
-              <dt>Conversões</dt>
-              <dd>—</dd>
-              <small>Tracking de conversão não configurado</small>
-            </div>
-            <div>
-              <dt>CTR</dt>
-              <dd>—</dd>
-              <small>Requer impressões rastreadas</small>
-            </div>
-          </dl>
+          ) : (
+            <dl className="campaign-results">
+              <div>
+                <dt>Visitantes</dt>
+                <dd>{insights.overview.visitors}</dd>
+                <small>Sessões rastreadas na campanha</small>
+              </div>
+              <div>
+                <dt>Interações</dt>
+                <dd>{interactions}</dd>
+                <small>Eventos reais de contato</small>
+              </div>
+              <div>
+                <dt>Contatos</dt>
+                <dd>{campaign.metrics.contacts}</dd>
+                <small>Formulários e Smart Cards</small>
+              </div>
+              <div>
+                <dt>Conversões</dt>
+                <dd>{insights.overview.conversions}</dd>
+                <small>Goals concluídos</small>
+              </div>
+              <div>
+                <dt>CVR</dt>
+                <dd>{formatPercentage(insights.overview.conversionRate)}</dd>
+                <small>Conversões por visitante</small>
+              </div>
+            </dl>
+          )}
           <section className="workspace-panel">
             <div className="campaign-section-heading">
               <h2>Cliques ao longo do tempo</h2>
@@ -1089,22 +1302,38 @@ export function CampaignDashboard({
           </section>
           <section className="workspace-panel">
             <div className="campaign-section-heading">
-              <h2>Desempenho por canal</h2>
+              <h2>Desempenho por distribuição</h2>
             </div>
-            {channelMetrics.length ? (
-              <ul className="campaign-channel-summary">
-                {channelMetrics.map((channel) => (
-                  <li key={channel.id}>
-                    <span>{channel.name}</span>
-                    <strong>{channel.clicks} cliques</strong>
-                  </li>
-                ))}
-              </ul>
+            {insights?.distributions.items.length ? (
+              <div className="analytics-table-wrap">
+                <table className="analytics-table">
+                  <thead>
+                    <tr>
+                      <th>Distribuição</th>
+                      <th>Visitantes</th>
+                      <th>Interações</th>
+                      <th>Conversões</th>
+                      <th>CVR</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {insights.distributions.items.map((distribution) => (
+                      <tr key={distribution.id}>
+                        <th scope="row">
+                          {distribution.name}
+                          <small>{distribution.channel.name}</small>
+                        </th>
+                        <td>{distribution.visitors}</td>
+                        <td>{distribution.interactions}</td>
+                        <td>{distribution.conversions}</td>
+                        <td>{formatPercentage(distribution.conversionRate)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             ) : (
-              <p>
-                Adicione canais e pontos de distribuição para comparar
-                resultados.
-              </p>
+              <p>Crie pontos de distribuição para comparar os resultados.</p>
             )}
           </section>
         </section>
@@ -1186,6 +1415,52 @@ export function CampaignDashboard({
             ) : (
               <p>Nenhum incidente registrado.</p>
             )}
+          </section>
+        </section>
+      )}
+
+      {tab === "settings" && (
+        <section className="campaign-dashboard-stack">
+          <div className="campaign-section-heading">
+            <div>
+              <span className="workspace-section-kicker">Configurações</span>
+              <h2>Como medir o sucesso</h2>
+              <p>Escolha um Goal já configurado neste workspace.</p>
+            </div>
+          </div>
+          <section className="workspace-panel campaign-form-grid">
+            <label className="campaign-field campaign-field-wide">
+              <span>Objetivo principal</span>
+              <select
+                value={primaryGoalId}
+                onChange={(event) => setPrimaryGoalId(event.target.value)}
+              >
+                <option value="">Nenhum objetivo principal</option>
+                {goalOptions.map((goal) => (
+                  <option key={goal.id} value={goal.id}>
+                    {goal.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+            {goalOptions.length ? (
+              <button
+                className="button"
+                type="button"
+                disabled={busy}
+                onClick={() => void savePrimaryGoal()}
+              >
+                Salvar objetivo principal
+              </button>
+            ) : (
+              <p>
+                Crie um Goal antes de defini-lo como o objetivo principal da
+                campanha.
+              </p>
+            )}
+            <Link className="text-button" href="/untrack/analytics/goals">
+              Gerenciar Goals
+            </Link>
           </section>
         </section>
       )}

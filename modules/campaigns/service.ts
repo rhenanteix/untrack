@@ -87,11 +87,24 @@ async function assertCampaignInputReferences(
   input: {
     clientId?: string | null;
     responsibleId?: string | null;
+    primaryGoalId?: string | null;
     primaryDestinationType?: string | null;
     primaryDestinationId?: string | null;
   },
 ) {
   await assertReferences(tx, workspaceId, { clientId: input.clientId });
+  if (input.primaryGoalId) {
+    const goal = await tx.analyticsGoal.findFirst({
+      where: { id: input.primaryGoalId, workspaceId },
+      select: { id: true },
+    });
+    if (!goal)
+      throw new ApiError(
+        404,
+        "PRIMARY_GOAL_NOT_FOUND",
+        "O objetivo principal não pertence a este workspace.",
+      );
+  }
   if (input.responsibleId) {
     const member = await tx.workspaceMember.findUnique({
       where: {
@@ -279,6 +292,9 @@ export async function getCampaign(actor: Actor, id: string) {
     include: {
       client: true,
       responsible: true,
+      primaryGoal: {
+        select: { id: true, name: true, goalType: true, status: true },
+      },
       channels: {
         include: {
           assets: {
@@ -339,22 +355,42 @@ export async function getCampaign(actor: Actor, id: string) {
   });
   if (!campaign)
     throw new ApiError(404, "CAMPAIGN_NOT_FOUND", "Campanha não encontrada.");
-  const [clicks, clickDays, activities] = await Promise.all([
-    prisma.linkClick.count({
-      where: { link: { campaignId: id, workspaceId: actor.workspaceId } },
-    }),
-    prisma.linkClick.groupBy({
-      by: ["day"],
-      where: { link: { campaignId: id, workspaceId: actor.workspaceId } },
-      _count: { _all: true },
-      orderBy: { day: "asc" },
-      take: 30,
-    }),
-    prisma.auditLog.findMany({
-      where: { workspaceId: actor.workspaceId, entityId: id },
-      orderBy: { createdAt: "desc" },
-      take: 20,
-    }),
+  const [clicks, clickDays, activities, formContacts, cardContacts] =
+    await Promise.all([
+      prisma.linkClick.count({
+        where: { link: { campaignId: id, workspaceId: actor.workspaceId } },
+      }),
+      prisma.linkClick.groupBy({
+        by: ["day"],
+        where: { link: { campaignId: id, workspaceId: actor.workspaceId } },
+        _count: { _all: true },
+        orderBy: { day: "asc" },
+        take: 30,
+      }),
+      prisma.auditLog.findMany({
+        where: { workspaceId: actor.workspaceId, entityId: id },
+        orderBy: { createdAt: "desc" },
+        take: 20,
+      }),
+      prisma.smartPageFormSubmission.groupBy({
+        by: ["contactId"],
+        where: {
+          workspaceId: actor.workspaceId,
+          campaignId: id,
+          contactId: { not: null },
+        },
+      }),
+      prisma.smartCardContactExchange.groupBy({
+        by: ["contactId"],
+        where: {
+          workspaceId: actor.workspaceId,
+          campaignId: id,
+        },
+      }),
+    ]);
+  const contactIds = new Set([
+    ...formContacts.flatMap((item) => (item.contactId ? [item.contactId] : [])),
+    ...cardContacts.map((item) => item.contactId),
   ]);
   const activityActors = await prisma.user.findMany({
     where: { id: { in: activities.map((activity) => activity.actorId) } },
@@ -383,6 +419,7 @@ export async function getCampaign(actor: Actor, id: string) {
     channels,
     metrics: {
       clicks,
+      contacts: contactIds.size,
       daily: clickDays.map((day) => ({
         date: day.day.toISOString().slice(0, 10),
         clicks: day._count._all,
@@ -396,19 +433,23 @@ export async function getCampaign(actor: Actor, id: string) {
 }
 
 export async function createCampaign(actor: Actor, input: CreateCampaignInput) {
-  const campaign = await workspaceTransaction(actor, "write", async (tx, access) => {
-    const data = createCampaignSchema.parse(input);
-    await assertCampaignInputReferences(tx, actor.workspaceId, data);
-    await reserveQuota(tx, actor.workspaceId, access, "campaigns");
-    const campaign = await tx.campaign.create({
-      data: { ...data, workspaceId: actor.workspaceId },
-      include: { client: true, responsible: true },
-    });
-    await audit(tx, actor, "campaign.create", campaign.id, {
-      name: campaign.name,
-    });
-    return campaign;
-  });
+  const campaign = await workspaceTransaction(
+    actor,
+    "write",
+    async (tx, access) => {
+      const data = createCampaignSchema.parse(input);
+      await assertCampaignInputReferences(tx, actor.workspaceId, data);
+      await reserveQuota(tx, actor.workspaceId, access, "campaigns");
+      const campaign = await tx.campaign.create({
+        data: { ...data, workspaceId: actor.workspaceId },
+        include: { client: true, responsible: true },
+      });
+      await audit(tx, actor, "campaign.create", campaign.id, {
+        name: campaign.name,
+      });
+      return campaign;
+    },
+  );
   const { track } = await import("@/lib/analytics");
   await track("campaign_created", { workspaceId: actor.workspaceId });
   return campaign;
@@ -419,48 +460,55 @@ export async function createCampaignFromBuilder(
   raw: CampaignBuilderInput,
 ) {
   const input = campaignBuilderSchema.parse(raw);
-  return workspaceTransaction(actor, "write", async (tx, access) => {
-    await assertCampaignInputReferences(tx, actor.workspaceId, input);
-    await reserveQuota(tx, actor.workspaceId, access, "campaigns");
-    const campaign = await tx.campaign.create({
-      data: {
-        workspaceId: actor.workspaceId,
-        name: input.name,
-        description: input.description,
-        clientId: input.clientId,
-        responsibleId: input.responsibleId,
-        objective: input.objectiveDescription,
-        objectiveType: input.objectiveType,
-        primaryDestinationType: input.primaryDestinationType,
-        primaryDestinationId: input.primaryDestinationId,
-        primaryDestinationUrl: input.primaryDestinationUrl,
-        startDate: input.startDate,
-        endDate: input.endDate,
-        channels: {
-          create: input.channels.map((channel) => {
-            const tracking = automaticTracking(input.name, channel);
-            return {
-              workspaceId: actor.workspaceId,
-              name: channel.name,
-              type: channel.type,
-              destinationUrl: trackedDestination(
-                input.primaryDestinationUrl,
-                tracking,
-              ),
-              ...tracking,
-            };
-          }),
+  const campaign = await workspaceTransaction(
+    actor,
+    "write",
+    async (tx, access) => {
+      await assertCampaignInputReferences(tx, actor.workspaceId, input);
+      await reserveQuota(tx, actor.workspaceId, access, "campaigns");
+      const campaign = await tx.campaign.create({
+        data: {
+          workspaceId: actor.workspaceId,
+          name: input.name,
+          description: input.description,
+          clientId: input.clientId,
+          responsibleId: input.responsibleId,
+          objective: input.objectiveDescription,
+          objectiveType: input.objectiveType,
+          primaryDestinationType: input.primaryDestinationType,
+          primaryDestinationId: input.primaryDestinationId,
+          primaryDestinationUrl: input.primaryDestinationUrl,
+          startDate: input.startDate,
+          endDate: input.endDate,
+          channels: {
+            create: input.channels.map((channel) => {
+              const tracking = automaticTracking(input.name, channel);
+              return {
+                workspaceId: actor.workspaceId,
+                name: channel.name,
+                type: channel.type,
+                destinationUrl: trackedDestination(
+                  input.primaryDestinationUrl,
+                  tracking,
+                ),
+                ...tracking,
+              };
+            }),
+          },
         },
-      },
-      include: { client: true, responsible: true, channels: true },
-    });
-    await audit(tx, actor, "campaign.created", campaign.id, {
-      name: campaign.name,
-      objectiveType: campaign.objectiveType,
-      channels: campaign.channels.length,
-    });
-    return campaign;
-  });
+        include: { client: true, responsible: true, channels: true },
+      });
+      await audit(tx, actor, "campaign.created", campaign.id, {
+        name: campaign.name,
+        objectiveType: campaign.objectiveType,
+        channels: campaign.channels.length,
+      });
+      return campaign;
+    },
+  );
+  const { track } = await import("@/lib/analytics");
+  await track("campaign_created", { workspaceId: actor.workspaceId });
+  return campaign;
 }
 
 export async function updateCampaign(
@@ -469,7 +517,7 @@ export async function updateCampaign(
   input: UpdateCampaignInput,
 ) {
   const data = updateCampaignSchema.parse(input);
-  return workspaceTransaction(actor, "write", async (tx) => {
+  const result = await workspaceTransaction(actor, "write", async (tx) => {
     const existing = await tx.campaign.findFirst({
       where: { id, workspaceId: actor.workspaceId },
     });
@@ -481,6 +529,10 @@ export async function updateCampaign(
         data.responsibleId === undefined
           ? existing.responsibleId
           : data.responsibleId,
+      primaryGoalId:
+        data.primaryGoalId === undefined
+          ? existing.primaryGoalId
+          : data.primaryGoalId,
       primaryDestinationType:
         data.primaryDestinationType === undefined
           ? existing.primaryDestinationType
@@ -496,8 +548,22 @@ export async function updateCampaign(
       include: { client: true, responsible: true },
     });
     await audit(tx, actor, "campaign.updated", campaign.id, data);
-    return campaign;
+    return {
+      campaign,
+      activated: existing.status !== "active" && campaign.status === "active",
+      primaryGoalSelected:
+        data.primaryGoalId !== undefined &&
+        data.primaryGoalId !== existing.primaryGoalId,
+    };
   });
+  if (result.activated || result.primaryGoalSelected) {
+    const { track } = await import("@/lib/analytics");
+    if (result.activated)
+      await track("campaign_activated", { workspaceId: actor.workspaceId });
+    if (result.primaryGoalSelected)
+      await track("campaign_goal_selected", { workspaceId: actor.workspaceId });
+  }
+  return result.campaign;
 }
 
 export async function deleteCampaign(actor: Actor, id: string) {
@@ -726,6 +792,11 @@ export async function createCampaignAsset(
     });
     return asset;
   });
+  const { track } = await import("@/lib/analytics");
+  await track("campaign_asset_added", { workspaceId: actor.workspaceId });
+  await track("campaign_distribution_created", {
+    workspaceId: actor.workspaceId,
+  });
   return { asset, distributionUrl };
 }
 
@@ -799,11 +870,11 @@ export async function approveCampaign(
   });
   if (!campaign)
     throw new ApiError(404, "CAMPAIGN_NOT_FOUND", "Campanha não encontrada.");
-  if (campaign.status !== "draft" && campaign.status !== "scheduled") {
+  if (campaign.status !== "draft") {
     throw new ApiError(
       400,
       "CAMPAIGN_NOT_APPROVABLE",
-      "Apenas campanhas em rascunho ou agendadas podem ser aprovadas.",
+      "Apenas campanhas em rascunho podem ser aprovadas.",
     );
   }
   const approval = await prisma.campaignApproval.create({
@@ -822,7 +893,7 @@ export async function approveCampaign(
       approvalStatus: action === "approved" ? "approved" : "rejected",
       approvedAt: action === "approved" ? new Date() : null,
       approvedById: action === "approved" ? actor.userId : null,
-      status: action === "approved" ? "scheduled" : "draft",
+      status: action === "approved" ? "active" : "draft",
     },
   });
   await audit(prisma, actor, "campaign.approve", campaignId, { action, notes });

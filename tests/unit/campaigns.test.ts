@@ -18,6 +18,8 @@ describe("campaigns schemas", () => {
   it("validates campaign status", () => {
     expect(campaignStatusSchema.parse("draft")).toBe("draft");
     expect(() => campaignStatusSchema.parse("invalid" as never)).toThrow();
+    expect(() => campaignStatusSchema.parse("scheduled" as never)).toThrow();
+    expect(() => campaignStatusSchema.parse("paused" as never)).toThrow();
   });
 
   it("validates channel type", () => {
@@ -26,9 +28,13 @@ describe("campaigns schemas", () => {
   });
 
   it("validates create campaign input", () => {
-    const result = createCampaignSchema.parse({ name: "Campanha Teste" });
+    const result = createCampaignSchema.parse({
+      name: "Campanha Teste",
+      primaryGoalId: "goal_123",
+    });
     expect(result.name).toBe("Campanha Teste");
     expect(result.status).toBe("draft");
+    expect(result.primaryGoalId).toBe("goal_123");
   });
 
   it("validates create channel input", () => {

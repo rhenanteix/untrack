@@ -34,6 +34,7 @@ export type GoalEventContext = {
   elementType?: string;
   elementId?: string;
   campaignId?: string;
+  campaignAssetId?: string;
   path?: string;
   attribution: Attribution;
   visitorId?: string;
@@ -175,6 +176,7 @@ export class GoalEngine {
           visitorId: context.visitorId,
           sessionId: context.sessionId,
           campaignId: context.campaignId,
+          campaignAssetId: context.campaignAssetId,
           assetType: context.assetType,
           assetId: context.assetId,
           source: context.attribution.source,
@@ -216,6 +218,7 @@ export class GoalEngine {
           assetType: context.assetType,
           assetId: context.assetId,
           campaignId: context.campaignId,
+          campaignAssetId: context.campaignAssetId,
           goalId: goal.id,
           path: context.path,
           day: new Date(

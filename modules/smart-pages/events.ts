@@ -90,6 +90,23 @@ export async function recordPublicSmartPageEvent(
     referrer: headers.get("referer"),
   });
   const inherited = trustedCampaignContext(headers);
+  const campaign = inherited.campaignId
+    ? await db.campaign.findFirst({
+        where: { id: inherited.campaignId, workspaceId: page.workspaceId },
+        select: { id: true },
+      })
+    : null;
+  const campaignAsset =
+    campaign && inherited.campaignAssetId
+      ? await db.campaignAsset.findFirst({
+          where: {
+            id: inherited.campaignAssetId,
+            workspaceId: page.workspaceId,
+            campaignId: campaign.id,
+          },
+          select: { id: true },
+        })
+      : null;
   const destinationIsWhatsApp = Boolean(
     block?.link?.destinationUrl &&
     /^https:\/\/(?:wa\.me|(?:api\.|web\.)?whatsapp\.com)\//i.test(
@@ -129,7 +146,8 @@ export async function recordPublicSmartPageEvent(
         : undefined,
     elementId:
       block?.id ?? (input.event === "social_click" ? input.blockId : undefined),
-    campaignId: inherited.campaignId ?? block?.link?.campaignId ?? undefined,
+    campaignId: campaign?.id ?? block?.link?.campaignId ?? undefined,
+    campaignAssetId: campaignAsset?.id,
     smartPageId: page.id,
     smartPageBlockId: block?.id,
     path: `/${input.slug}`,
@@ -144,8 +162,8 @@ export async function recordPublicSmartPageEvent(
       context,
       attribution,
       {
-        campaignId:
-          inherited.campaignId ?? block?.link?.campaignId ?? undefined,
+        campaignId: campaign?.id ?? block?.link?.campaignId ?? undefined,
+        campaignAssetId: campaignAsset?.id,
         qrContext: inherited.qrContext,
       },
     ),

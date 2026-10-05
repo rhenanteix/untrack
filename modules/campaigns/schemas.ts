@@ -2,9 +2,7 @@ import { z } from "zod";
 
 export const campaignStatusSchema = z.enum([
   "draft",
-  "scheduled",
   "active",
-  "paused",
   "completed",
   "archived",
 ]);
@@ -91,6 +89,7 @@ export const createCampaignSchema = z.object({
   responsibleId: z.string().optional().nullable(),
   objective: z.string().max(1000).optional().default(""),
   objectiveType: campaignObjectiveTypeSchema.optional().nullable(),
+  primaryGoalId: z.string().max(255).optional().nullable(),
   primaryDestinationType: destinationTypeSchema.optional().nullable(),
   primaryDestinationId: z.string().max(255).optional().nullable(),
   primaryDestinationUrl: z.string().url().max(4096).optional().nullable(),
@@ -142,6 +141,7 @@ export const campaignResponseSchema = z.object({
   clientId: z.string().optional().nullable(),
   responsibleId: z.string().optional().nullable(),
   objective: z.string(),
+  primaryGoalId: z.string().optional().nullable(),
   startDate: z.coerce.date().optional().nullable(),
   endDate: z.coerce.date().optional().nullable(),
   status: campaignStatusSchema,

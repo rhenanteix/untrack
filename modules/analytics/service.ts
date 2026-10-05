@@ -32,6 +32,7 @@ export type RecordAnalyticsEventInput = {
   elementType?: string;
   elementId?: string;
   campaignId?: string;
+  campaignAssetId?: string;
   smartPageId?: string;
   smartPageBlockId?: string;
   smartCardId?: string;
@@ -268,6 +269,7 @@ export async function recordAnalyticsEvent(
           elementType: input.elementType?.slice(0, 40),
           elementId: input.elementId?.slice(0, 255),
           campaignId: input.campaignId?.slice(0, 255),
+          campaignAssetId: input.campaignAssetId?.slice(0, 255),
           smartPageId: input.smartPageId,
           smartPageBlockId: input.smartPageBlockId,
           smartCardId: input.smartCardId,
@@ -305,6 +307,7 @@ export async function recordAnalyticsEvent(
             elementType: input.elementType,
             elementId: input.elementId,
             campaignId: input.campaignId,
+            campaignAssetId: input.campaignAssetId,
             path,
             attribution,
             ...identity,

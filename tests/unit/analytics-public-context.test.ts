@@ -26,9 +26,15 @@ describe("public analytics context", () => {
       requestHeaders,
       context,
       attribution,
-      { campaignId: "campaign_1", qrContext: "event_stand" },
+      {
+        campaignId: "campaign_1",
+        campaignAssetId: "distribution_stand",
+        qrContext: "event_stand",
+      },
     );
-    const responseCookieHeader = cookies.map((cookie) => cookie.split(";")[0]).join("; ");
+    const responseCookieHeader = cookies
+      .map((cookie) => cookie.split(";")[0])
+      .join("; ");
     const nextHeaders = new Headers({ cookie: responseCookieHeader });
     const next = resolvePublicAnalyticsContext(nextHeaders);
 
@@ -40,6 +46,7 @@ describe("public analytics context", () => {
     });
     expect(trustedCampaignContext(nextHeaders)).toEqual({
       campaignId: "campaign_1",
+      campaignAssetId: "distribution_stand",
       qrContext: "event_stand",
     });
   });

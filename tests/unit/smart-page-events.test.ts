@@ -141,7 +141,11 @@ describe("smart page analytics events", () => {
       initialHeaders,
       initial,
       attribution,
-      { campaignId: "campaign_1", qrContext: "event_stand" },
+      {
+        campaignId: "campaign_1",
+        campaignAssetId: "distribution_stand",
+        qrContext: "event_stand",
+      },
     )
       .map((item) => item.split(";")[0])
       .join("; ");
@@ -157,6 +161,10 @@ describe("smart page analytics events", () => {
           type: "link",
           link: { campaignId: null, destinationUrl: "https://example.com" },
         }),
+      },
+      campaign: { findFirst: vi.fn().mockResolvedValue({ id: "campaign_1" }) },
+      campaignAsset: {
+        findFirst: vi.fn().mockResolvedValue({ id: "distribution_stand" }),
       },
     } as unknown as ReturnType<typeof getPrisma>);
 
@@ -175,6 +183,7 @@ describe("smart page analytics events", () => {
         visitorKey: initial.identity.visitorId,
         sessionKey: initial.identity.sessionId,
         campaignId: "campaign_1",
+        campaignAssetId: "distribution_stand",
         attribution: expect.objectContaining({
           trustedContext: expect.any(Object),
         }),

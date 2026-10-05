@@ -5,13 +5,23 @@ import { getPrisma } from "@/lib/prisma";
 import { recordAnalyticsEvent } from "@/modules/analytics/service";
 import { cachedDestination } from "@/modules/link-management/cache";
 
-vi.mock("next/server", () => ({ after: (callback: () => unknown) => callback() }));
-vi.mock("@/lib/app-url", () => ({ appUrl: () => new URL("http://localhost:3000") }));
+vi.mock("next/server", () => ({
+  after: (callback: () => unknown) => callback(),
+}));
+vi.mock("@/lib/app-url", () => ({
+  appUrl: () => new URL("http://localhost:3000"),
+}));
 vi.mock("@/lib/prisma", () => ({ getPrisma: vi.fn() }));
 vi.mock("@/lib/short-links", () => ({ publicLink: vi.fn() }));
-vi.mock("@/modules/short-links/click-metadata", () => ({ clickMetadata: vi.fn(() => null) }));
-vi.mock("@/modules/link-management/cache", () => ({ cachedDestination: vi.fn() }));
-vi.mock("@/modules/analytics/service", () => ({ recordAnalyticsEvent: vi.fn() }));
+vi.mock("@/modules/short-links/click-metadata", () => ({
+  clickMetadata: vi.fn(() => null),
+}));
+vi.mock("@/modules/link-management/cache", () => ({
+  cachedDestination: vi.fn(),
+}));
+vi.mock("@/modules/analytics/service", () => ({
+  recordAnalyticsEvent: vi.fn(),
+}));
 vi.mock("@/lib/analytics", () => ({ track: vi.fn() }));
 
 beforeEach(() => {
@@ -29,6 +39,12 @@ beforeEach(() => {
         id: "qr_1",
         campaignId: "campaign_1",
         context: "event_stand",
+      }),
+    },
+    campaignAsset: {
+      findFirst: vi.fn().mockResolvedValue({
+        id: "distribution_stand",
+        campaignId: "campaign_1",
       }),
     },
   } as never);
@@ -57,8 +73,12 @@ describe("tracked redirects", () => {
     );
 
     expect(response.status).toBe(302);
-    expect(response.headers.get("Location")).toBe("https://linkor.test/minha-pagina");
-    expect(response.headers.get("Set-Cookie")).toContain("linkor_analytics_context=");
+    expect(response.headers.get("Location")).toBe(
+      "https://linkor.test/minha-pagina",
+    );
+    expect(response.headers.get("Set-Cookie")).toContain(
+      "linkor_analytics_context=",
+    );
     await vi.waitFor(() =>
       expect(recordAnalyticsEvent).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -66,6 +86,7 @@ describe("tracked redirects", () => {
           assetType: "qr_code",
           assetId: "qr_1",
           campaignId: "campaign_1",
+          campaignAssetId: "distribution_stand",
           metadata: { qrContext: "event_stand" },
           attribution: expect.objectContaining({
             knownContext: { source: "qr", medium: "qr", channel: "qr" },

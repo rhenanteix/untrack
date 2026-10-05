@@ -32,6 +32,7 @@ export type AnalyticsFilters = {
   assetType?: AnalyticsAssetType;
   assetId?: string;
   campaignId?: string;
+  campaignAssetId?: string;
   goalId?: string;
   source?: string;
   channel?: string;
@@ -158,6 +159,9 @@ export function eventWhere(actor: Actor, filters: ResolvedFilters) {
     ...(filters.assetType ? { assetType: filters.assetType } : {}),
     ...(filters.assetId ? { assetId: filters.assetId } : {}),
     ...(filters.campaignId ? { campaignId: filters.campaignId } : {}),
+    ...(filters.campaignAssetId
+      ? { campaignAssetId: filters.campaignAssetId }
+      : {}),
     ...(filters.goalId
       ? {
           visitor: {
@@ -180,6 +184,9 @@ export function conversionWhere(actor: Actor, filters: ResolvedFilters) {
     ...(filters.assetType ? { assetType: filters.assetType } : {}),
     ...(filters.assetId ? { assetId: filters.assetId } : {}),
     ...(filters.campaignId ? { campaignId: filters.campaignId } : {}),
+    ...(filters.campaignAssetId
+      ? { campaignAssetId: filters.campaignAssetId }
+      : {}),
     ...(filters.source ? { source: filters.source } : {}),
     ...(filters.channel ? { channel: filters.channel } : {}),
   };
@@ -296,6 +303,14 @@ export async function analyticsTimeseries(
     );
     conversionConditions.push(
       Prisma.sql`conversion."campaignId" = ${filters.campaignId}`,
+    );
+  }
+  if (filters.campaignAssetId) {
+    eventConditions.push(
+      Prisma.sql`event."campaignAssetId" = ${filters.campaignAssetId}`,
+    );
+    conversionConditions.push(
+      Prisma.sql`conversion."campaignAssetId" = ${filters.campaignAssetId}`,
     );
   }
   if (filters.source) {
@@ -515,6 +530,112 @@ export function analyticsChannels(actor: Actor, input: AnalyticsFilters) {
   return dimensionBreakdown(actor, input, "channel").then((result) =>
     result.locked ? { ...result, items: [] } : result,
   );
+}
+
+const campaignInteractionEvents = [...clickEvents, "form_submit", "qr_scan"];
+
+/** Groups real event and conversion records by the campaign's existing distribution assets. */
+export async function analyticsCampaignDistributions(
+  actor: Actor,
+  input: AnalyticsFilters,
+) {
+  const filters = await resolveAnalyticsFilters(actor, input);
+  if (!filters.campaignId)
+    return {
+      range: { from: filters.from.toISOString(), to: filters.to.toISOString() },
+      items: [],
+    };
+  const db = getPrisma();
+  const assets = await db.campaignAsset.findMany({
+    where: {
+      workspaceId: actor.workspaceId,
+      campaignId: filters.campaignId,
+    },
+    select: {
+      id: true,
+      name: true,
+      assetType: true,
+      status: true,
+      channel: { select: { id: true, name: true, type: true } },
+    },
+    orderBy: { createdAt: "asc" },
+  });
+  if (!assets.length)
+    return {
+      range: { from: filters.from.toISOString(), to: filters.to.toISOString() },
+      items: [],
+    };
+  const assetIds = assets.map((asset) => asset.id);
+  const [visitors, interactions, conversions] = await Promise.all([
+    db.analyticsEvent.groupBy({
+      by: ["campaignAssetId", "visitorId"],
+      where: {
+        ...eventWhere(actor, filters),
+        campaignAssetId: { in: assetIds },
+        visitorId: { not: null },
+      },
+    }),
+    db.analyticsEvent.groupBy({
+      by: ["campaignAssetId"],
+      where: {
+        ...eventWhere(actor, filters),
+        campaignAssetId: { in: assetIds },
+        name: { in: campaignInteractionEvents },
+      },
+      _count: { _all: true },
+    }),
+    db.analyticsConversion.groupBy({
+      by: ["campaignAssetId"],
+      where: {
+        ...conversionWhere(actor, filters),
+        campaignAssetId: { in: assetIds },
+      },
+      _count: { _all: true },
+    }),
+  ]);
+  const visitorsByAsset = new Map<string, number>();
+  for (const visitor of visitors) {
+    if (!visitor.campaignAssetId) continue;
+    visitorsByAsset.set(
+      visitor.campaignAssetId,
+      (visitorsByAsset.get(visitor.campaignAssetId) ?? 0) + 1,
+    );
+  }
+  const interactionsByAsset = new Map(
+    interactions.flatMap((item) =>
+      item.campaignAssetId ? [[item.campaignAssetId, item._count._all]] : [],
+    ),
+  );
+  const conversionsByAsset = new Map(
+    conversions.flatMap((item) =>
+      item.campaignAssetId ? [[item.campaignAssetId, item._count._all]] : [],
+    ),
+  );
+  return {
+    range: { from: filters.from.toISOString(), to: filters.to.toISOString() },
+    items: assets
+      .map((asset) => {
+        const uniqueVisitors = visitorsByAsset.get(asset.id) ?? 0;
+        const conversionCount = conversionsByAsset.get(asset.id) ?? 0;
+        return {
+          id: asset.id,
+          name: asset.name,
+          type: asset.assetType,
+          status: asset.status,
+          channel: asset.channel,
+          visitors: uniqueVisitors,
+          interactions: interactionsByAsset.get(asset.id) ?? 0,
+          conversions: conversionCount,
+          conversionRate: conversionRate(conversionCount, uniqueVisitors),
+        };
+      })
+      .sort(
+        (left, right) =>
+          right.conversions - left.conversions ||
+          right.visitors - left.visitors ||
+          left.name.localeCompare(right.name, "pt-BR"),
+      ),
+  };
 }
 
 export async function analyticsAssets(actor: Actor, input: AnalyticsFilters) {

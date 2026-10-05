@@ -172,6 +172,7 @@ model AnalyticsEvent {
   elementType      String?         @db.VarChar(40)
   elementId        String?         @db.VarChar(255)
   campaignId       String?         @db.VarChar(255)
+  campaignAssetId  String?         @db.VarChar(255)
   goalId           String?
   path             String?         @db.VarChar(2048)
   destinationUrl   String?         @db.VarChar(4096)
@@ -219,6 +220,7 @@ model AnalyticsEvent {
   @@index([workspaceId, isTest, occurredAt])
   @@index([assetId, occurredAt])
   @@index([campaignId, occurredAt])
+  @@index([campaignAssetId, occurredAt])
   @@index([goalId, occurredAt])
   @@index([userId, occurredAt])
   @@index([audienceContactId, occurredAt])
@@ -300,6 +302,7 @@ model AnalyticsGoal {
   createdAt        DateTime                @default(now())
   updatedAt        DateTime                @updatedAt
   workspace        Workspace               @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  primaryForCampaigns Campaign[]           @relation("CampaignPrimaryGoal")
   conversions      AnalyticsConversion[]
   completionEvents AnalyticsEvent[]        @relation("AnalyticsGoalCompletionEvents")
 
@@ -316,6 +319,7 @@ model AnalyticsConversion {
   visitorId          String?
   sessionId          String?
   campaignId         String?  @db.VarChar(255)
+  campaignAssetId    String?  @db.VarChar(255)
   assetType          String?  @db.VarChar(40)
   assetId            String?  @db.VarChar(255)
   source             String?  @db.VarChar(253)
@@ -343,6 +347,7 @@ model AnalyticsConversion {
   @@index([sessionId, occurredAt])
   @@index([workspaceId, source, occurredAt])
   @@index([workspaceId, campaignId, occurredAt])
+  @@index([workspaceId, campaignAssetId, occurredAt])
   @@index([workspaceId, day])
 }
 
@@ -769,6 +774,7 @@ model SmartPageFormSubmission {
   visitorId      String?
   sessionId      String?
   campaignId     String?
+  campaignAssetId String?
   source         String          @default("direct") @db.VarChar(253)
   medium         String?         @db.VarChar(120)
   channel        String?         @db.VarChar(40)
@@ -794,6 +800,7 @@ model SmartPageFormSubmission {
   @@index([visitorId, submittedAt])
   @@index([sessionId, submittedAt])
   @@index([campaignId, submittedAt])
+  @@index([workspaceId, campaignAssetId, submittedAt])
 }
 
 model RateLimit {
@@ -1173,6 +1180,7 @@ model Campaign {
   responsibleId String?
   objective String? @db.VarChar(1000)
   objectiveType String? @db.VarChar(40)
+  primaryGoalId String?
   primaryDestinationType String? @db.VarChar(40)
   primaryDestinationId String? @db.VarChar(255)
   primaryDestinationUrl String? @db.VarChar(4096)
@@ -1187,6 +1195,7 @@ model Campaign {
   workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   client Client? @relation(fields: [clientId, workspaceId], references: [id, workspaceId])
   responsible User? @relation(fields: [responsibleId], references: [id], onDelete: SetNull)
+  primaryGoal AnalyticsGoal? @relation("CampaignPrimaryGoal", fields: [primaryGoalId], references: [id], onDelete: SetNull)
   utmLinks UtmLink[]
   shortLinks ShortLink[]
   qrs QrAsset[]
@@ -1204,6 +1213,7 @@ model Campaign {
   @@index([workspaceId, createdAt])
   @@index([workspaceId, status])
   @@index([workspaceId, clientId])
+  @@index([workspaceId, primaryGoalId])
   @@index([responsibleId])
 }
 

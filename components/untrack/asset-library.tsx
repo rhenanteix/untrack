@@ -36,10 +36,9 @@ interface Result {
 }
 const statuses: Record<string, string> = {
   draft: "Rascunho",
-  scheduled: "Agendada",
   active: "Ativa",
-  paused: "Pausada",
   completed: "Concluída",
+  archived: "Arquivada",
   inactive: "Desativado",
   expired: "Expirado",
 };
@@ -229,7 +228,7 @@ export function AssetLibrary({ kind }: { kind: "links" | "campaigns" }) {
             <option value="">Todos</option>
             {(kind === "links"
               ? ["active", "inactive", "expired"]
-              : ["draft", "scheduled", "active", "paused", "completed"]
+              : ["draft", "active", "completed", "archived"]
             ).map((status) => (
               <option value={status} key={status}>
                 {kind === "links" && status === "active"

@@ -12,7 +12,8 @@ import {
 } from "./attribution";
 import { analyticsSessionTimeoutMilliseconds } from "./session";
 
-const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const uuidPattern =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const oneYearInSeconds = 365 * 24 * 60 * 60;
 
 type PublicAnalyticsContextPayload = {
@@ -20,6 +21,7 @@ type PublicAnalyticsContextPayload = {
   expiresAt: number;
   attribution: ResolvedAttributionContext;
   campaignId?: string;
+  campaignAssetId?: string;
   qrContext?: string;
 };
 
@@ -61,7 +63,12 @@ function cookieAttributes(headers: Headers, maxAge?: number) {
   ].join("; ");
 }
 
-function setCookie(headers: Headers, name: string, value: string, maxAge?: number) {
+function setCookie(
+  headers: Headers,
+  name: string,
+  value: string,
+  maxAge?: number,
+) {
   return `${name}=${encodeURIComponent(value)}; ${cookieAttributes(headers, maxAge)}`;
 }
 
@@ -80,9 +87,15 @@ function decodeContext(value: string | undefined) {
   if (!value) return undefined;
   const [payload, signature] = value.split(".");
   const expected = payload ? sign(payload) : undefined;
-  if (!payload || !signature || !expected || signature.length !== expected.length)
+  if (
+    !payload ||
+    !signature ||
+    !expected ||
+    signature.length !== expected.length
+  )
     return undefined;
-  if (!timingSafeEqual(Buffer.from(signature), Buffer.from(expected))) return undefined;
+  if (!timingSafeEqual(Buffer.from(signature), Buffer.from(expected)))
+    return undefined;
   try {
     const parsed = JSON.parse(
       Buffer.from(payload, "base64url").toString("utf8"),
@@ -134,14 +147,27 @@ export function resolvePublicAnalyticsContext(
       cookieHeaders: [],
     };
 
-  const existingVisitorId = validUuid(readCookie(headers, analyticsVisitorCookieName));
-  const existingSessionId = validUuid(readCookie(headers, analyticsSessionCookieName));
-  const visitorId = validUuid(suppliedIdentity.visitorId) ?? existingVisitorId ?? randomUUID();
-  const sessionId = validUuid(suppliedIdentity.sessionId) ?? existingSessionId ?? randomUUID();
+  const existingVisitorId = validUuid(
+    readCookie(headers, analyticsVisitorCookieName),
+  );
+  const existingSessionId = validUuid(
+    readCookie(headers, analyticsSessionCookieName),
+  );
+  const visitorId =
+    validUuid(suppliedIdentity.visitorId) ?? existingVisitorId ?? randomUUID();
+  const sessionId =
+    validUuid(suppliedIdentity.sessionId) ?? existingSessionId ?? randomUUID();
   const cookieHeaders = [
     ...(existingVisitorId === visitorId
       ? []
-      : [setCookie(headers, analyticsVisitorCookieName, visitorId, oneYearInSeconds)]),
+      : [
+          setCookie(
+            headers,
+            analyticsVisitorCookieName,
+            visitorId,
+            oneYearInSeconds,
+          ),
+        ]),
     ...(existingSessionId === sessionId
       ? []
       : [
@@ -153,7 +179,9 @@ export function resolvePublicAnalyticsContext(
           ),
         ]),
   ];
-  const context = decodeContext(readCookie(headers, analyticsContextCookieName));
+  const context = decodeContext(
+    readCookie(headers, analyticsContextCookieName),
+  );
   return {
     trackingAllowed: true,
     identity: { visitorId, sessionId },
@@ -170,15 +198,17 @@ export function publicAnalyticsContextCookies(
   headers: Headers,
   requestContext: PublicAnalyticsRequestContext,
   attribution: Attribution,
-  context: { campaignId?: string; qrContext?: string } = {},
+  context: {
+    campaignId?: string;
+    campaignAssetId?: string;
+    qrContext?: string;
+  } = {},
 ) {
   if (!requestContext.trackingAllowed) return [];
   const utm = Object.fromEntries(
     ["utmSource", "utmMedium", "utmCampaign", "utmContent", "utmTerm"].flatMap(
       (key) => {
-        const value = requestContext.attribution[
-          key as keyof AttributionInput
-        ];
+        const value = requestContext.attribution[key as keyof AttributionInput];
         return typeof value === "string" ? [[key, limited(value, 120)]] : [];
       },
     ),
@@ -201,7 +231,12 @@ export function publicAnalyticsContextCookies(
         : {}),
       ...utm,
     },
-    ...(context.campaignId ? { campaignId: context.campaignId.slice(0, 255) } : {}),
+    ...(context.campaignId
+      ? { campaignId: context.campaignId.slice(0, 255) }
+      : {}),
+    ...(context.campaignAssetId
+      ? { campaignAssetId: context.campaignAssetId.slice(0, 255) }
+      : {}),
     ...(context.qrContext ? { qrContext: context.qrContext.slice(0, 80) } : {}),
   };
   const encoded = encodeContext(payload);
@@ -222,10 +257,15 @@ export function publicAnalyticsContextCookies(
 
 export function trustedCampaignContext(headers: Headers) {
   if (analyticsOptOut(headers)) return {};
-  const context = decodeContext(readCookie(headers, analyticsContextCookieName));
+  const context = decodeContext(
+    readCookie(headers, analyticsContextCookieName),
+  );
   return context
     ? {
         ...(context.campaignId ? { campaignId: context.campaignId } : {}),
+        ...(context.campaignAssetId
+          ? { campaignAssetId: context.campaignAssetId }
+          : {}),
         ...(context.qrContext ? { qrContext: context.qrContext } : {}),
       }
     : {};

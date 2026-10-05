@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { getPrisma } from "@/lib/prisma";
 import {
+  analyticsCampaignDistributions,
   analyticsGoals,
   analyticsJourneys,
   analyticsOverview,
@@ -47,6 +48,77 @@ describe("analytics overview", () => {
         assetType: "smart_page",
         isBot: false,
       });
+  });
+});
+
+describe("campaign distribution analytics", () => {
+  it("aggregates only distribution assets that belong to the requested workspace and campaign", async () => {
+    const eventGroupBy = vi
+      .fn()
+      .mockResolvedValueOnce([
+        { campaignAssetId: "distribution_1", visitorId: "visitor_1" },
+        { campaignAssetId: "distribution_1", visitorId: "visitor_2" },
+      ])
+      .mockResolvedValueOnce([
+        { campaignAssetId: "distribution_1", _count: { _all: 4 } },
+      ]);
+    const conversionGroupBy = vi
+      .fn()
+      .mockResolvedValue([
+        { campaignAssetId: "distribution_1", _count: { _all: 1 } },
+      ]);
+    const assetFindMany = vi.fn().mockResolvedValue([
+      {
+        id: "distribution_1",
+        name: "QR Stand",
+        assetType: "qr_code",
+        status: "active",
+        channel: { id: "channel_1", name: "Offline", type: "offline" },
+      },
+    ]);
+    vi.mocked(getPrisma).mockReturnValue({
+      user: {
+        findUniqueOrThrow: vi.fn().mockResolvedValue({
+          plan: "free",
+          trial: null,
+        }),
+      },
+      workspace: {
+        findUnique: vi.fn().mockResolvedValue({ timezone: "UTC" }),
+      },
+      campaignAsset: { findMany: assetFindMany },
+      analyticsEvent: { groupBy: eventGroupBy },
+      analyticsConversion: { groupBy: conversionGroupBy },
+    } as unknown as ReturnType<typeof getPrisma>);
+
+    const result = await analyticsCampaignDistributions(
+      { userId: "user_1", workspaceId: "workspace_1", role: "owner" },
+      { campaignId: "campaign_1" },
+    );
+
+    expect(assetFindMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { workspaceId: "workspace_1", campaignId: "campaign_1" },
+      }),
+    );
+    expect(result.items).toEqual([
+      {
+        id: "distribution_1",
+        name: "QR Stand",
+        type: "qr_code",
+        status: "active",
+        channel: { id: "channel_1", name: "Offline", type: "offline" },
+        visitors: 2,
+        interactions: 4,
+        conversions: 1,
+        conversionRate: 50,
+      },
+    ]);
+    for (const call of [
+      ...eventGroupBy.mock.calls,
+      ...conversionGroupBy.mock.calls,
+    ])
+      expect(call[0].where).toMatchObject({ workspaceId: "workspace_1" });
   });
 });
 

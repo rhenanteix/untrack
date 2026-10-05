@@ -25,6 +25,11 @@ type QrRedirectContext = {
   context: string | null;
 };
 
+type CampaignAssetRedirectContext = {
+  id: string;
+  campaignId: string;
+};
+
 async function recordRedirectAnalytics(
   request: Request,
   link: ShortLink,
@@ -32,6 +37,7 @@ async function recordRedirectAnalytics(
   tracking: PublicAnalyticsRequestContext,
   attribution: AttributionInput,
   qr: QrRedirectContext | null,
+  campaignAsset: CampaignAssetRedirectContext | null,
 ) {
   if (!tracking.trackingAllowed) return;
   await recordAnalyticsEvent({
@@ -46,7 +52,12 @@ async function recordRedirectAnalytics(
     sessionKey: tracking.identity.sessionId,
     assetType: qr ? "qr_code" : "link",
     assetId: qr?.id ?? link.id,
-    campaignId: qr?.campaignId ?? link.campaignId ?? undefined,
+    campaignId:
+      qr?.campaignId ??
+      campaignAsset?.campaignId ??
+      link.campaignId ??
+      undefined,
+    campaignAssetId: campaignAsset?.id,
     path: new URL(request.url).pathname,
     destinationUrl: link.destinationUrl,
     attribution,
@@ -57,17 +68,48 @@ async function recordRedirectAnalytics(
 }
 
 export async function drainClickOutbox() {
-  return getPrisma().$transaction(async (tx) => {
-    const events = await tx.$queryRaw<Array<{ id: string; linkId: string; createdAt: Date; day: Date; referrer: string; device: string }>>`SELECT * FROM "ClickOutbox" ORDER BY "createdAt" LIMIT 500 FOR UPDATE SKIP LOCKED`;
-    for (const event of events) {
-      if (await tx.shortLink.findUnique({ where: { id: event.linkId }, select: { id: true } })) await tx.linkClick.upsert({ where: { id: event.id }, update: {}, create: event });
-    }
-    await tx.clickOutbox.deleteMany({ where: { id: { in: events.map((event) => event.id) } } });
-    return events.length;
-  }, { timeout: 15000 });
+  return getPrisma().$transaction(
+    async (tx) => {
+      const events = await tx.$queryRaw<
+        Array<{
+          id: string;
+          linkId: string;
+          createdAt: Date;
+          day: Date;
+          referrer: string;
+          device: string;
+        }>
+      >`SELECT * FROM "ClickOutbox" ORDER BY "createdAt" LIMIT 500 FOR UPDATE SKIP LOCKED`;
+      for (const event of events) {
+        if (
+          await tx.shortLink.findUnique({
+            where: { id: event.linkId },
+            select: { id: true },
+          })
+        )
+          await tx.linkClick.upsert({
+            where: { id: event.id },
+            update: {},
+            create: event,
+          });
+      }
+      await tx.clickOutbox.deleteMany({
+        where: { id: { in: events.map((event) => event.id) } },
+      });
+      return events.length;
+    },
+    { timeout: 15000 },
+  );
 }
-export async function redirectResponse(request: Request, slug: string, distribution: "digital" | "qr" | "whatsapp", countClick: boolean, unavailableMessage = "Link não encontrado, expirado ou desativado.") {
-  if (!/^[A-Za-z0-9_-]{3,64}$/.test(slug)) return new Response("Link não encontrado.", { status: 404 });
+export async function redirectResponse(
+  request: Request,
+  slug: string,
+  distribution: "digital" | "qr" | "whatsapp",
+  countClick: boolean,
+  unavailableMessage = "Link não encontrado, expirado ou desativado.",
+) {
+  if (!/^[A-Za-z0-9_-]{3,64}$/.test(slug))
+    return new Response("Link não encontrado.", { status: 404 });
   const hostname = new URL(request.url).hostname.toLowerCase();
   const domainKey = hostname === appUrl().hostname ? "platform" : hostname;
   const metadata = countClick ? clickMetadata(request.headers) : null;
@@ -87,47 +129,80 @@ export async function redirectResponse(request: Request, slug: string, distribut
           SELECT ${randomUUID()}, "id", ${metadata.day}, ${metadata.referrer}, ${metadata.device} FROM destination RETURNING "id"
         ) SELECT * FROM destination`;
       link = rows[0] ?? null;
-      after(async () => { try { await drainClickOutbox(); } catch { console.error("Click outbox pending; cron will retry."); } });
+      after(async () => {
+        try {
+          await drainClickOutbox();
+        } catch {
+          console.error("Click outbox pending; cron will retry.");
+        }
+      });
     } catch {
       // Analytics storage failure must not prevent navigation.
       link = await publicLink(slug, hostname, distribution);
     }
   } else link = await publicLink(slug, hostname, distribution);
-  if (!link) return new Response(unavailableMessage, { status: 404, headers: { "Cache-Control": "no-store" } });
+  if (!link)
+    return new Response(unavailableMessage, {
+      status: 404,
+      headers: { "Cache-Control": "no-store" },
+    });
   const qr =
     countClick && distribution === "qr"
-      ? await getPrisma().qrAsset.findFirst({
-          where: { redirectId: link.id, workspaceId: link.workspaceId },
-          select: { id: true, campaignId: true, context: true },
-        }).catch(() => null)
+      ? await getPrisma()
+          .qrAsset.findFirst({
+            where: { redirectId: link.id, workspaceId: link.workspaceId },
+            select: { id: true, campaignId: true, context: true },
+          })
+          .catch(() => null)
       : null;
-    const tracking = countClick
-      ? resolvePublicAnalyticsContext(
-          request.headers,
-          {},
-          {
-            ...extractUtmAttribution(request.url),
-            ...(distribution === "qr"
-              ? {
-                  knownContext: {
-                    source: "qr",
-                    medium: "qr",
-                    channel: "qr",
-                  },
-                }
-              : {}),
-          },
-        )
-      : undefined;
-    const attribution = tracking
-      ? { ...tracking.attribution, referrer: request.headers.get("referer") }
-      : undefined;
-    const resolvedAttribution = attribution
-      ? resolveAttribution(attribution)
-      : undefined;
-    if (tracking && attribution)
+  const campaignAsset =
+    countClick && link.campaignId
+      ? await getPrisma()
+          .campaignAsset.findFirst({
+            where: {
+              workspaceId: link.workspaceId,
+              campaignId: link.campaignId,
+              linkId: link.id,
+            },
+            select: { id: true, campaignId: true },
+          })
+          .catch(() => null)
+      : null;
+  const tracking = countClick
+    ? resolvePublicAnalyticsContext(
+        request.headers,
+        {},
+        {
+          ...extractUtmAttribution(request.url),
+          ...(distribution === "qr"
+            ? {
+                knownContext: {
+                  source: "qr",
+                  medium: "qr",
+                  channel: "qr",
+                },
+              }
+            : {}),
+        },
+      )
+    : undefined;
+  const attribution = tracking
+    ? { ...tracking.attribution, referrer: request.headers.get("referer") }
+    : undefined;
+  const resolvedAttribution = attribution
+    ? resolveAttribution(attribution)
+    : undefined;
+  if (tracking && attribution)
     after(() =>
-      recordRedirectAnalytics(request, link, distribution, tracking, attribution, qr).catch((error) =>
+      recordRedirectAnalytics(
+        request,
+        link,
+        distribution,
+        tracking,
+        attribution,
+        qr,
+        campaignAsset,
+      ).catch((error) =>
         console.error("Redirect analytics event was not recorded", error),
       ),
     );
@@ -141,14 +216,25 @@ export async function redirectResponse(request: Request, slug: string, distribut
     });
   // Explicit query policy: all incoming query parameters are ignored, including UTMs.
   const destination = await cachedDestination(link);
-  const headers = new Headers({ Location: destination, "Cache-Control": "no-store, max-age=0", "CDN-Cache-Control": "no-store", "X-Robots-Tag": "noindex, nofollow", "Referrer-Policy": "no-referrer" });
+  const headers = new Headers({
+    Location: destination,
+    "Cache-Control": "no-store, max-age=0",
+    "CDN-Cache-Control": "no-store",
+    "X-Robots-Tag": "noindex, nofollow",
+    "Referrer-Policy": "no-referrer",
+  });
   if (tracking && resolvedAttribution)
     for (const cookie of publicAnalyticsContextCookies(
       request.headers,
       tracking,
       resolvedAttribution,
       {
-        campaignId: qr?.campaignId ?? link.campaignId ?? undefined,
+        campaignId:
+          qr?.campaignId ??
+          campaignAsset?.campaignId ??
+          link.campaignId ??
+          undefined,
+        campaignAssetId: campaignAsset?.id,
         qrContext: qr?.context ?? undefined,
       },
     ))

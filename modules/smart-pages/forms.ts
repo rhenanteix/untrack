@@ -317,7 +317,25 @@ export async function submitPublicSmartPageForm(
     referrer: headers.get("referer"),
   });
   const inherited = trustedCampaignContext(headers);
-  const campaignId = inherited.campaignId ?? undefined;
+  const campaign = inherited.campaignId
+    ? await db.campaign.findFirst({
+        where: { id: inherited.campaignId, workspaceId: form.workspaceId },
+        select: { id: true },
+      })
+    : null;
+  const campaignAsset =
+    campaign && inherited.campaignAssetId
+      ? await db.campaignAsset.findFirst({
+          where: {
+            id: inherited.campaignAssetId,
+            workspaceId: form.workspaceId,
+            campaignId: campaign.id,
+          },
+          select: { id: true },
+        })
+      : null;
+  const campaignId = campaign?.id;
+  const campaignAssetId = campaignAsset?.id;
 
   const captured = await db.$transaction(async (tx) => {
     const duplicate = await tx.smartPageFormSubmission.findUnique({
@@ -402,6 +420,7 @@ export async function submitPublicSmartPageForm(
         smartPageId: form.smartPageId,
         contactId: savedContact.id,
         campaignId: campaignId ?? null,
+        campaignAssetId: campaignAssetId ?? null,
         source: attribution.source,
         medium: attribution.medium,
         channel: attribution.channel,
@@ -423,6 +442,7 @@ export async function submitPublicSmartPageForm(
           smartPageId: form.smartPageId,
           smartPageBlockId: form.smartPageBlockId,
           campaignId: campaignId ?? null,
+          campaignAssetId: campaignAssetId ?? null,
           source: attribution.source,
         }),
       },
@@ -438,6 +458,7 @@ export async function submitPublicSmartPageForm(
             submissionId: submission.id,
             smartPageId: form.smartPageId,
             campaignId: campaignId ?? null,
+            campaignAssetId: campaignAssetId ?? null,
           }),
         },
       });
@@ -473,6 +494,7 @@ export async function submitPublicSmartPageForm(
         elementType: "form",
         elementId: form.id,
         campaignId,
+        campaignAssetId,
         smartPageId: form.smartPageId,
         smartPageBlockId: form.smartPageBlockId,
         path: `/${form.smartPage.slug}`,
@@ -494,6 +516,7 @@ export async function submitPublicSmartPageForm(
           elementType: "form",
           elementId: form.id,
           campaignId,
+          campaignAssetId,
           smartPageId: form.smartPageId,
           smartPageBlockId: form.smartPageBlockId,
           path: `/${form.smartPage.slug}`,
@@ -539,7 +562,7 @@ export async function submitPublicSmartPageForm(
       headers,
       tracking,
       attribution,
-      { campaignId, qrContext: inherited.qrContext },
+      { campaignId, campaignAssetId, qrContext: inherited.qrContext },
     ),
   };
 }

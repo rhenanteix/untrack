@@ -4,6 +4,7 @@ import { errorResponse } from "@/lib/api-response";
 import { analyticsAssetTypes } from "@/modules/analytics/event-types";
 import {
   analyticsAssets,
+  analyticsCampaignDistributions,
   analyticsCampaigns,
   analyticsChannels,
   analyticsGoals,
@@ -26,6 +27,7 @@ const searchSchema = z.object({
       "sources",
       "channels",
       "assets",
+      "distributions",
       "campaigns",
       "goals",
       "utms",
@@ -41,6 +43,7 @@ const searchSchema = z.object({
   assetType: z.enum(analyticsAssetTypes).optional(),
   assetId: z.string().min(1).max(255).optional(),
   campaignId: z.string().min(1).max(255).optional(),
+  campaignAssetId: z.string().min(1).max(255).optional(),
   goalId: z.string().min(1).max(255).optional(),
   source: z.string().trim().min(1).max(253).optional(),
   channel: z
@@ -71,6 +74,7 @@ export async function GET(request: Request) {
       assetType: input.assetType,
       assetId: input.assetId,
       campaignId: input.campaignId,
+      campaignAssetId: input.campaignAssetId,
       goalId: input.goalId,
       source: input.source,
       channel: input.channel,
@@ -81,6 +85,7 @@ export async function GET(request: Request) {
       sources: analyticsSources,
       channels: analyticsChannels,
       assets: analyticsAssets,
+      distributions: analyticsCampaignDistributions,
       campaigns: analyticsCampaigns,
       goals: analyticsGoals,
       utms: analyticsUtms,

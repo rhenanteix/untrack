@@ -1,5 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { getPrisma } from "@/lib/prisma";
+import { resolveAttribution } from "@/modules/analytics/attribution";
+import {
+  publicAnalyticsContextCookies,
+  resolvePublicAnalyticsContext,
+} from "@/modules/analytics/public-context";
 import { recordAnalyticsEvent } from "@/modules/analytics/service";
 import { submitPublicSmartPageForm } from "@/modules/smart-pages/forms";
 
@@ -192,6 +197,88 @@ describe("public Smart Page form submissions", () => {
       where: { id: "visitor_1" },
       data: { audienceContactId: "contact_1" },
     });
+  });
+
+  it("keeps a signed campaign distribution through form capture and conversion events", async () => {
+    const redirectHeaders = new Headers();
+    const context = resolvePublicAnalyticsContext(redirectHeaders);
+    const cookie = publicAnalyticsContextCookies(
+      redirectHeaders,
+      context,
+      resolveAttribution({
+        knownContext: { source: "qr", medium: "qr", channel: "qr" },
+      }),
+      {
+        campaignId: "campaign_1",
+        campaignAssetId: "distribution_stand",
+        qrContext: "stand_principal",
+      },
+    )
+      .map((value) => value.split(";")[0])
+      .join("; ");
+    const captureTx = {
+      smartPageFormSubmission: {
+        findUnique: vi.fn().mockResolvedValue(null),
+        create: vi.fn().mockResolvedValue({ id: "submission_1" }),
+      },
+      audienceContact: {
+        findFirst: vi.fn().mockResolvedValue(null),
+        create: vi.fn().mockResolvedValue({ id: "contact_1" }),
+      },
+      audienceContactEvent: { create: vi.fn().mockResolvedValue({}) },
+    };
+    const identityTx = {
+      smartPageFormSubmission: { update: vi.fn().mockResolvedValue({}) },
+      analyticsVisitor: { update: vi.fn().mockResolvedValue({}) },
+    };
+    vi.mocked(getPrisma).mockReturnValue({
+      smartPageForm: { findFirst: vi.fn().mockResolvedValue(form) },
+      smartPageFormSubmission: { findUnique: vi.fn().mockResolvedValue(null) },
+      campaign: { findFirst: vi.fn().mockResolvedValue({ id: "campaign_1" }) },
+      campaignAsset: {
+        findFirst: vi.fn().mockResolvedValue({ id: "distribution_stand" }),
+      },
+      $transaction: vi
+        .fn()
+        .mockImplementationOnce(async (callback) => callback(captureTx))
+        .mockImplementationOnce(async (callback) => callback(identityTx)),
+    } as unknown as ReturnType<typeof getPrisma>);
+
+    await submitPublicSmartPageForm(
+      "minha-pagina",
+      "form_1",
+      {
+        idempotencyKey: "ae47514d-d214-44c6-b9ec-a7d3004f0db5",
+        values: {
+          field_name: "Maria Silva",
+          field_email: "maria@example.com",
+        },
+      },
+      new Headers({ cookie }),
+    );
+
+    expect(captureTx.smartPageFormSubmission.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          campaignId: "campaign_1",
+          campaignAssetId: "distribution_stand",
+        }),
+      }),
+    );
+    expect(recordAnalyticsEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        name: "form_submit",
+        campaignId: "campaign_1",
+        campaignAssetId: "distribution_stand",
+      }),
+    );
+    expect(recordAnalyticsEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        name: "lead_created",
+        campaignId: "campaign_1",
+        campaignAssetId: "distribution_stand",
+      }),
+    );
   });
 
   it("records another submission for an existing e-mail without a new lead", async () => {
