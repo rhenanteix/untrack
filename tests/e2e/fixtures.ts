@@ -1,4 +1,4 @@
-import { test as base, expect, devices } from "@playwright/test";
+import { test as base, expect, devices, type APIRequestContext, type Page } from "@playwright/test";
 import { PrismaClient } from "@prisma/client";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
@@ -30,7 +30,7 @@ const prisma = databaseUrl
   : new PrismaClient();
 
 export const test = base.extend({
-  page: async ({ page }, use, testInfo) => {
+  page: async ({ page }: { page: Page }, use: (page: Page) => Promise<void>) => {
     try {
       await prisma.anonymousUse.deleteMany();
     } catch {
@@ -40,4 +40,4 @@ export const test = base.extend({
   },
 });
 
-export { expect, devices };
+export { expect, devices, type APIRequestContext, type Page };
