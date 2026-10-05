@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./fixtures";
 
 const VIEWPORTS = [320, 375, 390, 430, 768, 1024, 1440] as const;
 const ROUTES = ["/", "/limpar-link", "/gerar-utm", "/gerar-qrcode"] as const;

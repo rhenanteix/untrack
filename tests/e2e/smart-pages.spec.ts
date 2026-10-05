@@ -1,6 +1,6 @@
 import { grantTestPremium } from "../helpers/premium";
 import { randomUUID } from "node:crypto";
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./fixtures";
 
 const password = "Senha de teste Smart Page! 2026";
 

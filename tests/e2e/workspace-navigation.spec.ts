@@ -4,7 +4,7 @@ import {
   test,
   type APIRequestContext,
   type Page,
-} from "@playwright/test";
+} from "./fixtures";
 import { grantTestPremium } from "../helpers/premium";
 
 async function account(request: APIRequestContext, baseURL: string) {

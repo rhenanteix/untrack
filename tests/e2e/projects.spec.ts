@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { expect, test, type APIRequestContext } from "@playwright/test";
+import { expect, test, type APIRequestContext } from "./fixtures";
 
 async function register(request: APIRequestContext, baseURL: string, name: string) {
   const response = await request.post(`${baseURL}/api/auth/sign-up/email`, {

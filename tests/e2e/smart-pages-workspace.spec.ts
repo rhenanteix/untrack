@@ -1,6 +1,6 @@
 import { grantTestPremium, testDatabase } from "../helpers/premium";
 import { randomUUID } from "node:crypto";
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./fixtures";
 
 async function register(
   request: import("@playwright/test").APIRequestContext,

@@ -1,13 +1,18 @@
 import { defineConfig, devices } from "@playwright/test";
+import { test as base } from "./tests/e2e/fixtures";
 
 const baseURL = "http://localhost:3100";
+
+export const test = base;
+export { expect } from "@playwright/test";
 
 export default defineConfig({
   testDir: "./tests/e2e",
   timeout: 60_000,
   expect: { timeout: 15_000 },
-  fullyParallel: true,
-  workers: process.env.PLAYWRIGHT_EXECUTABLE_PATH ? 1 : undefined,
+  fullyParallel: false,
+  globalSetup: "./tests/e2e/global-setup.ts",
+  workers: 1,
   retries: process.env.CI ? 2 : 0,
   reporter: "html",
   use: {
@@ -15,6 +20,9 @@ export default defineConfig({
     trace: "on-first-retry",
     launchOptions: {
       executablePath: process.env.PLAYWRIGHT_EXECUTABLE_PATH,
+    },
+    env: {
+      DATABASE_URL: process.env.TEST_DATABASE_URL || process.env.DATABASE_URL,
     },
   },
   webServer: {

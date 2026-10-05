@@ -1,4 +1,7 @@
-import { devices, expect, test } from "@playwright/test";
+import { devices, expect } from "@playwright/test";
+import { test as fixture } from "./fixtures";
+
+const test = fixture;
 
 test.use({ ...devices["iPhone 13"], browserName: "chromium" });
 

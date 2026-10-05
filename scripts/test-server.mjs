@@ -1,5 +1,6 @@
 import nextEnv from "@next/env";
 import { spawn, spawnSync } from "node:child_process";
+import { PrismaClient } from "@prisma/client";
 
 nextEnv.loadEnvConfig(process.cwd());
 const testUrl = process.env.TEST_DATABASE_URL;
@@ -19,6 +20,9 @@ const migration = spawnSync(
   { stdio: "inherit", env },
 );
 if (migration.status !== 0) process.exit(migration.status ?? 1);
+const prisma = new PrismaClient({ datasourceUrl: testUrl });
+await prisma.anonymousUse.deleteMany();
+await prisma.$disconnect();
 const server = spawn(
   process.execPath,
   ["node_modules/next/dist/bin/next", "dev", "--port", "3100"],

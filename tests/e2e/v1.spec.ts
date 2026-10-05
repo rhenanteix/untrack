@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./fixtures";
 
 test("UTM Builder preserva o destino e permite abrir a campanha", async ({
   page,
