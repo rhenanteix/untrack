@@ -10,6 +10,7 @@ import {
   trustedCampaignContext,
 } from "@/modules/analytics/public-context";
 import { recordAnalyticsEvent } from "@/modules/analytics/service";
+import type { Actor } from "@/modules/workspaces/context";
 
 const submissionInputSchema = z
   .object({
@@ -32,6 +33,21 @@ const submissionInputSchema = z
   .strict();
 
 type FormValue = string | boolean;
+
+export type SmartPageFormOverview = {
+  id: string;
+  name: string;
+  title: string;
+  status: "active" | "inactive";
+  smartPage: { id: string; title: string; slug: string };
+  createdAt: Date;
+  updatedAt: Date;
+  views: number;
+  submissions: number;
+  contacts: number;
+  leads: number;
+  submissionRate: number;
+};
 
 type Field = {
   id: string;
@@ -161,6 +177,86 @@ function contactData(fields: Field[], values: Record<string, FormValue>) {
     consentGiven,
     consentText,
   };
+}
+
+export async function listSmartPageFormOverviews(
+  actor: Actor,
+): Promise<SmartPageFormOverview[]> {
+  const db = getPrisma();
+  const forms = await db.smartPageForm.findMany({
+    where: { workspaceId: actor.workspaceId },
+    select: {
+      id: true,
+      name: true,
+      title: true,
+      status: true,
+      createdAt: true,
+      updatedAt: true,
+      smartPage: { select: { id: true, title: true, slug: true } },
+    },
+    orderBy: [{ updatedAt: "desc" }, { id: "desc" }],
+    take: 200,
+  });
+  if (!forms.length) return [];
+  const formIds = forms.map((form) => form.id);
+  const [events, contacts] = await Promise.all([
+    db.analyticsEvent.groupBy({
+      by: ["elementId", "name"],
+      where: {
+        workspaceId: actor.workspaceId,
+        elementType: "form",
+        elementId: { in: formIds },
+        name: { in: ["form_view", "form_submit", "lead_created"] },
+      },
+      _count: { _all: true },
+    }),
+    db.smartPageFormSubmission.groupBy({
+      by: ["formId", "contactId"],
+      where: {
+        workspaceId: actor.workspaceId,
+        formId: { in: formIds },
+        contactId: { not: null },
+      },
+    }),
+  ]);
+  const eventCounts = new Map<string, Record<string, number>>();
+  for (const event of events) {
+    if (!event.elementId) continue;
+    const counts = eventCounts.get(event.elementId) ?? {};
+    counts[event.name] = event._count._all;
+    eventCounts.set(event.elementId, counts);
+  }
+  const contactCounts = new Map<string, number>();
+  for (const contact of contacts)
+    contactCounts.set(
+      contact.formId,
+      (contactCounts.get(contact.formId) ?? 0) + 1,
+    );
+  return forms.map((form) => {
+    const counts = eventCounts.get(form.id) ?? {};
+    const views = counts.form_view ?? 0;
+    const submissions = counts.form_submit ?? 0;
+    return {
+      ...form,
+      status: form.status,
+      views,
+      submissions,
+      contacts: contactCounts.get(form.id) ?? 0,
+      leads: counts.lead_created ?? 0,
+      submissionRate: views
+        ? Number(((submissions / views) * 100).toFixed(1))
+        : 0,
+    };
+  });
+}
+
+export async function getSmartPageFormOverview(actor: Actor, id: string) {
+  const form = (await listSmartPageFormOverviews(actor)).find(
+    (item) => item.id === id,
+  );
+  if (!form)
+    throw new ApiError(404, "FORM_NOT_FOUND", "Formulário não encontrado.");
+  return form;
 }
 
 export async function submitPublicSmartPageForm(

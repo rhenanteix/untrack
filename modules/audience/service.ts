@@ -36,6 +36,20 @@ const contactInclude = {
       campaign: { select: { id: true, name: true } },
     },
   },
+  formSubmissions: {
+    orderBy: { submittedAt: "desc" as const },
+    take: 1,
+    select: {
+      id: true,
+      source: true,
+      medium: true,
+      channel: true,
+      submittedAt: true,
+      form: { select: { id: true, name: true, title: true } },
+      smartPage: { select: { id: true, title: true, slug: true } },
+      campaign: { select: { id: true, name: true } },
+    },
+  },
   _count: { select: { events: true, exchanges: true } },
 } as const;
 
@@ -81,6 +95,19 @@ export async function getAudienceContact(actor: Actor, id: string) {
           smartCard: {
             select: { id: true, slug: true, firstName: true, lastName: true },
           },
+          campaign: { select: { id: true, name: true } },
+        },
+      },
+      formSubmissions: {
+        orderBy: { submittedAt: "desc" },
+        select: {
+          id: true,
+          source: true,
+          medium: true,
+          channel: true,
+          submittedAt: true,
+          form: { select: { id: true, name: true, title: true } },
+          smartPage: { select: { id: true, title: true, slug: true } },
           campaign: { select: { id: true, name: true } },
         },
       },

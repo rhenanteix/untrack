@@ -29,6 +29,22 @@
   font-size: 10px;
   font-weight: 800;
 }
+.headingActions {
+  display: flex;
+  align-items: end;
+  gap: 12px;
+}
+.headingActions > a {
+  padding: 9px 0;
+  color: #315b44;
+  font-size: 12px;
+  font-weight: 800;
+  text-decoration: none;
+  text-underline-offset: 3px;
+}
+.headingActions > a:hover {
+  text-decoration: underline;
+}
 .heading input,
 .classification select,
 .noteForm textarea {
@@ -315,6 +331,16 @@
   }
   .heading label {
     width: 100%;
+  }
+  .headingActions {
+    width: 100%;
+    align-items: end;
+  }
+  .headingActions > a {
+    flex: 0 0 auto;
+  }
+  .headingActions label {
+    min-width: 0;
   }
   .workspace {
     display: block;

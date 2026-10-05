@@ -880,7 +880,7 @@ export function SmartPagesDashboard({
             }
           : current,
       );
-          setFormBuilderRevision((revision) => revision + 1);
+      setFormBuilderRevision((revision) => revision + 1);
       action.setNotice("Formulário atualizado.");
     });
   }
@@ -2047,6 +2047,26 @@ export function SmartPagesDashboard({
                           </article>
                         ))}
                       </div>
+                      <section
+                        className="sp-form-metrics"
+                        aria-label="Captação de contatos"
+                      >
+                        <h4>Captação de contatos</h4>
+                        <div className="sp-metric-cards">
+                          {[
+                            ["Visualizações de formulário", metrics.formViews],
+                            ["Submissões", metrics.formSubmissions],
+                            ["Contatos únicos", metrics.formContacts],
+                            ["Novos contatos", metrics.formLeads],
+                            ["Taxa de envio", `${metrics.formSubmissionRate}%`],
+                          ].map(([label, value]) => (
+                            <article key={label}>
+                              <span>{label}</span>
+                              <strong>{value}</strong>
+                            </article>
+                          ))}
+                        </div>
+                      </section>
                       <div className="smart-page-metric-lists">
                         <div>
                           <h4>Links com mais cliques</h4>

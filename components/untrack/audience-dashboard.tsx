@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
 import { FiMail, FiMessageCircle, FiPlus } from "react-icons/fi";
 import { apiRequest } from "./shared";
@@ -12,6 +13,17 @@ type Exchange = {
   intent: string | null;
   capturedAt: string;
   smartCard: { id: string; slug: string; firstName: string; lastName: string };
+  campaign: { id: string; name: string } | null;
+};
+
+type FormSubmission = {
+  id: string;
+  source: string;
+  medium: string | null;
+  channel: string | null;
+  submittedAt: string;
+  form: { id: string; name: string; title: string };
+  smartPage: { id: string; title: string; slug: string };
   campaign: { id: string; name: string } | null;
 };
 
@@ -30,6 +42,7 @@ type Contact = {
   temperature: "cold" | "warm" | "hot";
   updatedAt: string;
   exchanges: Exchange[];
+  formSubmissions: FormSubmission[];
   events?: {
     id: string;
     name: string;
@@ -72,6 +85,8 @@ function eventLabel(
   if (event.name === "link_clicked") return "Abriu um link";
   if (event.name === "whatsapp_clicked") return "Clicou em WhatsApp";
   if (event.name === "booking_clicked") return "Abriu agendamento";
+  if (event.name === "form_submitted") return "Enviou formulário";
+  if (event.name === "lead_created") return "Novo contato criado";
   if (event.name === "note_added") return "Nota adicionada";
   return event.name;
 }
@@ -162,6 +177,13 @@ export function AudienceDashboard({
   }
 
   const latestExchange = selected?.exchanges[0];
+  const latestSubmission = selected?.formSubmissions[0];
+  const hasLatestSubmission =
+    latestSubmission !== undefined
+      ? !latestExchange ||
+        new Date(latestSubmission.submittedAt).getTime() >=
+          new Date(latestExchange.capturedAt).getTime()
+      : false;
   return (
     <section className={styles.dashboard}>
       <header className={styles.heading}>
@@ -173,14 +195,17 @@ export function AudienceDashboard({
             campanha e histórico.
           </p>
         </div>
-        <label>
-          <span>Buscar contato</span>
-          <input
-            value={search}
-            onChange={(event) => setSearch(event.target.value)}
-            placeholder="Nome, e-mail ou empresa"
-          />
-        </label>
+        <div className={styles.headingActions}>
+          <Link href="/untrack/audience/forms">Formulários</Link>
+          <label>
+            <span>Buscar contato</span>
+            <input
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+              placeholder="Nome, e-mail ou empresa"
+            />
+          </label>
+        </div>
       </header>
       {notice && (
         <p className={styles.notice} role="status">
@@ -225,9 +250,10 @@ export function AudienceDashboard({
                       {contact.company || contact.email || "Sem empresa"}
                     </small>
                     <em>
-                      {exchange?.smartCard
-                        ? `${exchange.smartCard.firstName} ${exchange.smartCard.lastName}`
-                        : "Smart Card"}
+                      {contact.formSubmissions[0]?.form.name ||
+                        (exchange?.smartCard
+                          ? `${exchange.smartCard.firstName} ${exchange.smartCard.lastName}`
+                          : "Sem origem")}
                     </em>
                   </span>
                   <i data-temperature={contact.temperature}>
@@ -311,34 +337,66 @@ export function AudienceDashboard({
                 </select>
               </label>
             </div>
-            {latestExchange && (
+            {(latestExchange || latestSubmission) && (
               <section className={styles.context}>
                 <h3>Contexto da captura</h3>
                 <dl>
-                  <div>
-                    <dt>Cartão</dt>
-                    <dd>
-                      {latestExchange.smartCard.firstName}{" "}
-                      {latestExchange.smartCard.lastName}
-                    </dd>
-                  </div>
+                  {hasLatestSubmission && latestSubmission ? (
+                    <>
+                      <div>
+                        <dt>Formulário</dt>
+                        <dd>{latestSubmission.form.name}</dd>
+                      </div>
+                      <div>
+                        <dt>Smart Page</dt>
+                        <dd>{latestSubmission.smartPage.title}</dd>
+                      </div>
+                    </>
+                  ) : (
+                    latestExchange && (
+                      <div>
+                        <dt>Cartão</dt>
+                        <dd>
+                          {latestExchange.smartCard.firstName}{" "}
+                          {latestExchange.smartCard.lastName}
+                        </dd>
+                      </div>
+                    )
+                  )}
                   <div>
                     <dt>Origem</dt>
                     <dd>
-                      {latestExchange.sourceLabel || latestExchange.source}
+                      {hasLatestSubmission && latestSubmission
+                        ? latestSubmission.source
+                        : latestExchange?.sourceLabel || latestExchange?.source}
                     </dd>
                   </div>
                   <div>
-                    <dt>Interesse</dt>
-                    <dd>{latestExchange.intent || "Não informado"}</dd>
+                    <dt>{hasLatestSubmission ? "Canal" : "Interesse"}</dt>
+                    <dd>
+                      {hasLatestSubmission
+                        ? latestSubmission?.channel || "Não informado"
+                        : latestExchange?.intent || "Não informado"}
+                    </dd>
                   </div>
                   <div>
                     <dt>Campanha</dt>
-                    <dd>{latestExchange.campaign?.name || "Sem campanha"}</dd>
+                    <dd>
+                      {(hasLatestSubmission
+                        ? latestSubmission?.campaign
+                        : latestExchange?.campaign
+                      )?.name || "Sem campanha"}
+                    </dd>
                   </div>
                   <div>
-                    <dt>Capturado</dt>
-                    <dd>{formatDate(latestExchange.capturedAt)}</dd>
+                    <dt>{hasLatestSubmission ? "Enviado" : "Capturado"}</dt>
+                    <dd>
+                      {formatDate(
+                        hasLatestSubmission && latestSubmission
+                          ? latestSubmission.submittedAt
+                          : latestExchange!.capturedAt,
+                      )}
+                    </dd>
                   </div>
                 </dl>
               </section>

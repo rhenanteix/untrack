@@ -40,6 +40,10 @@ export default async function AudiencePage() {
             ...exchange,
             capturedAt: exchange.capturedAt.toISOString(),
           })),
+          formSubmissions: contact.formSubmissions.map((submission) => ({
+            ...submission,
+            submittedAt: submission.submittedAt.toISOString(),
+          })),
         })),
       }}
       canEdit={data.actor.role !== "viewer"}

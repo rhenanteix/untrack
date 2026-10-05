@@ -12,6 +12,8 @@ replacing the existing ShortLink, UTM, QR, campaign, or analytics domains.
   ShortLink reference;
 - live editor preview, managed-link selection, visibility, new-tab behavior,
   click tracking, and page metrics;
+- form blocks with validated fields, idempotent public submission, contact
+  deduplication, and conversion metrics;
 - workspace roles, quotas, audit events, same-origin mutation checks, rate
   limits, and tenant isolation.
 
@@ -61,6 +63,8 @@ Authenticated workspace APIs:
 - `POST`, `PATCH /api/smart-pages/[id]/blocks`
 - `PATCH`, `DELETE /api/smart-pages/[id]/blocks/[blockId]`
 - `GET /api/smart-pages/[id]/analytics?days=30`
+- `POST /api/smart-pages/public/[slug]/forms/[formId]`
+- `GET /api/audience/forms` and `GET /api/audience/forms/[id]`
 
 The public `POST /api/smart-pages/events` accepts only the page and block event
 names registered in `lib/analytics-events.ts`. It resolves the published page
@@ -76,6 +80,13 @@ referrer URL, query string, account cookie, or submitted destination URL.
 Known preview bots and prefetches are ignored using the same policy as short
 link clicks. Unique visitors are unique browser sessions, not a claim of unique
 people.
+
+Form values, consent text, and contact information are stored only with the
+workspace contact/submission records. They are never copied into analytics
+events. The Smart Page Results tab and Audience form overview expose aggregate
+views, submissions, unique contacts, new contacts, and submission rate; the
+Audience contact timeline shows only form, page, origin, campaign, and event
+context.
 
 ## Validation
 
