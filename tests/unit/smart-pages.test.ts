@@ -135,6 +135,85 @@ describe("smart page schemas", () => {
       }).success,
     ).toBe(false);
   });
+
+  it("accepts a form with stable field IDs and requires a contact identity field", () => {
+    const form = smartPageBlockInputSchema.parse({
+      type: "form",
+      settings: {
+        name: "Contato do evento",
+        title: "Receba as novidades",
+        fields: [
+          {
+            fieldType: "name",
+            label: "Nome",
+            required: true,
+            options: [],
+          },
+          {
+            fieldType: "email",
+            label: "E-mail",
+            required: true,
+            options: [],
+          },
+          {
+            fieldType: "consent",
+            label: "Concordo em compartilhar meus dados para contato.",
+            required: true,
+            options: [],
+          },
+        ],
+      },
+    });
+    expect(form).toMatchObject({
+      type: "form",
+      visible: true,
+      analyticsEnabled: true,
+      settings: { submitLabel: "Enviar", status: "active" },
+    });
+    expect(
+      smartPageBlockInputSchema.safeParse({
+        type: "form",
+        settings: {
+          name: "Sem identidade",
+          title: "Conte algo",
+          fields: [
+            {
+              fieldType: "message",
+              label: "Mensagem",
+              required: true,
+              options: [],
+            },
+          ],
+        },
+      }).success,
+    ).toBe(false);
+  });
+
+  it("rejects malformed select options and unknown form settings", () => {
+    expect(
+      smartPageBlockInputSchema.safeParse({
+        type: "form",
+        settings: {
+          name: "Contato",
+          title: "Contato",
+          fields: [
+            {
+              fieldType: "email",
+              label: "E-mail",
+              required: true,
+              options: [],
+            },
+            {
+              fieldType: "select",
+              label: "Interesse",
+              options: ["Orçamento"],
+            },
+          ],
+          workspaceId: "workspace_b",
+        },
+      }).success,
+    ).toBe(false);
+  });
 });
 
 describe("smart page entitlements", () => {

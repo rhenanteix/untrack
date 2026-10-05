@@ -35,7 +35,8 @@ export type SmartPageBlockType =
   | "email"
   | "phone"
   | "event"
-  | "appointment";
+  | "appointment"
+  | "form";
 
 export interface SmartPageContentBlock {
   id: string;
@@ -60,6 +61,7 @@ export interface SmartPageContentBlock {
     alignment?: "left" | "center" | "right";
     openInNewTab?: boolean;
     buttonLabel?: string;
+    formId?: string;
   };
   visible: boolean;
   analyticsEnabled: boolean;
@@ -72,6 +74,9 @@ export interface SmartPageContentBlock {
   } | null;
   productId?: string | null;
   product?: { id: string; name: string } | null;
+  form?:
+    | import("@/components/smart-pages/public-form").PublicSmartPageFormData
+    | null;
 }
 
 function secondaryLabel(block: SmartPageContentBlock) {
@@ -89,8 +94,11 @@ function secondaryLabel(block: SmartPageContentBlock) {
   if (block.type === "phone") return "Contato por telefone";
   if (block.type === "event") return block.settings.date || "Evento";
   if (block.type === "appointment") return "Agendamento";
+  if (block.type === "form") return "Formulário";
   if (block.link) return `${block.link.domainKey}/${block.link.slug}`;
-  return block.settings.destinationUrl?.replace(/^https?:\/\//, "") ?? "Sem destino";
+  return (
+    block.settings.destinationUrl?.replace(/^https?:\/\//, "") ?? "Sem destino"
+  );
 }
 
 function blockTitle(block: SmartPageContentBlock) {
@@ -110,6 +118,7 @@ function blockTitle(block: SmartPageContentBlock) {
     return block.settings.label ?? block.settings.address ?? "E-mail";
   if (block.type === "event" || block.type === "appointment")
     return block.settings.title ?? "Evento";
+  if (block.type === "form") return block.form?.title ?? "Formulário";
   return block.settings.title ?? "Link sem título";
 }
 
@@ -146,7 +155,9 @@ export function ContentBlock({
   const Icon =
     block.type === "product"
       ? HiOutlineShoppingBag
-      : block.type === "title" || block.type === "text" || block.type === "divider"
+      : block.type === "title" ||
+          block.type === "text" ||
+          block.type === "divider"
         ? HiOutlineDocumentText
         : block.type === "image"
           ? HiOutlinePhoto
@@ -166,7 +177,9 @@ export function ContentBlock({
                         ? HiOutlinePhone
                         : block.type === "event" || block.type === "appointment"
                           ? HiOutlineCalendarDays
-                          : HiOutlineLink;
+                          : block.type === "form"
+                            ? HiOutlineDocumentText
+                            : HiOutlineLink;
   const title = blockTitle(block);
 
   return (
@@ -221,7 +234,11 @@ export function ContentBlock({
         aria-label={`${block.visible ? "Ocultar" : "Ativar"} ${title}`}
         onClick={() => onToggle(block)}
       >
-        {block.visible ? <HiOutlineEye aria-hidden="true" /> : <HiOutlineEyeSlash aria-hidden="true" />}
+        {block.visible ? (
+          <HiOutlineEye aria-hidden="true" />
+        ) : (
+          <HiOutlineEyeSlash aria-hidden="true" />
+        )}
         <span>{block.visible ? "Ativo" : "Oculto"}</span>
       </button>
       <div className="sp-content-block-menu">

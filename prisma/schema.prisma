@@ -8,6 +8,11 @@ enum SmartPageStatus {
   published
 }
 
+enum SmartPageFormStatus {
+  active
+  inactive
+}
+
 enum SmartCardStatus {
   draft
   published
@@ -218,6 +223,7 @@ model AnalyticsEvent {
 model AnalyticsVisitor {
   id                String   @id @default(cuid())
   workspaceId       String
+  audienceContactId String?
   visitorHash       String   @db.VarChar(64)
   firstTouchSource  String?  @db.VarChar(253)
   firstTouchMedium  String?  @db.VarChar(120)
@@ -233,12 +239,15 @@ model AnalyticsVisitor {
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
   workspace         Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  audienceContact   AudienceContact? @relation("AudienceContactVisitors", fields: [audienceContactId], references: [id], onDelete: SetNull)
   sessions          AnalyticsSession[]
   events            AnalyticsEvent[]
   conversions       AnalyticsConversion[]
+  formSubmissions   SmartPageFormSubmission[]
 
   @@unique([workspaceId, visitorHash])
   @@index([workspaceId, lastSeenAt])
+  @@index([audienceContactId])
 }
 
 model AnalyticsSession {
@@ -258,6 +267,7 @@ model AnalyticsSession {
   visitor            AnalyticsVisitor @relation(fields: [visitorId], references: [id], onDelete: Cascade)
   events             AnalyticsEvent[]
   conversions        AnalyticsConversion[]
+  formSubmissions    SmartPageFormSubmission[]
 
   @@index([workspaceId, sessionHash, lastActivityAt])
   @@index([visitorId, startedAt])
@@ -429,6 +439,8 @@ model SmartPage {
   workspace   Workspace       @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   images      SmartPageImage[]
   blocks      SmartPageBlock[]
+  forms       SmartPageForm[]
+  formSubmissions SmartPageFormSubmission[]
   analyticsEvents AnalyticsEvent[]
 
   @@index([workspaceId, createdAt])
@@ -528,6 +540,14 @@ model AudienceContact {
   company     String?               @db.VarChar(120)
   jobTitle    String?               @db.VarChar(160)
   city        String?               @db.VarChar(120)
+  firstSource String?               @db.VarChar(253)
+  firstMedium String?               @db.VarChar(120)
+  firstChannel String?              @db.VarChar(40)
+  firstCampaign String?             @db.VarChar(120)
+  lastSource  String?               @db.VarChar(253)
+  lastMedium  String?               @db.VarChar(120)
+  lastChannel String?               @db.VarChar(40)
+  lastCampaign String?              @db.VarChar(120)
   customFields Json                 @default("{}")
   status      AudienceContactStatus @default(new_contact)
   temperature ContactTemperature    @default(cold)
@@ -535,12 +555,16 @@ model AudienceContact {
   updatedAt   DateTime              @updatedAt
   workspace   Workspace             @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   exchanges   SmartCardContactExchange[]
+  formSubmissions SmartPageFormSubmission[]
+  analyticsVisitors AnalyticsVisitor[] @relation("AudienceContactVisitors")
   events      AudienceContactEvent[]
   analyticsEvents AnalyticsEvent[]
 
   @@index([workspaceId, createdAt])
   @@index([workspaceId, email])
   @@index([workspaceId, phone])
+  @@index([workspaceId, firstCampaign])
+  @@index([workspaceId, lastCampaign])
 }
 
 model SmartCardContactExchange {
@@ -620,12 +644,91 @@ model SmartPageBlock {
   smartPage        SmartPage  @relation(fields: [smartPageId], references: [id], onDelete: Cascade)
   link             ShortLink? @relation(fields: [linkId], references: [id], onDelete: SetNull)
   product          Product?   @relation(fields: [productId], references: [id], onDelete: SetNull)
+  form             SmartPageForm?
   analyticsEvents  AnalyticsEvent[]
 
   @@unique([smartPageId, position])
   @@index([smartPageId, position])
   @@index([linkId])
   @@index([productId])
+}
+
+model SmartPageForm {
+  id               String              @id @default(cuid())
+  workspaceId      String
+  smartPageId      String
+  smartPageBlockId String              @unique
+  name             String              @db.VarChar(120)
+  title            String              @db.VarChar(120)
+  description      String              @default("") @db.VarChar(500)
+  submitLabel      String              @default("Enviar") @db.VarChar(80)
+  successMessage   String              @default("Obrigado! Recebemos seus dados.") @db.VarChar(500)
+  privacyPolicyUrl String?             @db.VarChar(4096)
+  status           SmartPageFormStatus @default(active)
+  createdAt        DateTime            @default(now())
+  updatedAt        DateTime            @updatedAt
+  workspace        Workspace           @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  smartPage        SmartPage           @relation(fields: [smartPageId], references: [id], onDelete: Cascade)
+  smartPageBlock   SmartPageBlock      @relation(fields: [smartPageBlockId], references: [id], onDelete: Cascade)
+  fields           SmartPageFormField[]
+  submissions      SmartPageFormSubmission[]
+
+  @@index([workspaceId, createdAt])
+  @@index([smartPageId, status])
+}
+
+model SmartPageFormField {
+  id          String          @id @default(cuid())
+  formId      String
+  fieldType   String          @db.VarChar(40)
+  label       String          @db.VarChar(120)
+  placeholder String?         @db.VarChar(160)
+  required    Boolean         @default(false)
+  position    Int
+  options     Json            @default("[]")
+  config      Json            @default("{}")
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+  form        SmartPageForm   @relation(fields: [formId], references: [id], onDelete: Cascade)
+
+  @@unique([formId, position])
+  @@index([formId, position])
+}
+
+model SmartPageFormSubmission {
+  id             String          @id @default(cuid())
+  workspaceId    String
+  formId         String
+  smartPageId    String
+  contactId      String?
+  visitorId      String?
+  sessionId      String?
+  campaignId     String?
+  source         String          @default("direct") @db.VarChar(253)
+  medium         String?         @db.VarChar(120)
+  channel        String?         @db.VarChar(40)
+  values         Json            @default("{}")
+  consentGiven   Boolean         @default(false)
+  consentText    String?         @db.VarChar(1000)
+  consentedAt    DateTime?
+  idempotencyKey String          @db.VarChar(64)
+  submittedAt    DateTime        @default(now())
+  workspace      Workspace       @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  form           SmartPageForm   @relation(fields: [formId], references: [id], onDelete: Cascade)
+  smartPage      SmartPage       @relation(fields: [smartPageId], references: [id], onDelete: Cascade)
+  contact        AudienceContact? @relation(fields: [contactId], references: [id], onDelete: SetNull)
+  visitor        AnalyticsVisitor? @relation(fields: [visitorId], references: [id], onDelete: SetNull)
+  session        AnalyticsSession? @relation(fields: [sessionId], references: [id], onDelete: SetNull)
+  campaign       Campaign?       @relation(fields: [campaignId, workspaceId], references: [id, workspaceId])
+
+  @@unique([formId, idempotencyKey])
+  @@index([workspaceId, submittedAt])
+  @@index([formId, submittedAt])
+  @@index([smartPageId, submittedAt])
+  @@index([contactId, submittedAt])
+  @@index([visitorId, submittedAt])
+  @@index([sessionId, submittedAt])
+  @@index([campaignId, submittedAt])
 }
 
 model RateLimit {
@@ -790,6 +893,8 @@ model Workspace {
   incidents CampaignIncident[]
   deliveries NotificationDelivery[]
   smartPages SmartPage[]
+  smartPageForms SmartPageForm[]
+  smartPageFormSubmissions SmartPageFormSubmission[]
   analyticsEvents AnalyticsEvent[]
   analyticsVisitors AnalyticsVisitor[]
   analyticsSessions AnalyticsSession[]
@@ -1027,6 +1132,7 @@ model Campaign {
   whatsappLinks WhatsappLink[]
   smartCards SmartCard[]
   smartCardContactExchanges SmartCardContactExchange[]
+  formSubmissions SmartPageFormSubmission[]
   @@unique([id, workspaceId])
   @@index([workspaceId, createdAt])
   @@index([workspaceId, status])

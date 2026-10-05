@@ -49,7 +49,10 @@ export function errorResponse(
   );
 }
 
-export async function readJson(request: Request): Promise<unknown> {
+export async function readJson(
+  request: Request,
+  maxBytes?: number,
+): Promise<unknown> {
   const contentType = request.headers.get("content-type") ?? "";
   if (!contentType.toLowerCase().startsWith("application/json")) {
     throw new ApiError(
@@ -58,10 +61,30 @@ export async function readJson(request: Request): Promise<unknown> {
       "Envie os dados como JSON.",
     );
   }
-
   try {
-    return await request.json();
-  } catch {
+    const contentLength = Number(request.headers.get("content-length"));
+    if (
+      maxBytes &&
+      Number.isFinite(contentLength) &&
+      contentLength > maxBytes
+    ) {
+      throw new ApiError(
+        413,
+        "PAYLOAD_TOO_LARGE",
+        "Os dados enviados são grandes demais.",
+      );
+    }
+    const body = await request.text();
+    if (maxBytes && new TextEncoder().encode(body).byteLength > maxBytes) {
+      throw new ApiError(
+        413,
+        "PAYLOAD_TOO_LARGE",
+        "Os dados enviados são grandes demais.",
+      );
+    }
+    return JSON.parse(body) as unknown;
+  } catch (error) {
+    if (error instanceof ApiError) throw error;
     throw new ApiError(400, "INVALID_JSON", "O JSON enviado é inválido.");
   }
 }

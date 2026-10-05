@@ -314,6 +314,84 @@ export const appointmentBlockSettingsSchema = z
   })
   .strict();
 
+export const smartPageFormFieldTypeSchema = z.enum([
+  "name",
+  "email",
+  "phone",
+  "company",
+  "job_title",
+  "message",
+  "consent",
+  "text",
+  "textarea",
+  "select",
+  "checkbox",
+]);
+
+export const smartPageFormFieldInputSchema = z
+  .object({
+    id: z.string().trim().min(1).max(200).optional(),
+    fieldType: smartPageFormFieldTypeSchema,
+    label: z.string().trim().min(1, "Informe o rótulo do campo.").max(120),
+    placeholder: z.string().trim().max(160).optional(),
+    required: z.boolean().default(false),
+    options: z.array(z.string().trim().min(1).max(80)).max(12).default([]),
+  })
+  .strict()
+  .superRefine((field, context) => {
+    if (field.fieldType === "select" && field.options.length < 2) {
+      context.addIssue({
+        code: "custom",
+        path: ["options"],
+        message: "Campos de seleção precisam de pelo menos duas opções.",
+      });
+    }
+    if (field.fieldType !== "select" && field.options.length > 0) {
+      context.addIssue({
+        code: "custom",
+        path: ["options"],
+        message: "Opções só são aceitas em campos de seleção.",
+      });
+    }
+  });
+
+export const smartPageFormSettingsInputSchema = z
+  .object({
+    name: z.string().trim().min(1, "Informe o nome do formulário.").max(120),
+    title: z.string().trim().min(1, "Informe o título do formulário.").max(120),
+    description: z.string().trim().max(500).default(""),
+    submitLabel: z.string().trim().min(1).max(80).default("Enviar"),
+    successMessage: z
+      .string()
+      .trim()
+      .min(1)
+      .max(500)
+      .default("Obrigado! Recebemos seus dados."),
+    privacyPolicyUrl: webUrlSchema.nullable().optional(),
+    status: z.enum(["active", "inactive"]).default("active"),
+    fields: z.array(smartPageFormFieldInputSchema).min(1).max(12),
+  })
+  .strict()
+  .superRefine((form, context) => {
+    const ids = form.fields.flatMap((field) => (field.id ? [field.id] : []));
+    if (new Set(ids).size !== ids.length) {
+      context.addIssue({
+        code: "custom",
+        path: ["fields"],
+        message: "Cada campo deve aparecer uma única vez.",
+      });
+    }
+    if (
+      !form.fields.some((field) => ["email", "phone"].includes(field.fieldType))
+    ) {
+      context.addIssue({
+        code: "custom",
+        path: ["fields"],
+        message: "Adicione e-mail ou telefone para identificar o contato.",
+      });
+    }
+  });
+
 const titleSmartPageBlockInputSchema = z
   .object({
     type: z.literal("title"),
@@ -405,6 +483,13 @@ const appointmentSmartPageBlockInputSchema = z
     ...settingsOnlyBlockBase,
   })
   .strict();
+const formSmartPageBlockInputSchema = z
+  .object({
+    type: z.literal("form"),
+    settings: smartPageFormSettingsInputSchema,
+    ...settingsOnlyBlockBase,
+  })
+  .strict();
 
 export const smartPageBlockInputSchema = z
   .union([
@@ -423,6 +508,7 @@ export const smartPageBlockInputSchema = z
     phoneSmartPageBlockInputSchema,
     eventSmartPageBlockInputSchema,
     appointmentSmartPageBlockInputSchema,
+    formSmartPageBlockInputSchema,
   ])
   .superRefine((value, context) => {
     if (
@@ -441,3 +527,9 @@ export const smartPageBlockInputSchema = z
 export type SmartPageInput = z.infer<typeof smartPageInputSchema>;
 export type SmartPageUpdate = z.infer<typeof smartPageUpdateSchema>;
 export type SmartPageBlockInput = z.infer<typeof smartPageBlockInputSchema>;
+export type SmartPageFormFieldInput = z.infer<
+  typeof smartPageFormFieldInputSchema
+>;
+export type SmartPageFormSettingsInput = z.infer<
+  typeof smartPageFormSettingsInputSchema
+>;

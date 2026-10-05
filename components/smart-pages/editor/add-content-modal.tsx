@@ -21,12 +21,7 @@ import {
 } from "@/components/smart-pages/smart-form";
 
 type ContentKind =
-  | "choose"
-  | "link"
-  | "product"
-  | "create-product"
-  | "social"
-  | "settings";
+  "choose" | "link" | "product" | "create-product" | "social" | "settings";
 type SettingsBlockType =
   | "title"
   | "text"
@@ -40,7 +35,8 @@ type SettingsBlockType =
   | "email"
   | "phone"
   | "event"
-  | "appointment";
+  | "appointment"
+  | "form";
 type ContentCategory =
   | "suggested"
   | "links"
@@ -181,6 +177,15 @@ const contentOptions: ContentOption[] = [
     blockType: "phone",
   },
   {
+    id: "form",
+    title: "Formulário",
+    description: "Capture contatos diretamente na sua página",
+    categories: ["suggested", "contact"],
+    Icon: HiOutlineDocumentText,
+    action: "settings",
+    blockType: "form",
+  },
+  {
     id: "file",
     title: "Arquivo",
     description: "Compartilhe um PDF ou documento",
@@ -228,6 +233,39 @@ const socialOptions = [
   "WhatsApp",
 ] as const;
 
+const defaultFormSettings = {
+  name: "Novo formulário",
+  title: "Fale comigo",
+  description: "Deixe seus dados e entraremos em contato.",
+  submitLabel: "Enviar",
+  successMessage: "Obrigado! Recebemos seus dados.",
+  privacyPolicyUrl: null,
+  status: "active",
+  fields: [
+    {
+      fieldType: "name",
+      label: "Nome",
+      placeholder: "Seu nome",
+      required: true,
+      options: [],
+    },
+    {
+      fieldType: "email",
+      label: "E-mail",
+      placeholder: "voce@exemplo.com",
+      required: true,
+      options: [],
+    },
+    {
+      fieldType: "phone",
+      label: "WhatsApp / telefone",
+      placeholder: "+55 11 99999-9999",
+      required: false,
+      options: [],
+    },
+  ],
+} as const;
+
 function detectedPlatform(value: string) {
   const url = value.trim();
   if (!url) return null;
@@ -260,7 +298,11 @@ export function AddContentModal({
 }: {
   open: boolean;
   links: { id: string; title: string | null; slug: string }[];
-  products: { id: string; name: string; status: "draft" | "active" | "archived" }[];
+  products: {
+    id: string;
+    name: string;
+    status: "draft" | "active" | "archived";
+  }[];
   busy: boolean;
   failure: string;
   onClose: () => void;
@@ -270,7 +312,7 @@ export function AddContentModal({
   onOpenSocials: (network?: string) => void;
   onAddSettingsBlock: (
     type: SettingsBlockType,
-    settings: Record<string, string>,
+    settings: Record<string, unknown>,
   ) => void;
 }) {
   const [kind, setKind] = useState<ContentKind>("choose");
@@ -314,15 +356,18 @@ export function AddContentModal({
     onAddSettingsBlock(
       settingsType,
       Object.fromEntries(
-        Array.from(data.entries(), ([key, value]) => [key, String(value).trim()]),
+        Array.from(data.entries(), ([key, value]) => [
+          key,
+          String(value).trim(),
+        ]),
       ),
     );
   }
 
   function settingsTitle() {
     return (
-      contentOptions.find((option) => option.blockType === settingsType)?.title ??
-      "Conteúdo"
+      contentOptions.find((option) => option.blockType === settingsType)
+        ?.title ?? "Conteúdo"
     );
   }
 
@@ -371,7 +416,11 @@ export function AddContentModal({
             <HiOutlineXMark aria-hidden="true" />
           </button>
         </header>
-        {failure && <p className="sp-add-content-error" role="alert">{failure}</p>}
+        {failure && (
+          <p className="sp-add-content-error" role="alert">
+            {failure}
+          </p>
+        )}
         {kind === "choose" ? (
           <div className="sp-content-picker">
             <label className="sp-content-search">
@@ -428,24 +477,35 @@ export function AddContentModal({
               </nav>
               <section aria-live="polite">
                 <p>{categories.find((item) => item.id === category)?.label}</p>
-                <div className="sp-add-content-choices" aria-label="Tipo de conteúdo">
-                  {visibleOptions.map(({ id, title, description, Icon, action, blockType }) => (
-                    <button
-                      key={id}
-                      type="button"
-                      onClick={() => {
-                        if (blockType) selectSettingsBlock(blockType);
-                        else if (action) setKind(action);
-                      }}
-                    >
-                      <Icon aria-hidden="true" />
-                      <span>
-                        <strong>{title}</strong>
-                        <small>{description}</small>
-                      </span>
-                      <HiOutlineChevronRight aria-hidden="true" />
-                    </button>
-                  ))}
+                <div
+                  className="sp-add-content-choices"
+                  aria-label="Tipo de conteúdo"
+                >
+                  {visibleOptions.map(
+                    ({ id, title, description, Icon, action, blockType }) => (
+                      <button
+                        key={id}
+                        type="button"
+                        onClick={() => {
+                          if (blockType === "form") {
+                            onAddSettingsBlock(
+                              "form",
+                              structuredClone(defaultFormSettings),
+                            );
+                            closeModal();
+                          } else if (blockType) selectSettingsBlock(blockType);
+                          else if (action) setKind(action);
+                        }}
+                      >
+                        <Icon aria-hidden="true" />
+                        <span>
+                          <strong>{title}</strong>
+                          <small>{description}</small>
+                        </span>
+                        <HiOutlineChevronRight aria-hidden="true" />
+                      </button>
+                    ),
+                  )}
                   {!visibleOptions.length && (
                     <p className="sp-add-content-empty">
                       Nenhum tipo de conteúdo encontrado.
@@ -459,10 +519,14 @@ export function AddContentModal({
           <button
             type="button"
             className="sp-add-content-back"
-            onClick={() => setKind(kind === "create-product" ? "product" : "choose")}
+            onClick={() =>
+              setKind(kind === "create-product" ? "product" : "choose")
+            }
           >
             <HiOutlineArrowLeft aria-hidden="true" />
-            {kind === "create-product" ? "Adicionar produto" : "Adicionar conteúdo"}
+            {kind === "create-product"
+              ? "Adicionar produto"
+              : "Adicionar conteúdo"}
           </button>
         )}
         {kind === "link" ? (
@@ -484,14 +548,19 @@ export function AddContentModal({
               initialUrl={platform === "YouTube" ? search : ""}
             />
             <SmartField className="smart-page-check">
-              <input type="checkbox" name="openInNewTab" defaultChecked /> Abrir em nova aba
+              <input type="checkbox" name="openInNewTab" defaultChecked /> Abrir
+              em nova aba
             </SmartField>
             <button className="button" disabled={busy}>
               Adicionar link
             </button>
           </form>
         ) : kind === "product" ? (
-          <form className="sp-add-content-form" noValidate onSubmit={onAddProduct}>
+          <form
+            className="sp-add-content-form"
+            noValidate
+            onSubmit={onAddProduct}
+          >
             <div className="sp-add-content-product-heading">
               <div>
                 <strong>Adicionar produto</strong>
@@ -526,7 +595,11 @@ export function AddContentModal({
                 </SmartField>
                 <SmartField>
                   Texto do botão
-                  <input name="buttonLabel" maxLength={40} defaultValue="Ver produto" />
+                  <input
+                    name="buttonLabel"
+                    maxLength={40}
+                    defaultValue="Ver produto"
+                  />
                 </SmartField>
                 <button className="button" disabled={busy}>
                   Adicionar produto
@@ -558,10 +631,16 @@ export function AddContentModal({
             </div>
           </div>
         ) : kind === "settings" && settingsType ? (
-          <form className="sp-add-content-form" noValidate onSubmit={submitSettings}>
+          <form
+            className="sp-add-content-form"
+            noValidate
+            onSubmit={submitSettings}
+          >
             <div className="sp-add-content-product-heading">
               <div>
-                <strong>Adicionar {settingsTitle().toLocaleLowerCase("pt-BR")}</strong>
+                <strong>
+                  Adicionar {settingsTitle().toLocaleLowerCase("pt-BR")}
+                </strong>
                 <small>Essa alteração aparecerá imediatamente na prévia.</small>
               </div>
             </div>
@@ -569,7 +648,13 @@ export function AddContentModal({
               <>
                 <SmartField>
                   Título
-                  <input required name="text" maxLength={120} autoFocus placeholder="Ex: Próximos eventos" />
+                  <input
+                    required
+                    name="text"
+                    maxLength={120}
+                    autoFocus
+                    placeholder="Ex: Próximos eventos"
+                  />
                 </SmartField>
                 <SmartField>
                   Tamanho
@@ -587,7 +672,14 @@ export function AddContentModal({
             {settingsType === "text" && (
               <SmartField>
                 Texto
-                <textarea required name="content" maxLength={1000} rows={5} autoFocus placeholder="Escreva uma mensagem para quem visita sua página." />
+                <textarea
+                  required
+                  name="content"
+                  maxLength={1000}
+                  rows={5}
+                  autoFocus
+                  placeholder="Escreva uma mensagem para quem visita sua página."
+                />
               </SmartField>
             )}
             {settingsType === "divider" && (
@@ -608,27 +700,66 @@ export function AddContentModal({
               <>
                 <SmartField>
                   Imagem (URL)
-                  <input required type="url" name="imageUrl" autoFocus placeholder="https://exemplo.com/imagem.webp" />
+                  <input
+                    required
+                    type="url"
+                    name="imageUrl"
+                    autoFocus
+                    placeholder="https://exemplo.com/imagem.webp"
+                  />
                 </SmartField>
                 <SmartField hint="Descreva a imagem para acessibilidade.">
                   Texto alternativo
-                  <input name="alt" maxLength={160} placeholder="Foto de uma palestra" />
+                  <input
+                    name="alt"
+                    maxLength={160}
+                    placeholder="Foto de uma palestra"
+                  />
                 </SmartField>
                 <SmartField hint="Opcional: abre quando alguém seleciona a imagem.">
                   Destino da imagem
-                  <input type="url" name="destinationUrl" placeholder="https://exemplo.com" />
+                  <input
+                    type="url"
+                    name="destinationUrl"
+                    placeholder="https://exemplo.com"
+                  />
                 </SmartField>
               </>
             )}
             {(settingsType === "video" || settingsType === "spotify") && (
               <>
-                <SmartField hint={settingsType === "video" ? "Use um endereço do YouTube." : "Use um link de faixa, álbum ou playlist do Spotify."}>
+                <SmartField
+                  hint={
+                    settingsType === "video"
+                      ? "Use um endereço do YouTube."
+                      : "Use um link de faixa, álbum ou playlist do Spotify."
+                  }
+                >
                   {settingsType === "video" ? "Vídeo" : "Spotify"}
-                  <input required type="url" name="url" autoFocus defaultValue={pastedUrl} placeholder={settingsType === "video" ? "https://youtube.com/watch?v=..." : "https://open.spotify.com/..."} />
+                  <input
+                    required
+                    type="url"
+                    name="url"
+                    autoFocus
+                    defaultValue={pastedUrl}
+                    placeholder={
+                      settingsType === "video"
+                        ? "https://youtube.com/watch?v=..."
+                        : "https://open.spotify.com/..."
+                    }
+                  />
                 </SmartField>
                 <SmartField>
                   Título
-                  <input name="title" maxLength={120} placeholder={settingsType === "video" ? "Meu último vídeo" : "Minha playlist"} />
+                  <input
+                    name="title"
+                    maxLength={120}
+                    placeholder={
+                      settingsType === "video"
+                        ? "Meu último vídeo"
+                        : "Minha playlist"
+                    }
+                  />
                 </SmartField>
               </>
             )}
@@ -636,11 +767,22 @@ export function AddContentModal({
               <>
                 <SmartField>
                   Nome do arquivo
-                  <input required name="title" maxLength={120} autoFocus placeholder="Meu portfólio" />
+                  <input
+                    required
+                    name="title"
+                    maxLength={120}
+                    autoFocus
+                    placeholder="Meu portfólio"
+                  />
                 </SmartField>
                 <SmartField>
                   Arquivo (URL)
-                  <input required type="url" name="url" placeholder="https://exemplo.com/arquivo.pdf" />
+                  <input
+                    required
+                    type="url"
+                    name="url"
+                    placeholder="https://exemplo.com/arquivo.pdf"
+                  />
                 </SmartField>
               </>
             )}
@@ -648,23 +790,50 @@ export function AddContentModal({
               <>
                 <SmartField>
                   Título
-                  <input name="title" maxLength={120} autoFocus placeholder="Escaneie o QR code" />
+                  <input
+                    name="title"
+                    maxLength={120}
+                    autoFocus
+                    placeholder="Escaneie o QR code"
+                  />
                 </SmartField>
                 <SmartField>
                   Destino do QR Code
-                  <input required type="url" name="destinationUrl" placeholder="https://exemplo.com" />
+                  <input
+                    required
+                    type="url"
+                    name="destinationUrl"
+                    placeholder="https://exemplo.com"
+                  />
                 </SmartField>
               </>
             )}
             {(settingsType === "whatsapp" || settingsType === "phone") && (
               <>
                 <SmartField>
-                  {settingsType === "whatsapp" ? "Número do WhatsApp" : "Telefone"}
-                  <input required name="number" inputMode="tel" autoFocus placeholder="+55 11 99999-9999" />
+                  {settingsType === "whatsapp"
+                    ? "Número do WhatsApp"
+                    : "Telefone"}
+                  <input
+                    required
+                    name="number"
+                    inputMode="tel"
+                    autoFocus
+                    placeholder="+55 11 99999-9999"
+                  />
                 </SmartField>
                 <SmartField>
                   Texto do botão
-                  <input required name="label" maxLength={80} defaultValue={settingsType === "whatsapp" ? "Falar no WhatsApp" : "Ligar"} />
+                  <input
+                    required
+                    name="label"
+                    maxLength={80}
+                    defaultValue={
+                      settingsType === "whatsapp"
+                        ? "Falar no WhatsApp"
+                        : "Ligar"
+                    }
+                  />
                 </SmartField>
                 {settingsType === "whatsapp" && (
                   <SmartField hint="Opcional: aparece ao abrir a conversa.">
@@ -678,7 +847,13 @@ export function AddContentModal({
               <>
                 <SmartField>
                   E-mail
-                  <input required type="email" name="address" autoFocus placeholder="voce@exemplo.com" />
+                  <input
+                    required
+                    type="email"
+                    name="address"
+                    autoFocus
+                    placeholder="voce@exemplo.com"
+                  />
                 </SmartField>
                 <SmartField>
                   Assunto inicial
@@ -686,25 +861,49 @@ export function AddContentModal({
                 </SmartField>
                 <SmartField>
                   Texto do botão
-                  <input required name="label" maxLength={80} defaultValue="Enviar e-mail" />
+                  <input
+                    required
+                    name="label"
+                    maxLength={80}
+                    defaultValue="Enviar e-mail"
+                  />
                 </SmartField>
               </>
             )}
             {(settingsType === "event" || settingsType === "appointment") && (
               <>
                 <SmartField>
-                  {settingsType === "event" ? "Nome do evento" : "Texto do botão"}
-                  <input required name="title" maxLength={120} autoFocus defaultValue={settingsType === "appointment" ? "Agendar um horário" : ""} />
+                  {settingsType === "event"
+                    ? "Nome do evento"
+                    : "Texto do botão"}
+                  <input
+                    required
+                    name="title"
+                    maxLength={120}
+                    autoFocus
+                    defaultValue={
+                      settingsType === "appointment" ? "Agendar um horário" : ""
+                    }
+                  />
                 </SmartField>
                 {settingsType === "event" && (
                   <SmartField hint="Opcional: use data, horário ou período.">
                     Quando acontece
-                    <input name="date" maxLength={80} placeholder="12 de outubro, 19h" />
+                    <input
+                      name="date"
+                      maxLength={80}
+                      placeholder="12 de outubro, 19h"
+                    />
                   </SmartField>
                 )}
                 <SmartField>
                   Destino
-                  <input required type="url" name="destinationUrl" placeholder="https://cal.com/seunome" />
+                  <input
+                    required
+                    type="url"
+                    name="destinationUrl"
+                    placeholder="https://cal.com/seunome"
+                  />
                 </SmartField>
               </>
             )}
@@ -713,11 +912,17 @@ export function AddContentModal({
             </button>
           </form>
         ) : (
-          <form className="sp-add-content-form" noValidate onSubmit={onCreateProduct}>
+          <form
+            className="sp-add-content-form"
+            noValidate
+            onSubmit={onCreateProduct}
+          >
             <div className="sp-add-content-product-heading">
               <div>
                 <strong>Criar produto</strong>
-                <small>Comece pelo essencial. Você poderá complementar depois.</small>
+                <small>
+                  Comece pelo essencial. Você poderá complementar depois.
+                </small>
               </div>
             </div>
             <SmartField>
@@ -741,10 +946,26 @@ export function AddContentModal({
                 defaultValue="digital"
                 onValueChange={setProductType}
                 options={[
-                  { value: "digital", label: "Digital", description: "Arquivo ou acesso online" },
-                  { value: "physical", label: "Físico", description: "Item enviado ao cliente" },
-                  { value: "session", label: "Serviço", description: "Atendimento ou consultoria" },
-                  { value: "booking", label: "Agendamento", description: "Sessão com horário" },
+                  {
+                    value: "digital",
+                    label: "Digital",
+                    description: "Arquivo ou acesso online",
+                  },
+                  {
+                    value: "physical",
+                    label: "Físico",
+                    description: "Item enviado ao cliente",
+                  },
+                  {
+                    value: "session",
+                    label: "Serviço",
+                    description: "Atendimento ou consultoria",
+                  },
+                  {
+                    value: "booking",
+                    label: "Agendamento",
+                    description: "Sessão com horário",
+                  },
                 ]}
               />
             </SmartField>
@@ -776,8 +997,16 @@ export function AddContentModal({
                 name="status"
                 defaultValue="draft"
                 options={[
-                  { value: "draft", label: "Rascunho", description: "Apenas você vê" },
-                  { value: "active", label: "Ativo", description: "Pronto para a página" },
+                  {
+                    value: "draft",
+                    label: "Rascunho",
+                    description: "Apenas você vê",
+                  },
+                  {
+                    value: "active",
+                    label: "Ativo",
+                    description: "Pronto para a página",
+                  },
                 ]}
               />
             </SmartField>

@@ -29,6 +29,7 @@ const inputSchema = z
     if (
       [
         "smart_block_view",
+        "form_view",
         "smart_block_clicked",
         "link_in_bio_product_view",
         "link_in_bio_product_click",
@@ -51,7 +52,10 @@ export async function POST(request: Request) {
       inputSchema.parse(await readJson(request)),
       request.headers,
     );
-    const response = new NextResponse(null, { status: 204, headers: rateHeaders });
+    const response = new NextResponse(null, {
+      status: 204,
+      headers: rateHeaders,
+    });
     for (const cookie of result.cookieHeaders)
       response.headers.append("Set-Cookie", cookie);
     return response;

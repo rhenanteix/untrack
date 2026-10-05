@@ -16,6 +16,7 @@ import type { SmartPageTheme } from "@/modules/smart-pages/themes";
 import QRCode from "qrcode";
 import { useEffect, useState } from "react";
 import type { SmartPageContentBlock } from "./content-block";
+import { SmartPageForm } from "../public-form";
 import styles from "../themes.module.css";
 
 export interface SmartPagePreviewData {
@@ -170,6 +171,14 @@ export function SmartPagePreview({ page }: { page: SmartPagePreviewData }) {
             </span>
           ) : block.type === "link" ? (
             <span key={block.id}>{block.settings.title}</span>
+          ) : block.type === "form" && block.form ? (
+            <SmartPageForm
+              key={block.id}
+              slug="preview"
+              blockId={block.id}
+              form={block.form}
+              preview
+            />
           ) : (
             <PreviewRichBlock key={block.id} block={block} />
           ),

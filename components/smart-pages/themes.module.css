@@ -1267,11 +1267,140 @@
   border-radius: 8px;
   background: #fff;
 }
+.publicForm {
+  display: grid;
+  gap: 16px;
+  padding: 18px;
+  border: 1px solid color-mix(in srgb, var(--ink) 24%, transparent);
+  border-radius: var(--radius);
+  background: color-mix(in srgb, var(--bg) 78%, var(--ink) 5%);
+  color: inherit;
+  text-align: left;
+}
+.publicFormHeading h2 {
+  margin: 0;
+  color: inherit;
+  font-size: 20px;
+  line-height: 1.2;
+}
+.publicFormHeading p {
+  margin: 7px 0 0;
+  font-size: 13px;
+  line-height: 1.5;
+  opacity: 0.8;
+}
+.publicFormFields {
+  display: grid;
+  gap: 12px;
+}
+.publicFormField,
+.publicFormCheck {
+  display: grid;
+  gap: 6px;
+  color: inherit;
+  font-size: 13px;
+  font-weight: 650;
+  line-height: 1.35;
+}
+.publicFormField input,
+.publicFormField select,
+.publicFormField textarea {
+  width: 100%;
+  min-height: 44px;
+  padding: 10px 12px;
+  border: 1px solid color-mix(in srgb, var(--ink) 30%, transparent);
+  border-radius: calc(var(--radius) * 0.7);
+  background: color-mix(in srgb, var(--bg) 94%, #fff);
+  color: inherit;
+  font: inherit;
+  font-size: 16px;
+  line-height: 1.35;
+}
+.publicFormField textarea {
+  min-height: 104px;
+  resize: vertical;
+}
+.publicFormField input[aria-invalid="true"],
+.publicFormField select[aria-invalid="true"],
+.publicFormField textarea[aria-invalid="true"],
+.publicFormCheck input[aria-invalid="true"] {
+  border-color: #b4483f;
+}
+.publicFormField input:focus-visible,
+.publicFormField select:focus-visible,
+.publicFormField textarea:focus-visible,
+.publicFormCheck input:focus-visible,
+.publicForm button:focus-visible,
+.publicFormPrivacy:focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--ink) 75%, transparent);
+  outline-offset: 3px;
+}
+.publicFormCheck {
+  grid-template-columns: auto 1fr;
+  align-items: start;
+}
+.publicFormCheck input {
+  width: 18px;
+  height: 18px;
+  margin: 0;
+  accent-color: var(--button);
+}
+.publicFormCheck small {
+  grid-column: 2;
+}
+.publicFormField small,
+.publicFormCheck small,
+.publicFormFailure {
+  margin: 0;
+  color: #b4483f;
+  font-size: 12px;
+  font-weight: 600;
+}
+.publicForm button {
+  min-height: 46px;
+  padding: 11px 16px;
+  border: 1px solid var(--button);
+  border-radius: calc(var(--radius) * 0.8);
+  background: var(--button);
+  color: var(--button-ink);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.publicForm button:disabled {
+  cursor: wait;
+  opacity: 0.68;
+}
+.publicFormPrivacy {
+  justify-self: start;
+  color: inherit;
+  font-size: 12px;
+  text-underline-offset: 3px;
+}
+.publicFormSuccess {
+  margin: 0;
+  color: inherit;
+  font-size: 14px;
+  font-weight: 650;
+  line-height: 1.5;
+}
+.publicFormHoneypot {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
 @media (max-width: 420px) {
   .richTitle {
     font-size: 20px;
   }
   .richQr {
     padding: 14px;
+  }
+  .publicForm {
+    padding: 15px;
   }
 }

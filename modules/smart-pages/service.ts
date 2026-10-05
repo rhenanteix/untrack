@@ -18,6 +18,7 @@ import {
   linkBlockSettingsSchema,
   socialLinksSchema,
   type SmartPageBlockInput,
+  type SmartPageFormFieldInput,
 } from "./schemas";
 
 const publicBlockInclude = {
@@ -44,6 +45,9 @@ const publicBlockInclude = {
       endAt: true,
     },
   },
+  form: {
+    include: { fields: { orderBy: { position: "asc" as const } } },
+  },
 } as const;
 
 function json(value: unknown): Prisma.InputJsonValue {
@@ -52,9 +56,10 @@ function json(value: unknown): Prisma.InputJsonValue {
 
 function onboardingSocialLinks(value: unknown) {
   if (!value || typeof value !== "object" || Array.isArray(value)) return [];
-  return socialLinksSchema.safeParse(
-    (value as Record<string, unknown>).socialLinks,
-  ).data ?? [];
+  return (
+    socialLinksSchema.safeParse((value as Record<string, unknown>).socialLinks)
+      .data ?? []
+  );
 }
 
 function slugConflict(error: unknown): never {
@@ -162,33 +167,29 @@ export async function createSmartPage(actor: Actor, raw: unknown) {
 export async function updateSmartPage(actor: Actor, id: string, raw: unknown) {
   const input = smartPageUpdateSchema.parse(raw);
   try {
-    const page = await workspaceTransaction(
-      actor,
-      "write",
-      async (tx) => {
-        const existing = await tx.smartPage.findFirst({
-          where: { id, workspaceId: actor.workspaceId },
-        });
-        if (!existing) {
-          throw new ApiError(
-            404,
-            "SMART_PAGE_NOT_FOUND",
-            "Smart Page não encontrada.",
-          );
-        }
-        const page = await tx.smartPage.update({ where: { id }, data: input });
-        await audit(tx, actor, "smartPage.updated", id, {
-          before: {
-            slug: existing.slug,
-            title: existing.title,
-            description: existing.description,
-            avatarUrl: existing.avatarUrl,
-          },
-          after: input,
-        });
-        return page;
-      },
-    );
+    const page = await workspaceTransaction(actor, "write", async (tx) => {
+      const existing = await tx.smartPage.findFirst({
+        where: { id, workspaceId: actor.workspaceId },
+      });
+      if (!existing) {
+        throw new ApiError(
+          404,
+          "SMART_PAGE_NOT_FOUND",
+          "Smart Page não encontrada.",
+        );
+      }
+      const page = await tx.smartPage.update({ where: { id }, data: input });
+      await audit(tx, actor, "smartPage.updated", id, {
+        before: {
+          slug: existing.slug,
+          title: existing.title,
+          description: existing.description,
+          avatarUrl: existing.avatarUrl,
+        },
+        after: input,
+      });
+      return page;
+    });
     await track("smart_page_updated", { workspaceId: actor.workspaceId });
     return page;
   } catch (error) {
@@ -247,6 +248,16 @@ export async function setSmartPagePublished(
   });
   if (published)
     await track("smart_page_published", { workspaceId: actor.workspaceId });
+  if (published) {
+    const forms = await getPrisma().smartPageForm.count({
+      where: { smartPageId: id, status: "active" },
+    });
+    if (forms)
+      await track("form_published", {
+        workspaceId: actor.workspaceId,
+        formCount: forms,
+      });
+  }
   return page;
 }
 
@@ -286,6 +297,60 @@ async function checkedBlockInput(
   return input;
 }
 
+function formFieldData(field: SmartPageFormFieldInput, position: number) {
+  return {
+    fieldType: field.fieldType,
+    label: field.label,
+    placeholder: field.placeholder || null,
+    required: field.required,
+    position,
+    options: json(field.options),
+    config: json({}),
+  };
+}
+
+async function replaceFormFields(
+  tx: Prisma.TransactionClient,
+  formId: string,
+  fields: SmartPageFormFieldInput[],
+) {
+  const existing = await tx.smartPageFormField.findMany({
+    where: { formId },
+    select: { id: true },
+  });
+  const existingIds = new Set(existing.map((field) => field.id));
+  const retainedIds = fields.flatMap((field) => (field.id ? [field.id] : []));
+  if (!retainedIds.every((id) => existingIds.has(id))) {
+    throw new ApiError(
+      400,
+      "INVALID_FORM_FIELD",
+      "Um dos campos do formulário não pertence a este formulário.",
+    );
+  }
+  await tx.smartPageFormField.deleteMany({
+    where: {
+      formId,
+      ...(retainedIds.length ? { id: { notIn: retainedIds } } : {}),
+    },
+  });
+  await tx.smartPageFormField.updateMany({
+    where: { formId },
+    data: { position: { increment: fields.length + existing.length } },
+  });
+  await Promise.all(
+    fields.map((field, position) =>
+      field.id
+        ? tx.smartPageFormField.update({
+            where: { id: field.id },
+            data: formFieldData(field, position),
+          })
+        : tx.smartPageFormField.create({
+            data: { formId, ...formFieldData(field, position) },
+          }),
+    ),
+  );
+}
+
 export async function addSmartPageBlock(
   actor: Actor,
   pageId: string,
@@ -312,21 +377,53 @@ export async function addSmartPageBlock(
         smartPageId: pageId,
         type: validInput.type,
         position,
-        settings: json(validInput.settings),
+        settings: json(validInput.type === "form" ? {} : validInput.settings),
         visible: validInput.visible,
         analyticsEnabled: validInput.analyticsEnabled,
-        linkId: validInput.type === "link" ? validInput.linkId ?? null : null,
+        linkId: validInput.type === "link" ? (validInput.linkId ?? null) : null,
         productId: validInput.type === "product" ? validInput.productId : null,
       },
       include: publicBlockInclude,
     });
+    const result =
+      validInput.type === "form"
+        ? await (async () => {
+            const form = await tx.smartPageForm.create({
+              data: {
+                workspaceId: actor.workspaceId,
+                smartPageId: pageId,
+                smartPageBlockId: block.id,
+                name: validInput.settings.name,
+                title: validInput.settings.title,
+                description: validInput.settings.description,
+                submitLabel: validInput.settings.submitLabel,
+                successMessage: validInput.settings.successMessage,
+                privacyPolicyUrl: validInput.settings.privacyPolicyUrl ?? null,
+                status: validInput.settings.status,
+                fields: {
+                  create: validInput.settings.fields.map(formFieldData),
+                },
+              },
+            });
+            return tx.smartPageBlock.update({
+              where: { id: block.id },
+              data: { settings: json({ formId: form.id }) },
+              include: publicBlockInclude,
+            });
+          })()
+        : block;
     await audit(tx, actor, "smartPage.blockCreated", block.id, {
       pageId,
       type: block.type,
     });
-    return block;
+    return result;
   });
   await track("smart_block_created", { workspaceId: actor.workspaceId });
+  if (input.type === "form")
+    await Promise.all([
+      track("form_created", { workspaceId: actor.workspaceId }),
+      track("form_block_added", { workspaceId: actor.workspaceId }),
+    ]);
   return block;
 }
 
@@ -344,11 +441,50 @@ export async function updateSmartPageBlock(
         smartPageId: pageId,
         smartPage: { workspaceId: actor.workspaceId },
       },
+      include: publicBlockInclude,
     });
     if (!block) {
       throw new ApiError(404, "SMART_BLOCK_NOT_FOUND", "Bloco não encontrado.");
     }
     const validInput = await checkedBlockInput(tx, actor, input);
+    if (block.form && validInput.type !== "form") {
+      throw new ApiError(
+        400,
+        "FORM_BLOCK_TYPE_IMMUTABLE",
+        "Um formulário só pode ser atualizado como formulário.",
+      );
+    }
+    if (validInput.type === "form") {
+      if (!block.form) {
+        throw new ApiError(400, "FORM_NOT_FOUND", "Formulário não encontrado.");
+      }
+      await tx.smartPageForm.update({
+        where: { id: block.form.id },
+        data: {
+          name: validInput.settings.name,
+          title: validInput.settings.title,
+          description: validInput.settings.description,
+          submitLabel: validInput.settings.submitLabel,
+          successMessage: validInput.settings.successMessage,
+          privacyPolicyUrl: validInput.settings.privacyPolicyUrl ?? null,
+          status: validInput.settings.status,
+        },
+      });
+      await replaceFormFields(tx, block.form.id, validInput.settings.fields);
+      const updated = await tx.smartPageBlock.update({
+        where: { id: blockId },
+        data: {
+          visible: validInput.visible,
+          analyticsEnabled: validInput.analyticsEnabled,
+        },
+        include: publicBlockInclude,
+      });
+      await audit(tx, actor, "smartPage.blockUpdated", blockId, {
+        pageId,
+        type: updated.type,
+      });
+      return updated;
+    }
     const updated = await tx.smartPageBlock.update({
       where: { id: blockId },
       data: {
@@ -356,7 +492,7 @@ export async function updateSmartPageBlock(
         settings: json(validInput.settings),
         visible: validInput.visible,
         analyticsEnabled: validInput.analyticsEnabled,
-        linkId: validInput.type === "link" ? validInput.linkId ?? null : null,
+        linkId: validInput.type === "link" ? (validInput.linkId ?? null) : null,
         productId: validInput.type === "product" ? validInput.productId : null,
       },
       include: publicBlockInclude,
@@ -505,36 +641,68 @@ export async function smartPageMetrics(actor: Actor, id: string, days: number) {
     },
     day: { gte: start },
   };
+  const formViewWhere = {
+    smartPageId: page.id,
+    name: "form_view",
+    day: { gte: start },
+  };
+  const formSubmitWhere = {
+    smartPageId: page.id,
+    name: "form_submit",
+    day: { gte: start },
+  };
+  const leadWhere = {
+    smartPageId: page.id,
+    name: "lead_created",
+    day: { gte: start },
+  };
   const db = getPrisma();
-  const [views, clicks, visitors, topBlocks, trafficSources, devices] =
-    await Promise.all([
-      db.analyticsEvent.count({ where: viewWhere }),
-      db.analyticsEvent.count({ where: clickWhere }),
-      db.analyticsEvent.groupBy({
-        by: ["visitorHash"],
-        where: { ...viewWhere, visitorHash: { not: null } },
-      }),
-      db.analyticsEvent.groupBy({
-        by: ["smartPageBlockId"],
-        where: { ...clickWhere, smartPageBlockId: { not: null } },
-        _count: { _all: true },
-        orderBy: { _count: { smartPageBlockId: "desc" } },
-        take: 5,
-      }),
-      db.analyticsEvent.groupBy({
-        by: ["referrer"],
-        where: { ...viewWhere, referrer: { not: null } },
-        _count: { _all: true },
-        orderBy: { _count: { referrer: "desc" } },
-        take: 8,
-      }),
-      db.analyticsEvent.groupBy({
-        by: ["device"],
-        where: { ...viewWhere, device: { not: null } },
-        _count: { _all: true },
-        orderBy: { _count: { device: "desc" } },
-      }),
-    ]);
+  const [
+    views,
+    clicks,
+    visitors,
+    topBlocks,
+    trafficSources,
+    devices,
+    formViews,
+    formSubmissions,
+    leads,
+    uniqueContacts,
+  ] = await Promise.all([
+    db.analyticsEvent.count({ where: viewWhere }),
+    db.analyticsEvent.count({ where: clickWhere }),
+    db.analyticsEvent.groupBy({
+      by: ["visitorHash"],
+      where: { ...viewWhere, visitorHash: { not: null } },
+    }),
+    db.analyticsEvent.groupBy({
+      by: ["smartPageBlockId"],
+      where: { ...clickWhere, smartPageBlockId: { not: null } },
+      _count: { _all: true },
+      orderBy: { _count: { smartPageBlockId: "desc" } },
+      take: 5,
+    }),
+    db.analyticsEvent.groupBy({
+      by: ["referrer"],
+      where: { ...viewWhere, referrer: { not: null } },
+      _count: { _all: true },
+      orderBy: { _count: { referrer: "desc" } },
+      take: 8,
+    }),
+    db.analyticsEvent.groupBy({
+      by: ["device"],
+      where: { ...viewWhere, device: { not: null } },
+      _count: { _all: true },
+      orderBy: { _count: { device: "desc" } },
+    }),
+    db.analyticsEvent.count({ where: formViewWhere }),
+    db.analyticsEvent.count({ where: formSubmitWhere }),
+    db.analyticsEvent.count({ where: leadWhere }),
+    db.analyticsEvent.groupBy({
+      by: ["audienceContactId"],
+      where: { ...formSubmitWhere, audienceContactId: { not: null } },
+    }),
+  ]);
   const blockIds = topBlocks.flatMap((item) =>
     item.smartPageBlockId ? [item.smartPageBlockId] : [],
   );
@@ -558,6 +726,13 @@ export async function smartPageMetrics(actor: Actor, id: string, days: number) {
     uniqueVisitors: visitors.length,
     clicks,
     ctr: views ? Number(((clicks / views) * 100).toFixed(1)) : 0,
+    formViews,
+    formSubmissions,
+    formContacts: uniqueContacts.length,
+    formLeads: leads,
+    formSubmissionRate: formViews
+      ? Number(((formSubmissions / formViews) * 100).toFixed(1))
+      : 0,
     topLinks: topBlocks.flatMap((item) =>
       item.smartPageBlockId
         ? [

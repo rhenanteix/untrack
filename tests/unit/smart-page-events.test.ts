@@ -161,7 +161,11 @@ describe("smart page analytics events", () => {
     } as unknown as ReturnType<typeof getPrisma>);
 
     await recordPublicSmartPageEvent(
-      { event: "smart_block_clicked", slug: "minha-pagina", blockId: "block_1" },
+      {
+        event: "smart_block_clicked",
+        slug: "minha-pagina",
+        blockId: "block_1",
+      },
       new Headers({ cookie }),
     );
 
@@ -171,7 +175,9 @@ describe("smart page analytics events", () => {
         visitorKey: initial.identity.visitorId,
         sessionKey: initial.identity.sessionId,
         campaignId: "campaign_1",
-        attribution: expect.objectContaining({ trustedContext: expect.any(Object) }),
+        attribution: expect.objectContaining({
+          trustedContext: expect.any(Object),
+        }),
       }),
     );
   });
@@ -193,12 +199,60 @@ describe("smart page analytics events", () => {
     } as unknown as ReturnType<typeof getPrisma>);
 
     await recordPublicSmartPageEvent(
-      { event: "smart_block_clicked", slug: "minha-pagina", blockId: "block_1" },
+      {
+        event: "smart_block_clicked",
+        slug: "minha-pagina",
+        blockId: "block_1",
+      },
       new Headers(),
     );
 
     expect(recordAnalyticsEvent).toHaveBeenCalledWith(
       expect.objectContaining({ name: "whatsapp_click", elementId: "block_1" }),
     );
+  });
+
+  it("records a visible form without sending submitted values to analytics", async () => {
+    const findFirst = vi.fn().mockResolvedValue({
+      id: "form_block_1",
+      type: "form",
+      link: null,
+    });
+    vi.mocked(getPrisma).mockReturnValue({
+      smartPage: {
+        findFirst: vi
+          .fn()
+          .mockResolvedValue({ id: "page_1", workspaceId: "workspace_1" }),
+      },
+      smartPageBlock: { findFirst },
+    } as unknown as ReturnType<typeof getPrisma>);
+
+    await recordPublicSmartPageEvent(
+      {
+        event: "form_view",
+        slug: "minha-pagina",
+        blockId: "form_block_1",
+      },
+      new Headers(),
+    );
+
+    expect(findFirst).toHaveBeenCalledWith({
+      where: expect.objectContaining({ type: "form" }),
+      select: {
+        id: true,
+        type: true,
+        link: { select: { campaignId: true, destinationUrl: true } },
+      },
+    });
+    expect(recordAnalyticsEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        name: "form_view",
+        elementType: "block",
+        elementId: "form_block_1",
+      }),
+    );
+    expect(
+      vi.mocked(recordAnalyticsEvent).mock.calls.at(-1)?.[0],
+    ).not.toHaveProperty("metadata");
   });
 });

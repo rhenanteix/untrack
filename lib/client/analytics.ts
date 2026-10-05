@@ -27,6 +27,7 @@ type PublicIdentity = {
 type SmartPageEvent =
   | "smart_page_view"
   | "smart_block_view"
+  | "form_view"
   | "smart_block_clicked"
   | "link_in_bio_product_view"
   | "link_in_bio_product_click"
@@ -76,10 +77,7 @@ function publicIdentity(): PublicIdentity {
   const navigatorWithPrivacy = navigator as Navigator & {
     globalPrivacyControl?: boolean;
   };
-  if (
-    navigatorWithPrivacy.globalPrivacyControl ||
-    navigator.doNotTrack === "1"
-  )
+  if (navigatorWithPrivacy.globalPrivacyControl || navigator.doNotTrack === "1")
     return {};
   try {
     const visitorId =
@@ -154,10 +152,7 @@ export const analytics = {
 
   publicContext: publicTrackingContext,
 
-  trackPublicEvent(
-    event: UniversalEventName,
-    context: { path?: string } = {},
-  ) {
+  trackPublicEvent(event: UniversalEventName, context: { path?: string } = {}) {
     if (typeof window === "undefined") return Promise.resolve(undefined);
     return post("/api/events", {
       event,

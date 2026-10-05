@@ -13,7 +13,8 @@ import type {
   UniversalEventName,
 } from "./event-types";
 
-const sensitiveMetadataKey = /email|phone|whatsapp|address|name|message|token|password/i;
+const sensitiveMetadataKey =
+  /email|phone|whatsapp|address|name|message|token|password/i;
 
 type AnalyticsMetadata = Record<string, string | number | boolean | null>;
 
@@ -42,12 +43,15 @@ export type RecordAnalyticsEventInput = {
   isTest?: boolean;
   occurredAt?: Date;
   headers?: Headers;
+  includeIdentity?: boolean;
 };
 
 export type RecordAnalyticsEventResult = {
   eventId: string;
   recorded: boolean;
   duplicate: boolean;
+  visitorId?: string;
+  sessionId?: string;
 };
 
 function hashIdentifier(value: string | undefined) {
@@ -99,19 +103,24 @@ function destinationOnly(value: string | undefined) {
 function cleanMetadata(metadata: AnalyticsMetadata | undefined) {
   return Object.fromEntries(
     Object.entries(metadata ?? {})
-      .filter(([key, value]) =>
-        Boolean(key) &&
-        key.length <= 80 &&
-        !sensitiveMetadataKey.test(key) &&
-        (typeof value === "string"
-          ? value.length <= 500
-          : typeof value === "number" || typeof value === "boolean" || value === null),
+      .filter(
+        ([key, value]) =>
+          Boolean(key) &&
+          key.length <= 80 &&
+          !sensitiveMetadataKey.test(key) &&
+          (typeof value === "string"
+            ? value.length <= 500
+            : typeof value === "number" ||
+              typeof value === "boolean" ||
+              value === null),
       )
       .slice(0, 20),
   );
 }
 
-function legacyDevice(deviceType: ReturnType<typeof classifyDevice>["deviceType"]) {
+function legacyDevice(
+  deviceType: ReturnType<typeof classifyDevice>["deviceType"],
+) {
   return {
     mobile: "Celular",
     desktop: "Desktop",
@@ -304,7 +313,14 @@ export async function recordAnalyticsEvent(
             },
           })
         : 0;
-      return { eventId, recorded: true, duplicate: false, completedGoals };
+      return {
+        eventId,
+        recorded: true,
+        duplicate: false,
+        completedGoals,
+        visitorId: identity.visitorId,
+        sessionId: identity.sessionId,
+      };
     });
     if (!isTest) {
       void aggregateAnalyticsEvent({
@@ -317,7 +333,9 @@ export async function recordAnalyticsEvent(
         channel: attribution.channel,
         campaignId: input.campaignId,
         isBot: bot.isBot,
-      }).catch((error) => console.error("Analytics aggregation was not recorded", error));
+      }).catch((error) =>
+        console.error("Analytics aggregation was not recorded", error),
+      );
       for (let index = 0; index < persisted.completedGoals; index += 1)
         void aggregateAnalyticsEvent({
           workspaceId: input.workspaceId,
@@ -329,7 +347,9 @@ export async function recordAnalyticsEvent(
           channel: attribution.channel,
           campaignId: input.campaignId,
           isBot: bot.isBot,
-        }).catch((error) => console.error("Analytics aggregation was not recorded", error));
+        }).catch((error) =>
+          console.error("Analytics aggregation was not recorded", error),
+        );
     }
     reportAnalyticsHealth("events_received", {
       eventName: input.name,
@@ -341,6 +361,12 @@ export async function recordAnalyticsEvent(
       eventId: persisted.eventId,
       recorded: persisted.recorded,
       duplicate: persisted.duplicate,
+      ...(input.includeIdentity
+        ? {
+            visitorId: persisted.visitorId,
+            sessionId: persisted.sessionId,
+          }
+        : {}),
     };
   } catch (error) {
     if (

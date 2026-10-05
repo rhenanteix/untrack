@@ -9,6 +9,10 @@ import {
   youtubeEmbedUrl,
 } from "@/components/smart-pages/rich-block";
 import { PageSocialLinks } from "@/components/smart-pages/social-links";
+import {
+  SmartPageForm,
+  type PublicSmartPageFormData,
+} from "@/components/smart-pages/public-form";
 import styles from "@/components/smart-pages/themes.module.css";
 import type { Metadata } from "next";
 import { cache } from "react";
@@ -48,6 +52,12 @@ type PublicBlock =
       name: string;
       buttonLabel: string;
       href: string;
+    }
+  | {
+      type: "form";
+      id: string;
+      analyticsEnabled: boolean;
+      form: PublicSmartPageFormData;
     }
   | {
       type: RichBlockType;
@@ -314,6 +324,33 @@ export default async function PublicSmartPage({
         },
       ];
     }
+    if (block.type === "form" && block.form?.status === "active") {
+      return [
+        {
+          type: "form",
+          id: block.id,
+          analyticsEnabled: block.analyticsEnabled,
+          form: {
+            id: block.form.id,
+            name: block.form.name,
+            title: block.form.title,
+            description: block.form.description,
+            submitLabel: block.form.submitLabel,
+            successMessage: block.form.successMessage,
+            privacyPolicyUrl: block.form.privacyPolicyUrl,
+            status: block.form.status,
+            fields: block.form.fields.map((field) => ({
+              id: field.id,
+              fieldType: field.fieldType,
+              label: field.label,
+              placeholder: field.placeholder,
+              required: field.required,
+              options: field.options,
+            })),
+          },
+        },
+      ];
+    }
     if (isRichBlockType(block.type)) {
       const settings = parseRichBlockSettings(block.type, block.settings);
       return settings
@@ -352,6 +389,13 @@ export default async function PublicSmartPage({
         >
           {block.name} - {block.buttonLabel}
         </SmartPageLink>
+      ) : block.type === "form" ? (
+        <SmartPageForm
+          key={block.id}
+          slug={page.slug}
+          blockId={block.id}
+          form={block.form}
+        />
       ) : (
         renderRichBlock(block, page.slug)
       ),

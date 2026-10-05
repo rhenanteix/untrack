@@ -29,6 +29,7 @@ import { AppearanceControls } from "@/components/smart-pages/appearance-controls
 import { AddContentModal } from "@/components/smart-pages/editor/add-content-modal";
 import { ContentList } from "@/components/smart-pages/editor/content-list";
 import type { SmartPageContentBlock } from "@/components/smart-pages/editor/content-block";
+import type { SmartPageFormSettings } from "@/components/smart-pages/editor/form-builder";
 import { SmartPagePreview } from "@/components/smart-pages/editor/smart-page-preview";
 import { ImageUpload } from "@/components/smart-pages/image-upload";
 import {
@@ -105,9 +106,35 @@ interface SmartPageMetrics {
   uniqueVisitors: number;
   clicks: number;
   ctr: number;
+  formViews: number;
+  formSubmissions: number;
+  formContacts: number;
+  formLeads: number;
+  formSubmissionRate: number;
   topLinks: { blockId: string; title: string; clicks: number }[];
   trafficSources: { name: string; views: number }[];
   devices: { name: string; views: number }[];
+}
+
+function formSettings(block: SmartPageBlock): SmartPageFormSettings | null {
+  if (!block.form) return null;
+  return {
+    name: block.form.name,
+    title: block.form.title,
+    description: block.form.description,
+    submitLabel: block.form.submitLabel,
+    successMessage: block.form.successMessage,
+    privacyPolicyUrl: block.form.privacyPolicyUrl,
+    status: block.form.status,
+    fields: block.form.fields.map((field) => ({
+      ...field,
+      options: Array.isArray(field.options)
+        ? field.options.filter(
+            (option): option is string => typeof option === "string",
+          )
+        : [],
+    })),
+  };
 }
 
 function collectSocialLinks(data: FormData, order: SocialLink[]) {
@@ -184,6 +211,8 @@ export function SmartPagesDashboard({
   >({});
   const [activeForm, setActiveForm] = useState("");
   const [contentModalOpen, setContentModalOpen] = useState(false);
+  const [expandedBlockId, setExpandedBlockId] = useState<string | null>(null);
+  const [formBuilderRevision, setFormBuilderRevision] = useState(0);
   const [toolbarMenuOpen, setToolbarMenuOpen] = useState(false);
   const [editorSection, setEditorSection] = useState("profile");
   const [appearanceTab, setAppearanceTab] = useState<"themes" | "customize">(
@@ -729,7 +758,7 @@ export function SmartPagesDashboard({
 
   async function addSettingsBlock(
     type: Exclude<SmartPageBlock["type"], "link" | "product">,
-    settings: Record<string, string>,
+    settings: Record<string, unknown>,
   ) {
     setActiveForm(`add-${type}`);
     if (!selected) return;
@@ -744,6 +773,7 @@ export function SmartPagesDashboard({
       setSelected((current) =>
         current ? { ...current, blocks: [...current.blocks, block] } : current,
       );
+      if (type === "form") setExpandedBlockId(block.id);
       setContentModalOpen(false);
       action.setNotice("Conteúdo adicionado à página.");
     });
@@ -821,6 +851,40 @@ export function SmartPagesDashboard({
     });
   }
 
+  async function saveFormBlock(
+    block: SmartPageBlock,
+    settings: SmartPageFormSettings,
+  ) {
+    if (!selected || block.type !== "form") return;
+    setActiveForm(block.id);
+    await action.run(async () => {
+      const updated = await apiRequest<SmartPageBlock>(
+        `/api/smart-pages/${selected.id}/blocks/${block.id}`,
+        {
+          method: "PATCH",
+          body: JSON.stringify({
+            type: "form",
+            visible: block.visible,
+            analyticsEnabled: block.analyticsEnabled,
+            settings,
+          }),
+        },
+      );
+      setSelected((current) =>
+        current
+          ? {
+              ...current,
+              blocks: current.blocks.map((item) =>
+                item.id === updated.id ? updated : item,
+              ),
+            }
+          : current,
+      );
+          setFormBuilderRevision((revision) => revision + 1);
+      action.setNotice("Formulário atualizado.");
+    });
+  }
+
   async function deleteBlock(blockId: string) {
     if (!selected || !window.confirm("Excluir este link da Smart Page?"))
       return;
@@ -863,6 +927,7 @@ export function SmartPagesDashboard({
     );
     await action.run(async () => {
       try {
+        const settings = formSettings(block);
         const updated = await apiRequest<SmartPageBlock>(
           `/api/smart-pages/${selected.id}/blocks/${block.id}`,
           {
@@ -878,18 +943,32 @@ export function SmartPagesDashboard({
                       buttonLabel: block.settings.buttonLabel ?? "Ver produto",
                     },
                   }
-                : {
-                    type: "link",
-                    linkId: block.linkId ?? null,
-                    visible,
-                    analyticsEnabled: block.analyticsEnabled,
-                    settings: {
-                      title: block.settings.title ?? "",
-                      destinationUrl:
-                        block.settings.destinationUrl || undefined,
-                      openInNewTab: block.settings.openInNewTab ?? true,
-                    },
-                  },
+                : block.type === "form" && settings
+                  ? {
+                      type: "form",
+                      visible,
+                      analyticsEnabled: block.analyticsEnabled,
+                      settings,
+                    }
+                  : block.type === "link"
+                    ? {
+                        type: "link",
+                        linkId: block.linkId ?? null,
+                        visible,
+                        analyticsEnabled: block.analyticsEnabled,
+                        settings: {
+                          title: block.settings.title ?? "",
+                          destinationUrl:
+                            block.settings.destinationUrl || undefined,
+                          openInNewTab: block.settings.openInNewTab ?? true,
+                        },
+                      }
+                    : {
+                        type: block.type,
+                        visible,
+                        analyticsEnabled: block.analyticsEnabled,
+                        settings: block.settings,
+                      },
             ),
           },
         );
@@ -1812,6 +1891,7 @@ export function SmartPagesDashboard({
                     </button>
                   </div>
                   <ContentList
+                    key={`${expandedBlockId ?? "content-list"}:${formBuilderRevision}`}
                     blocks={selected.blocks}
                     drafts={blockDrafts}
                     managedLinks={managedLinks}
@@ -1838,6 +1918,10 @@ export function SmartPagesDashboard({
                     onSaveBlock={(event, block, settings) =>
                       void saveSettingsBlock(event, block, settings)
                     }
+                    onSaveForm={(block, settings) =>
+                      void saveFormBlock(block, settings)
+                    }
+                    initialExpandedBlockId={expandedBlockId}
                     onToggle={(block) => void toggleBlock(block)}
                     onDelete={(block) => void deleteBlock(block.id)}
                     onReorder={(blockIds) => void reorderBlocks(blockIds)}

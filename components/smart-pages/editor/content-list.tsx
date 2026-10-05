@@ -9,6 +9,7 @@ import {
   SmartSelect,
 } from "@/components/smart-pages/smart-form";
 import { ContentBlock, type SmartPageContentBlock } from "./content-block";
+import { FormBuilder, type SmartPageFormSettings } from "./form-builder";
 
 export function ContentList({
   blocks,
@@ -20,6 +21,8 @@ export function ContentList({
   onDraftChange,
   onSaveProduct,
   onSaveBlock,
+  onSaveForm,
+  initialExpandedBlockId,
   onToggle,
   onDelete,
   onReorder,
@@ -47,11 +50,18 @@ export function ContentList({
     block: SmartPageContentBlock,
     settings: SmartPageContentBlock["settings"],
   ) => void;
+  onSaveForm: (
+    block: SmartPageContentBlock,
+    settings: SmartPageFormSettings,
+  ) => void;
+  initialExpandedBlockId?: string | null;
   onToggle: (block: SmartPageContentBlock) => void;
   onDelete: (block: SmartPageContentBlock) => void;
   onReorder: (blockIds: string[]) => void;
 }) {
-  const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [expandedId, setExpandedId] = useState<string | null>(
+    initialExpandedBlockId ?? null,
+  );
   const [draggedId, setDraggedId] = useState<string | null>(null);
   const [dropTargetId, setDropTargetId] = useState<string | null>(null);
 
@@ -562,6 +572,13 @@ export function ContentList({
                       </SmartField>
                     </details>
                   </SmartForm>
+                ) : block.type === "form" && block.form ? (
+                  <FormBuilder
+                    form={block.form}
+                    busy={busy}
+                    canEdit={canEdit}
+                    onSave={(settings) => onSaveForm(block, settings)}
+                  />
                 ) : (
                   <SmartForm
                     failure={failure}

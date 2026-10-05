@@ -13,6 +13,7 @@ import {
 export const publicSmartPageEventNames = [
   "smart_page_view",
   "smart_block_view",
+  "form_view",
   "smart_block_clicked",
   "link_in_bio_product_view",
   "link_in_bio_product_click",
@@ -45,7 +46,8 @@ export async function recordPublicSmartPageEvent(
   });
   if (!page) return { recorded: false, cookieHeaders: [] };
 
-  const isBlockEvent = input.event !== "smart_page_view" && input.event !== "social_click";
+  const isBlockEvent =
+    input.event !== "smart_page_view" && input.event !== "social_click";
   const isProductEvent = input.event.startsWith("link_in_bio_product_");
   let block: {
     id: string;
@@ -61,6 +63,7 @@ export async function recordPublicSmartPageEvent(
         visible: true,
         analyticsEnabled: true,
         ...(isProductEvent ? { type: "product" } : {}),
+        ...(input.event === "form_view" ? { type: "form" } : {}),
       },
       select: {
         id: true,
@@ -81,8 +84,7 @@ export async function recordPublicSmartPageEvent(
       utmTerm: input.utmTerm,
     },
   );
-  if (!context.trackingAllowed)
-    return { recorded: false, cookieHeaders: [] };
+  if (!context.trackingAllowed) return { recorded: false, cookieHeaders: [] };
   const attribution = resolveAttribution({
     ...context.attribution,
     referrer: headers.get("referer"),
@@ -90,26 +92,28 @@ export async function recordPublicSmartPageEvent(
   const inherited = trustedCampaignContext(headers);
   const destinationIsWhatsApp = Boolean(
     block?.link?.destinationUrl &&
-      /^https:\/\/(?:wa\.me|(?:api\.|web\.)?whatsapp\.com)\//i.test(
-        block.link.destinationUrl,
-      ),
+    /^https:\/\/(?:wa\.me|(?:api\.|web\.)?whatsapp\.com)\//i.test(
+      block.link.destinationUrl,
+    ),
   );
   const name: RecordAnalyticsEventInput["name"] =
     input.event === "smart_page_view"
       ? "smart_page_view"
-      : input.event === "link_in_bio_product_view"
-        ? "product_view"
-        : input.event === "link_in_bio_product_click"
-          ? "product_click"
-          : input.event === "smart_block_clicked"
-            ? block?.type === "whatsapp" || destinationIsWhatsApp
-              ? "whatsapp_click"
-              : block?.type === "link"
-              ? "link_click"
-              : "button_click"
-            : input.event === "social_click"
-              ? "social_click"
-              : "block_view";
+      : input.event === "form_view"
+        ? "form_view"
+        : input.event === "link_in_bio_product_view"
+          ? "product_view"
+          : input.event === "link_in_bio_product_click"
+            ? "product_click"
+            : input.event === "smart_block_clicked"
+              ? block?.type === "whatsapp" || destinationIsWhatsApp
+                ? "whatsapp_click"
+                : block?.type === "link"
+                  ? "link_click"
+                  : "button_click"
+              : input.event === "social_click"
+                ? "social_click"
+                : "block_view";
   const result = await recordAnalyticsEvent({
     name,
     eventId: input.eventId,
@@ -118,8 +122,13 @@ export async function recordPublicSmartPageEvent(
     sessionKey: context.identity.sessionId,
     assetType: "smart_page",
     assetId: page.id,
-    elementType: block ? "block" : input.event === "social_click" ? "social" : undefined,
-    elementId: block?.id ?? (input.event === "social_click" ? input.blockId : undefined),
+    elementType: block
+      ? "block"
+      : input.event === "social_click"
+        ? "social"
+        : undefined,
+    elementId:
+      block?.id ?? (input.event === "social_click" ? input.blockId : undefined),
     campaignId: inherited.campaignId ?? block?.link?.campaignId ?? undefined,
     smartPageId: page.id,
     smartPageBlockId: block?.id,
@@ -130,9 +139,15 @@ export async function recordPublicSmartPageEvent(
   });
   return {
     recorded: result.recorded || result.duplicate,
-    cookieHeaders: publicAnalyticsContextCookies(headers, context, attribution, {
-      campaignId: inherited.campaignId ?? block?.link?.campaignId ?? undefined,
-      qrContext: inherited.qrContext,
-    }),
+    cookieHeaders: publicAnalyticsContextCookies(
+      headers,
+      context,
+      attribution,
+      {
+        campaignId:
+          inherited.campaignId ?? block?.link?.campaignId ?? undefined,
+        qrContext: inherited.qrContext,
+      },
+    ),
   };
 }

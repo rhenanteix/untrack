@@ -4,6 +4,7 @@ import { ApiError } from "@/lib/api-response";
 import { appUrl } from "@/lib/app-url";
 import { track } from "@/lib/analytics";
 import { getPrisma } from "@/lib/prisma";
+import { normalizePhone } from "@/modules/audience/identity";
 import { recordAnalyticsEvent } from "@/modules/analytics/service";
 import { resolveAttribution } from "@/modules/analytics/attribution";
 import {
@@ -52,11 +53,6 @@ const knownContactFields = new Set([
 
 function json(value: unknown): Prisma.InputJsonValue {
   return JSON.parse(JSON.stringify(value)) as Prisma.InputJsonValue;
-}
-
-function normalizePhone(value: string) {
-  const digits = value.replace(/\D/g, "");
-  return value.trim().startsWith("+") ? `+${digits}` : digits;
 }
 
 function slugConflict(error: unknown): never {
