@@ -49,6 +49,13 @@ export function Footer() {
         [copy.nav.pricing, "/precos"],
       ],
     },
+    {
+      title: copy.footer.support,
+      links: [
+        [copy.footer.email, "mailto:rhenancontato@gmail.com"],
+        [copy.footer.whatsapp, "https://wa.me/5541988950911"],
+      ],
+    },
   ];
   if (
     pathname.startsWith("/untrack") ||
@@ -87,7 +94,10 @@ export function Footer() {
         </div>
       </div>
       <div className="shell footer-bottom">
-        <span>© {new Date().getFullYear()} LinkOr</span>
+        <div className="footer-identification">
+          <span>© {new Date().getFullYear()} LinkOr</span>
+          <span>{copy.footer.cnpj}: 27.900.115/0001-99</span>
+        </div>
         <nav aria-label="Legal">
           <Link href="/privacidade">{copy.footer.privacy}</Link>
           <Link href="/termos">{copy.footer.terms}</Link>

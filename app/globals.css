@@ -5294,7 +5294,7 @@ body:has(.product-shell) .site-footer {
 }
 .footer-groups {
   display: grid;
-  grid-template-columns: repeat(4, minmax(120px, 1fr));
+  grid-template-columns: repeat(5, minmax(120px, 1fr));
   gap: 28px;
 }
 .footer-groups nav {
@@ -5312,6 +5312,7 @@ body:has(.product-shell) .site-footer {
   color: #d5e0e5;
   font-size: 13px;
   line-height: 1.35;
+  overflow-wrap: anywhere;
 }
 .footer-groups a:hover,
 .footer-bottom a:hover {
@@ -5328,6 +5329,11 @@ body:has(.product-shell) .site-footer {
   padding: 20px 0 24px;
   color: #9eb2bd;
   font-size: 12px;
+}
+.footer-identification {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 18px;
 }
 .footer-bottom nav {
   display: flex;
@@ -5601,6 +5607,13 @@ body:has(.product-shell) .site-footer {
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 12px;
 }
+.static-page-grid--document {
+  grid-template-columns: minmax(0, 820px);
+}
+.static-page-grid--document article {
+  min-height: 0;
+  padding: 28px;
+}
 .static-page-grid article {
   display: grid;
   align-content: start;
@@ -5617,6 +5630,15 @@ body:has(.product-shell) .site-footer {
 }
 .static-page-grid p {
   margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.55;
+}
+.static-page-grid ul {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding-left: 20px;
   color: var(--muted);
   font-size: 13px;
   line-height: 1.55;
@@ -5709,7 +5731,10 @@ body:has(.product-shell) .site-footer {
   font-weight: 750;
   font-size: 15px;
   cursor: pointer;
-  transition: transform 0.15s ease, background 0.15s ease, box-shadow 0.15s ease;
+  transition:
+    transform 0.15s ease,
+    background 0.15s ease,
+    box-shadow 0.15s ease;
   border: 1px solid transparent;
 }
 
@@ -5824,7 +5849,9 @@ body:has(.product-shell) .site-footer {
   gap: 24px;
   opacity: 0;
   transform: translateY(20px);
-  transition: opacity 0.6s ease, transform 0.6s ease;
+  transition:
+    opacity 0.6s ease,
+    transform 0.6s ease;
 }
 
 .lv2-hero-journey--active {
@@ -5850,7 +5877,9 @@ body:has(.product-shell) .site-footer {
   cursor: pointer;
   font-weight: 650;
   font-size: 13px;
-  transition: border-color 0.15s ease, background 0.15s ease;
+  transition:
+    border-color 0.15s ease,
+    background 0.15s ease;
 }
 
 .lv2-hero-source:hover {
@@ -5913,7 +5942,11 @@ body:has(.product-shell) .site-footer {
   width: 48px;
   height: 48px;
   border-radius: 50%;
-  background: linear-gradient(135deg, var(--lv2-accent), var(--lv2-accent-strong));
+  background: linear-gradient(
+    135deg,
+    var(--lv2-accent),
+    var(--lv2-accent-strong)
+  );
 }
 
 .lv2-hero-card-lines {
@@ -5969,7 +6002,11 @@ body:has(.product-shell) .site-footer {
   color: var(--lv2-muted);
   opacity: 0;
   transform: translateY(8px);
-  transition: opacity 0.4s ease, transform 0.4s ease, border-color 0.15s ease, color 0.15s ease;
+  transition:
+    opacity 0.4s ease,
+    transform 0.4s ease,
+    border-color 0.15s ease,
+    color 0.15s ease;
 }
 
 .lv2-hero-result--visible {
@@ -6018,7 +6055,9 @@ body:has(.product-shell) .site-footer {
   cursor: pointer;
   font-weight: 650;
   font-size: 14px;
-  transition: border-color 0.15s ease, background 0.15s ease;
+  transition:
+    border-color 0.15s ease,
+    background 0.15s ease;
 }
 
 .lv2-source-btn:hover {
@@ -6416,7 +6455,11 @@ body:has(.product-shell) .site-footer {
 
 .lv2-source-bar-fill {
   height: 100%;
-  background: linear-gradient(90deg, var(--lv2-accent), var(--lv2-accent-strong));
+  background: linear-gradient(
+    90deg,
+    var(--lv2-accent),
+    var(--lv2-accent-strong)
+  );
   border-radius: inherit;
   transition: width 0.4s ease;
 }
@@ -6437,7 +6480,9 @@ body:has(.product-shell) .site-footer {
   font-weight: 650;
   font-size: 14px;
   cursor: pointer;
-  transition: border-color 0.15s ease, background 0.15s ease;
+  transition:
+    border-color 0.15s ease,
+    background 0.15s ease;
   text-align: center;
 }
 
@@ -6559,7 +6604,11 @@ body:has(.product-shell) .site-footer {
   width: 56px;
   height: 56px;
   border-radius: 50%;
-  background: linear-gradient(135deg, var(--lv2-accent), var(--lv2-accent-strong));
+  background: linear-gradient(
+    135deg,
+    var(--lv2-accent),
+    var(--lv2-accent-strong)
+  );
 }
 
 .lv2-audience-meta {
@@ -6655,7 +6704,11 @@ body:has(.product-shell) .site-footer {
   width: 48px;
   height: 48px;
   border-radius: 50%;
-  background: linear-gradient(135deg, var(--lv2-accent), var(--lv2-accent-strong));
+  background: linear-gradient(
+    135deg,
+    var(--lv2-accent),
+    var(--lv2-accent-strong)
+  );
 }
 
 .lv2-smart-card-header strong {
@@ -6786,7 +6839,11 @@ body:has(.product-shell) .site-footer {
   width: 72px;
   height: 72px;
   border-radius: 50%;
-  background: linear-gradient(135deg, var(--lv2-accent), var(--lv2-accent-strong));
+  background: linear-gradient(
+    135deg,
+    var(--lv2-accent),
+    var(--lv2-accent-strong)
+  );
   margin-inline: auto;
 }
 
@@ -6881,7 +6938,9 @@ body:has(.product-shell) .site-footer {
   font-weight: 750;
   font-size: 14px;
   cursor: pointer;
-  transition: border-color 0.15s ease, background 0.15s ease;
+  transition:
+    border-color 0.15s ease,
+    background 0.15s ease;
 }
 
 .lv2-quiz-option:hover {
@@ -7333,7 +7392,11 @@ body:has(.product-shell) .site-footer {
   width: 72px;
   height: 72px;
   border-radius: 50%;
-  background: linear-gradient(135deg, var(--lv2-accent), var(--lv2-accent-strong));
+  background: linear-gradient(
+    135deg,
+    var(--lv2-accent),
+    var(--lv2-accent-strong)
+  );
   margin-inline: auto;
 }
 

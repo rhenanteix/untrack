@@ -29,7 +29,8 @@ export const publicCopy = {
       intelligence: "Link Intelligence",
       intelligenceDescription: "Analise seus links e descubra oportunidades.",
       whatsapp: "WhatsApp Intelligence",
-      whatsappDescription: "Transforme cliques em contexto para suas campanhas.",
+      whatsappDescription:
+        "Transforme cliques em contexto para suas campanhas.",
       marketing: "Marketing",
       marketingDescription: "Campanhas, UTMs, QR Codes e resultados.",
       creators: "Criadores",
@@ -71,11 +72,13 @@ export const publicCopy = {
         "Crie páginas para reunir, distribuir e acompanhar seus links.",
       smartPagesDescription:
         "Editor, blocos, botões, templates e analytics no mesmo fluxo.",
-      intelligenceTitle: "Não apenas crie links. Entenda o que acontece depois.",
+      intelligenceTitle:
+        "Não apenas crie links. Entenda o que acontece depois.",
       intelligenceDescription:
         "Acompanhe cliques e desempenho dos seus links em uma visão operacional.",
       closingEyebrow: "Comece agora",
-      closingTitle: "Um link pode abrir uma conversa. Uma plataforma ajuda você a entender o que vem depois.",
+      closingTitle:
+        "Um link pode abrir uma conversa. Uma plataforma ajuda você a entender o que vem depois.",
       closingDescription:
         "Crie sua conta gratuita e reúna links, campanhas e resultados em um só lugar.",
     },
@@ -88,15 +91,21 @@ export const publicCopy = {
       campanhas: "Organize links, canais e resultados de campanha.",
       "utm-builder": "Crie URLs rastreáveis de forma consistente.",
       "qr-code": "Crie QR Codes para links e campanhas.",
-      "smart-pages": "Crie páginas para reunir, distribuir e acompanhar seus links.",
+      "smart-pages":
+        "Crie páginas para reunir, distribuir e acompanhar seus links.",
       analytics: "Entenda cliques, fontes e desempenho em um só lugar.",
     },
     footer: {
-      description: "Crie, organize e entenda cada link que move o seu trabalho.",
+      description:
+        "Crie, organize e entenda cada link que move o seu trabalho.",
       product: "Produto",
       tools: "Ferramentas",
       forYou: "Para você",
       company: "Empresa",
+      support: "Atendimento",
+      email: "rhenancontato@gmail.com",
+      whatsapp: "WhatsApp: +55 41 98895-0911",
+      cnpj: "CNPJ",
       exploreProducts: "Explorar produtos",
       campaigns: "Campanhas",
       resources: "Recursos",
@@ -143,7 +152,8 @@ export const publicCopy = {
     home: {
       eyebrow: "Link Intelligence Platform",
       title: "All your links in one place.",
-      subtitle: "Create, organize, track, and optimize your links and campaigns.",
+      subtitle:
+        "Create, organize, track, and optimize your links and campaigns.",
       explore: "Explore products",
       dashboardLabel: "LinkOr dashboard overview",
       overview: "Overview",
@@ -159,7 +169,8 @@ export const publicCopy = {
       campaignStatus: "3 active links and updated results.",
       productsEyebrow: "Products",
       productsTitle: "Everything you need to work with links.",
-      productsDescription: "Independent tools that work together in one platform.",
+      productsDescription:
+        "Independent tools that work together in one platform.",
       linksTitle: "Links",
       linksDescription: "Create, organize, and understand your links.",
       campaignsTitle: "Campaigns",
@@ -168,8 +179,10 @@ export const publicCopy = {
       smartPagesTitle: "Create pages to gather, share, and track your links.",
       smartPagesDescription:
         "Editor, blocks, buttons, templates, and analytics in one flow.",
-      intelligenceTitle: "Don't just create links. Understand what happens next.",
-      intelligenceDescription: "Track clicks and performance in one operational view.",
+      intelligenceTitle:
+        "Don't just create links. Understand what happens next.",
+      intelligenceDescription:
+        "Track clicks and performance in one operational view.",
       closingEyebrow: "Start now",
       closingTitle:
         "One link can start a conversation. A platform helps you understand what happens next.",
@@ -180,7 +193,8 @@ export const publicCopy = {
       "short-links": "Create short links and track their clicks.",
       whatsapp: "Create WhatsApp links and track clicks.",
       "link-analyzer": "Discover what sits behind a URL.",
-      "link-cleaner": "Remove tracking parameters without changing the destination.",
+      "link-cleaner":
+        "Remove tracking parameters without changing the destination.",
       "link-health": "Check technical health signals for your links.",
       campanhas: "Organize campaign links, channels, and results.",
       "utm-builder": "Create trackable URLs consistently.",
@@ -189,11 +203,16 @@ export const publicCopy = {
       analytics: "Understand clicks, sources, and performance in one place.",
     },
     footer: {
-      description: "Create, organize, and understand every link that moves your work.",
+      description:
+        "Create, organize, and understand every link that moves your work.",
       product: "Product",
       tools: "Tools",
       forYou: "For you",
       company: "Company",
+      support: "Support",
+      email: "rhenancontato@gmail.com",
+      whatsapp: "WhatsApp: +55 41 98895-0911",
+      cnpj: "CNPJ",
       exploreProducts: "Explore products",
       campaigns: "Campaigns",
       resources: "Resources",
@@ -262,9 +281,11 @@ export const publicCopy = {
       linksTitle: "Enlaces",
       linksDescription: "Crea, organiza y entiende tus enlaces.",
       campaignsTitle: "Campañas",
-      campaignsDescription: "Organiza todos los canales de una campaña en un solo lugar.",
+      campaignsDescription:
+        "Organiza todos los canales de una campaña en un solo lugar.",
       exploreGroup: "Explorar",
-      smartPagesTitle: "Crea páginas para reunir, compartir y seguir tus enlaces.",
+      smartPagesTitle:
+        "Crea páginas para reunir, compartir y seguir tus enlaces.",
       smartPagesDescription:
         "Editor, bloques, botones, plantillas y analíticas en un mismo flujo.",
       intelligenceTitle: "No solo crees enlaces. Entiende lo que pasa después.",
@@ -285,15 +306,21 @@ export const publicCopy = {
       campanhas: "Organiza enlaces, canales y resultados de campaña.",
       "utm-builder": "Crea URLs rastreables de forma consistente.",
       "qr-code": "Crea códigos QR para enlaces y campañas.",
-      "smart-pages": "Crea páginas para reunir, compartir y seguir tus enlaces.",
+      "smart-pages":
+        "Crea páginas para reunir, compartir y seguir tus enlaces.",
       analytics: "Entiende clics, fuentes y rendimiento en un solo lugar.",
     },
     footer: {
-      description: "Crea, organiza y entiende cada enlace que mueve tu trabajo.",
+      description:
+        "Crea, organiza y entiende cada enlace que mueve tu trabajo.",
       product: "Producto",
       tools: "Herramientas",
       forYou: "Para ti",
       company: "Empresa",
+      support: "Atención",
+      email: "rhenancontato@gmail.com",
+      whatsapp: "WhatsApp: +55 41 98895-0911",
+      cnpj: "CNPJ",
       exploreProducts: "Explorar productos",
       campaigns: "Campañas",
       resources: "Recursos",
