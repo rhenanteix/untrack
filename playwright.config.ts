@@ -21,9 +21,6 @@ export default defineConfig({
     launchOptions: {
       executablePath: process.env.PLAYWRIGHT_EXECUTABLE_PATH,
     },
-    env: {
-      DATABASE_URL: process.env.TEST_DATABASE_URL || process.env.DATABASE_URL,
-    },
   },
   webServer: {
     command: "node scripts/test-server.mjs",

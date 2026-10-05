@@ -11,7 +11,7 @@ test.beforeEach(async ({ page }) => {
   await page.reload();
 });
 
-async function signUp(page: import("@playwright/test").Page, baseURL: string) {
+async function signUp(page: import("@playwright/test").Page, baseURL: string | undefined) {
   await page.goto("/cadastro");
   const email = `cleaner-${crypto.randomUUID()}@example.com`;
   await page.getByLabel("Seu nome").fill("Cleaner test");
