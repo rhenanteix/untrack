@@ -55,6 +55,18 @@ enum ContactTemperature {
   hot
 }
 
+enum AudienceContactLifecycle {
+  new
+  engaged
+  converted
+}
+
+enum AudienceEngagementLevel {
+  low
+  medium
+  high
+}
+
 enum ProductStatus {
   draft
   active
@@ -374,6 +386,7 @@ model User {
   projectMemberships ProjectMember[]
   favorites Favorite[]
   recentResources RecentResource[]
+  audienceContactNotes AudienceContactNote[]
   ownedSmartCards SmartCard[] @relation("SmartCardOwner")
   analyticsEvents AnalyticsEvent[]
 }
@@ -540,6 +553,13 @@ model AudienceContact {
   company     String?               @db.VarChar(120)
   jobTitle    String?               @db.VarChar(160)
   city        String?               @db.VarChar(120)
+  creationSource String              @default("unknown") @db.VarChar(40)
+  firstSeenAt  DateTime              @default(now())
+  lastSeenAt   DateTime              @default(now())
+  audienceStatus AudienceContactLifecycle @default(new)
+  engagementLevel AudienceEngagementLevel @default(low)
+  conversionCount Int                @default(0)
+  meaningfulInteractionCount Int     @default(0)
   firstSource String?               @db.VarChar(253)
   firstMedium String?               @db.VarChar(120)
   firstChannel String?              @db.VarChar(40)
@@ -558,6 +578,8 @@ model AudienceContact {
   formSubmissions SmartPageFormSubmission[]
   analyticsVisitors AnalyticsVisitor[] @relation("AudienceContactVisitors")
   events      AudienceContactEvent[]
+  notes       AudienceContactNote[]
+  tags        AudienceContactTag[]
   analyticsEvents AnalyticsEvent[]
 
   @@index([workspaceId, createdAt])
@@ -565,6 +587,10 @@ model AudienceContact {
   @@index([workspaceId, phone])
   @@index([workspaceId, firstCampaign])
   @@index([workspaceId, lastCampaign])
+  @@index([workspaceId, firstSource])
+  @@index([workspaceId, audienceStatus, lastSeenAt])
+  @@index([workspaceId, engagementLevel, lastSeenAt])
+  @@unique([id, workspaceId])
 }
 
 model SmartCardContactExchange {
@@ -603,6 +629,45 @@ model AudienceContactEvent {
 
   @@index([contactId, occurredAt])
   @@index([workspaceId, occurredAt])
+}
+
+model AudienceContactTag {
+  workspaceId String
+  contactId   String
+  tagId       String
+  createdAt   DateTime        @default(now())
+  contact     AudienceContact @relation(fields: [contactId, workspaceId], references: [id, workspaceId], onDelete: Cascade)
+  tag         Tag             @relation(fields: [tagId, workspaceId], references: [id, workspaceId], onDelete: Cascade)
+
+  @@id([contactId, tagId])
+  @@index([workspaceId, tagId])
+}
+
+model AudienceContactNote {
+  id           String          @id @default(cuid())
+  workspaceId  String
+  contactId    String
+  authorUserId String
+  content      String          @db.VarChar(1000)
+  createdAt    DateTime        @default(now())
+  contact      AudienceContact @relation(fields: [contactId, workspaceId], references: [id, workspaceId], onDelete: Cascade)
+  author       User            @relation(fields: [authorUserId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId, contactId, createdAt])
+}
+
+model AudienceSegment {
+  id          String    @id @default(cuid())
+  workspaceId String
+  name        String    @db.VarChar(120)
+  description String    @default("") @db.VarChar(500)
+  rules       Json      @default("[]")
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@unique([workspaceId, name])
+  @@index([workspaceId, updatedAt])
 }
 
 model Product {
@@ -913,6 +978,7 @@ model Workspace {
   audienceContacts AudienceContact[]
   smartCardContactExchanges SmartCardContactExchange[]
   audienceContactEvents AudienceContactEvent[]
+  audienceSegments AudienceSegment[]
 }
 
 model Project {
@@ -975,6 +1041,7 @@ model Tag {
   updatedAt   DateTime @updatedAt
   workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   resources   ResourceTag[]
+  audienceContacts AudienceContactTag[]
 
   @@unique([workspaceId, slug])
   @@unique([id, workspaceId])

@@ -7,6 +7,9 @@ vi.mock("@/lib/prisma", () => ({ getPrisma: vi.fn() }));
 vi.mock("@/modules/analytics/service", () => ({
   recordAnalyticsEvent: vi.fn(),
 }));
+vi.mock("@/modules/audience/summary", () => ({
+  refreshAudienceContactSummary: vi.fn().mockResolvedValue(undefined),
+}));
 
 const form = {
   id: "form_1",

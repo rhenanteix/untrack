@@ -91,6 +91,11 @@ export function FormOverview({
                 >
                   Ver página pública
                 </Link>
+                <Link
+                  href={`/untrack/audience?form=${encodeURIComponent(selected.id)}`}
+                >
+                  Ver contatos
+                </Link>
               </header>
               <dl className={styles.metrics}>
                 {metric(selected.views, "Visualizações")}

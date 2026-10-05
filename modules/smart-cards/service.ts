@@ -5,6 +5,7 @@ import { appUrl } from "@/lib/app-url";
 import { track } from "@/lib/analytics";
 import { getPrisma } from "@/lib/prisma";
 import { normalizePhone } from "@/modules/audience/identity";
+import { refreshAudienceContactSummary } from "@/modules/audience/summary";
 import { recordAnalyticsEvent } from "@/modules/analytics/service";
 import { resolveAttribution } from "@/modules/analytics/attribution";
 import {
@@ -12,7 +13,6 @@ import {
   resolvePublicAnalyticsContext,
   trustedCampaignContext,
 } from "@/modules/analytics/public-context";
-import { getAccountAccess } from "@/modules/billing/account-access";
 import { PAGE_SIZE } from "@/lib/pagination";
 import { createQrAsset } from "@/modules/untrack-qr/service";
 import { exportQr, renderVerifiedQr } from "@/modules/untrack-qr/render";
@@ -464,6 +464,9 @@ export async function captureSmartCardContact(
           ...Object.fromEntries(
             Object.entries(data).filter(([, value]) => value !== null),
           ),
+          ...(existing.creationSource === "unknown"
+            ? { creationSource: "smart_card_exchange" }
+            : {}),
           customFields: json({
             ...(existing.customFields as Record<string, unknown>),
             ...customFields,
@@ -471,30 +474,12 @@ export async function captureSmartCardContact(
         },
       });
     } else {
-      await tx.$queryRaw`SELECT "id" FROM "User" WHERE "id" = ${card.ownerId} FOR UPDATE`;
-      const owner = await tx.user.findUniqueOrThrow({
-        where: { id: card.ownerId },
-        select: {
-          plan: true,
-          trial: {
-            select: {
-              status: true,
-              startedAt: true,
-              expiresAt: true,
-              usedAt: true,
-              cancelledAt: true,
-            },
-          },
-        },
-      });
-      await reserveQuota(
-        tx,
-        card.workspaceId,
-        getAccountAccess(owner),
-        "audienceContacts",
-      );
       saved = await tx.audienceContact.create({
-        data: { workspaceId: card.workspaceId, ...data },
+        data: {
+          workspaceId: card.workspaceId,
+          creationSource: "smart_card_exchange",
+          ...data,
+        },
       });
     }
     const exchange = await tx.smartCardContactExchange.create({
@@ -526,8 +511,8 @@ export async function captureSmartCardContact(
     return saved;
   });
   if (tracking.trackingAllowed)
-    await Promise.all([
-      recordAnalyticsEvent({
+    try {
+      const formEvent = await recordAnalyticsEvent({
         eventId: randomUUID(),
         name: "form_submit",
         workspaceId: card.workspaceId,
@@ -542,8 +527,14 @@ export async function captureSmartCardContact(
         attribution: tracking.attribution,
         origin: "server",
         headers,
-      }),
-      recordAnalyticsEvent({
+        includeIdentity: true,
+      });
+      if (formEvent.visitorId)
+        await getPrisma().analyticsVisitor.update({
+          where: { id: formEvent.visitorId },
+          data: { audienceContactId: contact.id },
+        });
+      await recordAnalyticsEvent({
         eventId: randomUUID(),
         name: "lead_created",
         workspaceId: card.workspaceId,
@@ -558,10 +549,14 @@ export async function captureSmartCardContact(
         attribution: tracking.attribution,
         origin: "server",
         headers,
-      }),
-    ]).catch((error) =>
-      console.error("Smart Card conversion analytics was not recorded", error),
-    );
+      });
+    } catch (error) {
+      console.error("Smart Card conversion analytics was not recorded", error);
+    }
+  void refreshAudienceContactSummary(card.workspaceId, contact.id).catch(
+    (error) =>
+      console.error("Smart Card contact summary was not refreshed", error),
+  );
   return {
     contact,
     consentText: contactConsentText(card),

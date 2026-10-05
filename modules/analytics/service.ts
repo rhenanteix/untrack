@@ -7,6 +7,7 @@ import { classifyBot, classifyDevice } from "./device";
 import { GoalEngine } from "./goal-engine";
 import { reportAnalyticsHealth } from "./health";
 import { analyticsSessionTimeoutMinutes } from "./session";
+import { refreshAudienceContactSummary } from "@/modules/audience/summary";
 import type {
   AnalyticsAssetType,
   AnalyticsEventOrigin,
@@ -169,7 +170,12 @@ async function resolveIdentity(
     },
   });
   const sessionHash = hashIdentifier(input.sessionKey);
-  if (!sessionHash) return { visitorId: visitor.id, visitorHash };
+  if (!sessionHash)
+    return {
+      visitorId: visitor.id,
+      visitorHash,
+      audienceContactId: visitor.audienceContactId ?? undefined,
+    };
 
   const expiresBefore = new Date(
     occurredAt.getTime() - analyticsSessionTimeoutMinutes() * 60_000,
@@ -207,6 +213,7 @@ async function resolveIdentity(
     visitorId: visitor.id,
     visitorHash,
     sessionId: session.id,
+    audienceContactId: visitor.audienceContactId ?? undefined,
     firstTouchSource: visitor.firstTouchSource,
     firstTouchMedium: visitor.firstTouchMedium,
     firstTouchChannel: visitor.firstTouchChannel,
@@ -242,6 +249,8 @@ export async function recordAnalyticsEvent(
         referrer,
         path,
       );
+      const audienceContactId =
+        input.audienceContactId ?? identity.audienceContactId;
       const event = await tx.analyticsEvent.create({
         data: {
           eventId,
@@ -251,7 +260,7 @@ export async function recordAnalyticsEvent(
           metadata: cleanMetadata(input.metadata),
           workspaceId: input.workspaceId,
           userId: input.userId,
-          audienceContactId: input.audienceContactId,
+          audienceContactId,
           visitorId: identity.visitorId,
           sessionId: identity.sessionId,
           assetType: input.assetType,
@@ -290,7 +299,7 @@ export async function recordAnalyticsEvent(
             name: input.name,
             workspaceId: input.workspaceId,
             userId: input.userId,
-            audienceContactId: input.audienceContactId,
+            audienceContactId,
             assetType: input.assetType,
             assetId: input.assetId,
             elementType: input.elementType,
@@ -320,8 +329,16 @@ export async function recordAnalyticsEvent(
         completedGoals,
         visitorId: identity.visitorId,
         sessionId: identity.sessionId,
+        audienceContactId,
       };
     });
+    if (input.workspaceId && persisted.audienceContactId)
+      void refreshAudienceContactSummary(
+        input.workspaceId,
+        persisted.audienceContactId,
+      ).catch((error) =>
+        console.error("Audience contact summary was not refreshed", error),
+      );
     if (!isTest) {
       void aggregateAnalyticsEvent({
         workspaceId: input.workspaceId,

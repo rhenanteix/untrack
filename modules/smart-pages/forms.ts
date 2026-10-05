@@ -3,6 +3,7 @@ import { Prisma } from "@prisma/client";
 import { ApiError } from "@/lib/api-response";
 import { getPrisma } from "@/lib/prisma";
 import { normalizeEmail, normalizePhone } from "@/modules/audience/identity";
+import { refreshAudienceContactSummary } from "@/modules/audience/summary";
 import { resolveAttribution } from "@/modules/analytics/attribution";
 import {
   publicAnalyticsContextCookies,
@@ -378,12 +379,16 @@ export async function submitPublicSmartPageForm(
             firstMedium: contact.firstMedium ?? firstTouch.firstMedium,
             firstChannel: contact.firstChannel ?? firstTouch.firstChannel,
             firstCampaign: contact.firstCampaign ?? firstTouch.firstCampaign,
+            ...(contact.creationSource === "unknown"
+              ? { creationSource: "form" }
+              : {}),
             ...lastTouch,
           },
         })
       : await tx.audienceContact.create({
           data: {
             workspaceId: form.workspaceId,
+            creationSource: "form",
             ...contactFields,
             customFields: json(contactInput.customFields),
             ...firstTouch,
@@ -517,6 +522,14 @@ export async function submitPublicSmartPageForm(
       console.error("Smart Page form analytics was not recorded", error);
     }
   }
+
+  if (captured.contactId)
+    void refreshAudienceContactSummary(
+      form.workspaceId,
+      captured.contactId,
+    ).catch((error) =>
+      console.error("Smart Page form contact summary was not refreshed", error),
+    );
 
   return {
     submitted: true,
