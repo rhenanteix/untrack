@@ -6,6 +6,7 @@ import {
   analyticsAssets,
   analyticsCampaigns,
   analyticsChannels,
+  analyticsGoals,
   analyticsJourneys,
   analyticsLocations,
   analyticsOverview,
@@ -13,6 +14,7 @@ import {
   analyticsTechnology,
   analyticsTime,
   analyticsTimeseries,
+  analyticsUtms,
 } from "@/modules/analytics/queries";
 import { requireActor } from "@/modules/workspaces/context";
 
@@ -25,12 +27,15 @@ const searchSchema = z.object({
       "channels",
       "assets",
       "campaigns",
+      "goals",
+      "utms",
       "locations",
       "technology",
       "time",
       "journeys",
     ])
     .default("overview"),
+  period: z.enum(["7d", "30d", "90d"]).optional(),
   from: z.coerce.date().optional(),
   to: z.coerce.date().optional(),
   assetType: z.enum(analyticsAssetTypes).optional(),
@@ -62,6 +67,7 @@ export async function GET(request: Request) {
     const filters = {
       from: input.from,
       to: input.to,
+      periodDays: input.period ? Number.parseInt(input.period, 10) : undefined,
       assetType: input.assetType,
       assetId: input.assetId,
       campaignId: input.campaignId,
@@ -76,6 +82,8 @@ export async function GET(request: Request) {
       channels: analyticsChannels,
       assets: analyticsAssets,
       campaigns: analyticsCampaigns,
+      goals: analyticsGoals,
+      utms: analyticsUtms,
       locations: analyticsLocations,
       technology: analyticsTechnology,
       time: analyticsTime,

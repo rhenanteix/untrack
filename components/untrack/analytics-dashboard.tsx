@@ -1,214 +1,344 @@
 "use client";
 
 import Link from "next/link";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { startTransition, useEffect, useState } from "react";
-import { FiTarget } from "react-icons/fi";
+import { FiArrowDown, FiTarget } from "react-icons/fi";
+import { PremiumGate } from "@/components/premium-gate";
+import { analytics } from "@/lib/client/analytics";
 import { apiRequest } from "./shared";
 
+type Tab = "overview" | "acquisition" | "content" | "conversions";
+type Metric = "visitors" | "clicks" | "conversions";
+type AcquisitionMode = "source" | "channel";
+
 type Overview = {
+  range: { historyDays: number; advancedAnalytics: boolean };
   visitors: number;
   sessions: number;
   views: number;
   clicks: number;
-  ctr: number;
+  whatsappClicks: number;
   conversions: number;
   conversionRate: number;
   comparison: Record<string, number | null>;
 };
-
 type Timeseries = {
   points: Array<{
     date: string;
     visitors: number;
-    views: number;
     clicks: number;
     conversions: number;
   }>;
 };
-
 type Breakdown = {
   items: Array<{
     name: string;
     visitors: number;
     clicks: number;
     conversions: number;
-    ctr: number;
     conversionRate: number;
   }>;
+  locked?: boolean;
+};
+type Asset = {
+  assetType: string;
+  assetId: string;
+  name: string;
+  context: string | null;
+  visitors: number;
+  clicks: number;
+  scans: number;
+  interactions: number;
+  conversions: number;
+  conversionRate: number;
+};
+type Campaign = {
+  campaignId: string;
+  name: string;
+  visitors: number;
+  clicks: number;
+  conversions: number;
+  conversionRate: number;
+};
+type Goal = {
+  goalId: string;
+  name: string;
+  conversions: number;
+  visitors: number;
+  conversionRate: number;
+};
+type Utm = {
+  utmSource: string | null;
+  utmMedium: string | null;
+  utmCampaign: string | null;
+  visitors: number;
+  conversions: number;
+  conversionRate: number;
+};
+type Data = {
+  overview: Overview;
+  series: Timeseries;
+  sources: Breakdown;
+  channels: Breakdown;
+  assets: { items: Asset[]; locked?: boolean };
+  campaigns: { items: Campaign[] };
+  goals: {
+    items: Goal[];
+    primary: Goal | null;
+    goalOptions: Array<{ id: string; name: string }>;
+  };
+  utms: { items: Utm[] };
 };
 
-type Assets = {
-  items: Array<{
-    assetType: string;
-    assetId: string;
-    visitors: number;
-    clicks: number;
-    conversions: number;
-    ctr: number;
-    conversionRate: number;
-  }>;
+const tabs: Array<{ value: Tab; label: string }> = [
+  { value: "overview", label: "Visão geral" },
+  { value: "acquisition", label: "Aquisição" },
+  { value: "content", label: "Conteúdo" },
+  { value: "conversions", label: "Conversões" },
+];
+const assetTypes: Record<string, string> = {
+  smart_page: "Smart Page",
+  smart_card: "Smart Card",
+  link: "Link",
+  qr_code: "QR Code",
+  campaign: "Campanha",
+  product: "Produto",
+  payment_link: "Link de pagamento",
 };
-
-type Technology = {
-  devices: Array<{ name: string; events: number }>;
-  operatingSystems: Array<{ name: string; events: number }>;
-  browsers: Array<{ name: string; events: number }>;
+const channelLabels: Record<string, string> = {
+  direct: "Direct",
+  organic_search: "Organic Search",
+  paid_search: "Paid Search",
+  organic_social: "Organic Social",
+  paid_social: "Paid Social",
+  email: "Email",
+  messaging: "Messaging",
+  referral: "Referral",
+  qr: "QR",
+  other: "Other",
 };
-
-type Locations = {
-  items: Array<{
-    country: string;
-    region: string | null;
-    city: string | null;
-    events: number;
-  }>;
-};
-
-type Time = { items: Array<{ weekday: number; hour: number; events: number }> };
-type Journeys = {
-  sampled: boolean;
-  items: Array<{ journey: string; sessions: number }>;
-};
-
-const assetOptions = [
-  ["", "Todos os ativos"],
-  ["smart_page", "Smart Pages"],
-  ["link", "Links"],
-  ["smart_card", "Smart Cards"],
-  ["qr_code", "QR Codes"],
-  ["campaign", "Campanhas"],
-] as const;
-
-const eventLabels = {
+const metricLabels: Record<Metric, string> = {
   visitors: "Visitantes",
-  views: "Visualizações",
   clicks: "Cliques",
   conversions: "Conversões",
 };
 
-function isoDate(date: Date) {
-  return date.toISOString().slice(0, 10);
-}
-
-function datesFor(days: number) {
-  const to = new Date();
-  const from = new Date(to);
-  from.setUTCDate(from.getUTCDate() - days + 1);
-  return { from: isoDate(from), to: isoDate(to) };
-}
-
 function number(value: number) {
   return new Intl.NumberFormat("pt-BR").format(value);
 }
-
 function percent(value: number) {
   return `${value.toLocaleString("pt-BR", { maximumFractionDigits: 1 })}%`;
 }
-
 function comparison(value: number | null | undefined) {
-  if (value === null || value === undefined) return "Sem comparação válida";
-  return `${value > 0 ? "+" : ""}${percent(value)} vs. período anterior`;
+  return value === null || value === undefined
+    ? null
+    : `${value > 0 ? "+" : ""}${percent(value)} vs. período anterior`;
+}
+function assetTypeLabel(type: string) {
+  return assetTypes[type] ?? type.replaceAll("_", " ");
+}
+function analyticsHref(values: Record<string, string | undefined>) {
+  const query = new URLSearchParams();
+  for (const [key, value] of Object.entries(values))
+    if (value) query.set(key, value);
+  return `/untrack/analytics?${query}`;
 }
 
-function QueryTable({
+function Skeleton() {
+  return (
+    <div
+      className="analytics-skeleton"
+      role="status"
+      aria-label="Carregando Analytics"
+    >
+      <div className="analytics-skeleton-kpis">
+        {Array.from({ length: 6 }, (_, index) => (
+          <span key={index} />
+        ))}
+      </div>
+      <span className="analytics-skeleton-chart" />
+      <span className="analytics-skeleton-table" />
+    </div>
+  );
+}
+
+function AcquisitionTable({
+  mode,
+  items,
+}: {
+  mode: AcquisitionMode;
+  items: Breakdown["items"];
+}) {
+  return items.length ? (
+    <div className="analytics-table-wrap">
+      <table className="analytics-table">
+        <thead>
+          <tr>
+            <th>{mode === "source" ? "Origem" : "Canal"}</th>
+            <th>Visitantes</th>
+            <th>Cliques</th>
+            <th>Conversões</th>
+            <th>CVR</th>
+          </tr>
+        </thead>
+        <tbody>
+          {items.map((item) => (
+            <tr key={item.name}>
+              <td>
+                {mode === "channel"
+                  ? (channelLabels[item.name] ?? item.name)
+                  : item.name === "direct"
+                    ? "Direct"
+                    : item.name}
+              </td>
+              <td>{number(item.visitors)}</td>
+              <td>{number(item.clicks)}</td>
+              <td>{number(item.conversions)}</td>
+              <td>{percent(item.conversionRate)}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  ) : (
+    <p className="analytics-muted">Ainda não há dados neste período.</p>
+  );
+}
+
+function ContentTable({
   title,
-  caption,
-  rows,
+  assets,
+  period,
+  variant,
 }: {
   title: string;
-  caption: string;
-  rows: Breakdown["items"];
+  assets: Asset[];
+  period: string;
+  variant: "all" | "smart" | "link" | "qr";
 }) {
+  const qr = variant === "qr";
   return (
     <section className="workspace-panel analytics-table-panel">
       <div className="workspace-panel-heading">
         <div>
           <h2>{title}</h2>
-          <p>{caption}</p>
         </div>
       </div>
-      {rows.length ? (
+      {assets.length ? (
         <div className="analytics-table-wrap">
           <table className="analytics-table">
             <thead>
               <tr>
-                <th>Origem</th>
-                <th>Visitantes</th>
-                <th>Cliques</th>
+                <th>
+                  {qr
+                    ? "QR"
+                    : variant === "link"
+                      ? "Link"
+                      : variant === "smart"
+                        ? "Smart Page"
+                        : "Ativo"}
+                </th>
+                {variant === "all" ? (
+                  <>
+                    <th>Tipo</th>
+                    <th>Visitantes</th>
+                    <th>Interações</th>
+                  </>
+                ) : null}
+                <th>{qr ? "Scans" : "Cliques"}</th>
                 <th>Conversões</th>
-                <th>Taxa de conversão</th>
+                <th>CVR</th>
               </tr>
             </thead>
             <tbody>
-              {rows.slice(0, 8).map((row) => (
-                <tr key={row.name}>
-                  <td>{row.name}</td>
-                  <td>{number(row.visitors)}</td>
-                  <td>{number(row.clicks)}</td>
-                  <td>{number(row.conversions)}</td>
-                  <td>{percent(row.conversionRate)}</td>
+              {assets.map((asset) => (
+                <tr key={`${asset.assetType}:${asset.assetId}`}>
+                  <td>
+                    <Link
+                      className="analytics-table-link"
+                      href={analyticsHref({
+                        tab: "content",
+                        period,
+                        assetType: asset.assetType,
+                        asset: asset.assetId,
+                      })}
+                      onClick={() => analytics.track("analytics_asset_opened")}
+                    >
+                      {asset.name}
+                    </Link>
+                    {asset.context ? <small>{asset.context}</small> : null}
+                  </td>
+                  {variant === "all" ? (
+                    <>
+                      <td>{assetTypeLabel(asset.assetType)}</td>
+                      <td>{number(asset.visitors)}</td>
+                      <td>{number(asset.interactions)}</td>
+                    </>
+                  ) : null}
+                  <td>{number(qr ? asset.scans : asset.clicks)}</td>
+                  <td>{number(asset.conversions)}</td>
+                  <td>{percent(asset.conversionRate)}</td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
       ) : (
-        <p className="analytics-muted">Ainda não há dados neste período.</p>
+        <p className="analytics-muted">
+          Sem dados suficientes para este ranking.
+        </p>
       )}
     </section>
   );
 }
 
-function TechnologyList({
-  title,
-  items,
-}: {
-  title: string;
-  items: Array<{ name: string; events: number }>;
-}) {
-  const total = items.reduce((sum, item) => sum + item.events, 0);
-  return (
-    <div className="analytics-list">
-      <h3>{title}</h3>
-      {items.length ? (
-        <ul>
-          {items.map((item) => (
-            <li key={item.name}>
-              <span>{item.name}</span>
-              <strong>
-                {total ? percent((item.events / total) * 100) : "0%"}
-              </strong>
-            </li>
-          ))}
-        </ul>
-      ) : (
-        <p>Sem dados suficientes.</p>
-      )}
-    </div>
-  );
-}
-
 export function AnalyticsDashboard() {
-  const [period, setPeriod] = useState(30);
-  const [range, setRange] = useState(datesFor(30));
-  const [assetType, setAssetType] = useState("");
-  const [metric, setMetric] = useState<keyof typeof eventLabels>("views");
-  const [overview, setOverview] = useState<Overview | null>(null);
-  const [series, setSeries] = useState<Timeseries | null>(null);
-  const [sources, setSources] = useState<Breakdown | null>(null);
-  const [channels, setChannels] = useState<Breakdown | null>(null);
-  const [assets, setAssets] = useState<Assets | null>(null);
-  const [technology, setTechnology] = useState<Technology | null>(null);
-  const [locations, setLocations] = useState<Locations | null>(null);
-  const [time, setTime] = useState<Time | null>(null);
-  const [journeys, setJourneys] = useState<Journeys | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
+  const pathname = usePathname();
+  const router = useRouter();
+  const queryKey = useSearchParams().toString();
+  const params = new URLSearchParams(queryKey);
+  const requestedTab = params.get("tab");
+  const tab = tabs.some((item) => item.value === requestedTab)
+    ? (requestedTab as Tab)
+    : "overview";
+  const requestedPeriod = params.get("period");
+  const period = ["7d", "30d", "90d"].includes(requestedPeriod ?? "")
+    ? (requestedPeriod as "7d" | "30d" | "90d")
+    : "7d";
+  const periodDays = Number.parseInt(period, 10);
+  const assetType = params.get("assetType") ?? "";
+  const assetId = params.get("asset") ?? "";
+  const campaignId = params.get("campaign") ?? "";
+  const goalId = params.get("goal") ?? "";
+  const [response, setResponse] = useState<{
+    key: string;
+    data: Data;
+  } | null>(null);
+  const [failure, setFailure] = useState<{
+    key: string;
+    message: string;
+  } | null>(null);
+  const [retry, setRetry] = useState(0);
+  const [metric, setMetric] = useState<Metric>("visitors");
+  const [acquisitionMode, setAcquisitionMode] =
+    useState<AcquisitionMode>("source");
+  const requestKey = [period, assetType, assetId, campaignId, goalId].join(":");
+  const data = response?.key === requestKey ? response.data : null;
+  const error = failure?.key === requestKey ? failure.message : "";
+  const loading = !data && !error;
+
+  useEffect(() => {
+    analytics.track("analytics_viewed");
+  }, []);
 
   useEffect(() => {
     const controller = new AbortController();
-    const query = new URLSearchParams({ from: range.from, to: range.to });
+    const query = new URLSearchParams({ period });
     if (assetType) query.set("assetType", assetType);
+    if (assetId) query.set("assetId", assetId);
+    if (campaignId) query.set("campaignId", campaignId);
+    if (goalId) query.set("goalId", goalId);
     const request = <T,>(view: string) =>
       apiRequest<T>(`/api/workspace/analytics?view=${view}&${query}`, {
         signal: controller.signal,
@@ -218,71 +348,106 @@ export function AnalyticsDashboard() {
       request<Timeseries>("timeseries"),
       request<Breakdown>("sources"),
       request<Breakdown>("channels"),
-      request<Assets>("assets"),
-      request<Technology>("technology"),
-      request<Locations>("locations"),
-      request<Time>("time"),
-      request<Journeys>("journeys"),
+      request<{ items: Asset[]; locked?: boolean }>("assets"),
+      request<{ items: Campaign[] }>("campaigns"),
+      request<Data["goals"]>("goals"),
+      request<{ items: Utm[] }>("utms"),
     ])
       .then(
         ([
-          nextOverview,
-          nextSeries,
-          nextSources,
-          nextChannels,
-          nextAssets,
-          nextTechnology,
-          nextLocations,
-          nextTime,
-          nextJourneys,
+          overview,
+          series,
+          sources,
+          channels,
+          assets,
+          campaigns,
+          goals,
+          utms,
         ]) => {
-          if (controller.signal.aborted) return;
-          setError("");
-          setOverview(nextOverview);
-          setSeries(nextSeries);
-          setSources(nextSources);
-          setChannels(nextChannels);
-          setAssets(nextAssets);
-          setTechnology(nextTechnology);
-          setLocations(nextLocations);
-          setTime(nextTime);
-          setJourneys(nextJourneys);
+          if (!controller.signal.aborted)
+            setResponse({
+              key: requestKey,
+              data: {
+                overview,
+                series,
+                sources,
+                channels,
+                assets,
+                campaigns,
+                goals,
+                utms,
+              },
+            });
         },
       )
-      .catch((requestError: Error) => {
-        if (!controller.signal.aborted) setError(requestError.message);
-      })
-      .finally(() => {
-        if (!controller.signal.aborted) setLoading(false);
+      .catch((reason: Error) => {
+        if (!controller.signal.aborted)
+          setFailure({
+            key: requestKey,
+            message: reason.message || "Não foi possível carregar estes dados.",
+          });
       });
     return () => controller.abort();
-  }, [assetType, range]);
+  }, [
+    assetId,
+    assetType,
+    campaignId,
+    goalId,
+    period,
+    periodDays,
+    requestKey,
+    retry,
+  ]);
 
-  function selectPeriod(days: number) {
-    startTransition(() => {
-      setPeriod(days);
-      setRange(datesFor(days));
-    });
+  function updateQuery(changes: Record<string, string | undefined>) {
+    const next = new URLSearchParams(queryKey);
+    for (const [key, value] of Object.entries(changes)) {
+      if (value) next.set(key, value);
+      else next.delete(key);
+    }
+    startTransition(() =>
+      router.replace(next.size ? `${pathname}?${next}` : pathname),
+    );
   }
 
+  function selectPeriod(days: number) {
+    analytics.track("analytics_period_changed");
+    updateQuery({ period: `${days}d` });
+  }
+
+  function applyFilters(changes: Record<string, string | undefined>) {
+    analytics.track("analytics_filter_applied");
+    updateQuery(changes);
+  }
+
+  const assets = data?.assets.items ?? [];
+  const filteredAssets = assets.filter(
+    (asset) => !assetType || asset.assetType === assetType,
+  );
+  const smartPages = assets.filter((asset) => asset.assetType === "smart_page");
+  const links = assets.filter((asset) => asset.assetType === "link");
+  const qrCodes = assets.filter((asset) => asset.assetType === "qr_code");
+  const currentAcquisition =
+    acquisitionMode === "source" ? data?.sources : data?.channels;
   const highest = Math.max(
-    ...(series?.points.map((point) => point[metric]) ?? [0]),
+    ...(data?.series.points.map((point) => point[metric]) ?? [0]),
     1,
   );
-  const timeMaximum = Math.max(
-    ...(time?.items.map((item) => item.events) ?? [0]),
-    1,
-  );
-  const isEmpty = !loading && overview && !overview.views && !overview.clicks;
+  const isEmpty = data
+    ? !data.overview.visitors &&
+      !data.overview.views &&
+      !data.overview.clicks &&
+      !data.overview.conversions
+    : false;
+  const historyDays = data?.overview.range.historyDays ?? 7;
 
   return (
     <div className="workspace-page analytics-page">
       <header className="workspace-page-heading analytics-heading">
         <div>
-          <span className="eyebrow">Inteligência</span>
           <h1>Analytics</h1>
           <p>
-            Entenda como as pessoas encontram e interagem com seus conteúdos.
+            Entenda de onde vêm seus acessos e quais ações geram resultados.
           </p>
         </div>
         <div className="workspace-heading-actions">
@@ -295,358 +460,558 @@ export function AnalyticsDashboard() {
         </div>
       </header>
 
+      <div
+        className="analytics-tabs"
+        role="tablist"
+        aria-label="Seções de Analytics"
+      >
+        {tabs.map((item) => (
+          <button
+            key={item.value}
+            type="button"
+            role="tab"
+            aria-selected={tab === item.value}
+            onClick={() => updateQuery({ tab: item.value })}
+          >
+            {item.label}
+          </button>
+        ))}
+      </div>
       <div className="analytics-filters" aria-label="Filtros de Analytics">
         <div className="analytics-period" role="group" aria-label="Período">
-          {[7, 30, 90].map((days) => (
-            <button
-              key={days}
-              type="button"
-              aria-pressed={period === days}
-              onClick={() => selectPeriod(days)}
-            >
-              {days} dias
-            </button>
-          ))}
-          <button
-            type="button"
-            aria-pressed={period === 0}
-            onClick={() => setPeriod(0)}
-          >
-            Personalizado
-          </button>
+          {[7, 30, 90].map((days) =>
+            days <= historyDays ? (
+              <button
+                key={days}
+                type="button"
+                aria-pressed={periodDays === days}
+                onClick={() => selectPeriod(days)}
+              >
+                {days} dias
+              </button>
+            ) : (
+              <PremiumGate
+                key={days}
+                feature={`${days} dias de Analytics`}
+                description="Amplie o histórico disponível com o LinkOr Premium. Seus dados continuam sendo coletados no plano Free."
+              >
+                {days} dias
+              </PremiumGate>
+            ),
+          )}
         </div>
-        {period === 0 && (
-          <div className="analytics-custom-dates">
-            <label>
-              De
-              <input
-                type="date"
-                value={range.from}
-                onChange={(event) =>
-                  setRange((current) => ({
-                    ...current,
-                    from: event.target.value,
-                  }))
-                }
-              />
-            </label>
-            <label>
-              Até
-              <input
-                type="date"
-                value={range.to}
-                onChange={(event) =>
-                  setRange((current) => ({
-                    ...current,
-                    to: event.target.value,
-                  }))
-                }
-              />
-            </label>
-          </div>
-        )}
         <label className="analytics-asset-filter">
-          <span>Ativo</span>
+          <span>Tipo de ativo</span>
           <select
             value={assetType}
-            onChange={(event) => setAssetType(event.target.value)}
+            onChange={(event) =>
+              applyFilters({ assetType: event.target.value, asset: undefined })
+            }
           >
-            {assetOptions.map(([value, label]) => (
+            <option value="">Todos os ativos</option>
+            {Object.entries(assetTypes).map(([value, label]) => (
               <option key={value} value={value}>
                 {label}
               </option>
             ))}
           </select>
         </label>
+        <label className="analytics-asset-filter">
+          <span>Ativo</span>
+          <select
+            value={assetId}
+            disabled={!filteredAssets.length}
+            onChange={(event) => applyFilters({ asset: event.target.value })}
+          >
+            <option value="">Todos os ativos</option>
+            {filteredAssets.map((asset) => (
+              <option key={asset.assetId} value={asset.assetId}>
+                {asset.name}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="analytics-asset-filter">
+          <span>Campanha</span>
+          <select
+            value={campaignId}
+            disabled={!data?.campaigns.items.length}
+            onChange={(event) => applyFilters({ campaign: event.target.value })}
+          >
+            <option value="">Todas as campanhas</option>
+            {data?.campaigns.items.map((campaign) => (
+              <option key={campaign.campaignId} value={campaign.campaignId}>
+                {campaign.name}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="analytics-asset-filter">
+          <span>Objetivo</span>
+          <select
+            value={goalId}
+            disabled={!data?.goals.goalOptions.length}
+            onChange={(event) => applyFilters({ goal: event.target.value })}
+          >
+            <option value="">Todos os objetivos</option>
+            {data?.goals.goalOptions.map((goal) => (
+              <option key={goal.id} value={goal.id}>
+                {goal.name}
+              </option>
+            ))}
+          </select>
+        </label>
       </div>
 
-      {loading && (
-        <p role="status" className="analytics-muted">
-          Carregando Analytics...
-        </p>
-      )}
-      {error && (
-        <p role="alert" className="form-error">
-          {error}
-        </p>
-      )}
-      {isEmpty && (
+      {loading ? <Skeleton /> : null}
+      {error ? (
+        <section className="workspace-panel analytics-error-state" role="alert">
+          <h2>Não foi possível carregar estes dados.</h2>
+          <p>{error}</p>
+          <button
+            className="button button-secondary"
+            type="button"
+            onClick={() => {
+              setFailure(null);
+              setRetry((value) => value + 1);
+            }}
+          >
+            Tentar novamente
+          </button>
+        </section>
+      ) : null}
+      {isEmpty ? (
         <section className="workspace-empty-state">
-          <h2>Ainda não temos dados suficientes.</h2>
+          <h2>Seu Analytics ainda está começando.</h2>
           <p>
-            Compartilhe uma Smart Page, link, QR Code ou Smart Card para começar
-            a medir interações reais.
+            Compartilhe seus links, páginas ou QR Codes para começar a receber
+            dados.
           </p>
           <div className="workspace-empty-actions">
-            <Link className="button" href="/untrack/smart-pages">
-              Ver Smart Pages
+            <Link className="button" href="/untrack/short-links">
+              Criar link
+            </Link>
+            <Link
+              className="button button-secondary"
+              href="/untrack/smart-pages"
+            >
+              Criar Smart Page
             </Link>
           </div>
         </section>
-      )}
+      ) : null}
 
-      {!loading && !error && overview && !isEmpty && (
+      {!loading && !error && data && !isEmpty ? (
         <>
-          <dl className="workspace-kpis analytics-kpis">
-            <div>
-              <dt>Visitantes</dt>
-              <dd>{number(overview.visitors)}</dd>
-              <small>{comparison(overview.comparison.visitors)}</small>
-            </div>
-            <div>
-              <dt>Sessões</dt>
-              <dd>{number(overview.sessions)}</dd>
-              <small>Visitas identificadas no período</small>
-            </div>
-            <div>
-              <dt>Visualizações</dt>
-              <dd>{number(overview.views)}</dd>
-              <small>{comparison(overview.comparison.views)}</small>
-            </div>
-            <div>
-              <dt>Cliques</dt>
-              <dd>{number(overview.clicks)}</dd>
-              <small>{comparison(overview.comparison.clicks)}</small>
-            </div>
-            <div>
-              <dt>CTR</dt>
-              <dd>{percent(overview.ctr)}</dd>
-              <small>Cliques por visualização</small>
-            </div>
-            <div>
-              <dt>Conversões</dt>
-              <dd>{number(overview.conversions)}</dd>
-              <small>{comparison(overview.comparison.conversions)}</small>
-            </div>
-            <div>
-              <dt>Taxa de conversão</dt>
-              <dd>{percent(overview.conversionRate)}</dd>
-              <small>Conversões por visitante único</small>
-            </div>
-          </dl>
-
-          <section className="workspace-panel analytics-performance">
-            <div className="workspace-panel-heading">
-              <div>
-                <h2>Desempenho</h2>
-                <p>Atividade real no período selecionado.</p>
-              </div>
-              <label className="analytics-metric">
-                <span>Métrica</span>
-                <select
-                  value={metric}
-                  onChange={(event) =>
-                    setMetric(event.target.value as keyof typeof eventLabels)
-                  }
-                >
-                  {Object.entries(eventLabels).map(([value, label]) => (
-                    <option key={value} value={value}>
-                      {label}
-                    </option>
-                  ))}
-                </select>
-              </label>
-            </div>
-            <ol className="dashboard-chart-bars analytics-chart-bars">
-              {series?.points.map((point) => (
-                <li
-                  key={point.date}
-                  title={`${point.date}: ${number(point[metric])}`}
-                >
-                  <span
-                    style={{
-                      height: `${Math.max((point[metric] / highest) * 100, 2)}%`,
-                    }}
-                  />
-                  <small>{point.date.slice(5)}</small>
-                </li>
-              ))}
-            </ol>
-          </section>
-
-          <div className="workspace-overview-grid">
-            <QueryTable
-              title="Aquisição"
-              caption="De onde vieram as visualizações."
-              rows={sources?.items ?? []}
-            />
-            <QueryTable
-              title="Canais"
-              caption="Agrupamento determinístico do tráfego."
-              rows={channels?.items ?? []}
-            />
-          </div>
-
-          <section className="workspace-panel analytics-table-panel">
-            <div className="workspace-panel-heading">
-              <div>
-                <h2>Conteúdo</h2>
-                <p>Performance por ativo no período selecionado.</p>
-              </div>
-            </div>
-            {assets?.items.length ? (
-              <div className="analytics-table-wrap">
-                <table className="analytics-table">
-                  <thead>
-                    <tr>
-                      <th>Ativo</th>
-                      <th>Visitantes</th>
-                      <th>Cliques</th>
-                      <th>CTR</th>
-                      <th>Conversões</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {assets.items.slice(0, 12).map((asset) => (
-                      <tr key={`${asset.assetType}:${asset.assetId}`}>
-                        <td>
-                          <span className="analytics-asset-type">
-                            {asset.assetType.replace("_", " ")}
-                          </span>
-                          <small>{asset.assetId}</small>
-                        </td>
-                        <td>{number(asset.visitors)}</td>
-                        <td>{number(asset.clicks)}</td>
-                        <td>{percent(asset.ctr)}</td>
-                        <td>{number(asset.conversions)}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            ) : (
-              <p className="analytics-muted">
-                Ainda não há ativos com atividade neste período.
-              </p>
-            )}
-          </section>
-
-          <div className="workspace-overview-grid">
-            <section className="workspace-panel">
-              <div className="workspace-panel-heading">
+          {tab === "overview" ? (
+            <>
+              <dl className="workspace-kpis analytics-kpis">
                 <div>
-                  <h2>Tecnologia</h2>
-                  <p>Dispositivos e navegadores informados pelo acesso.</p>
+                  <dt>Visitantes</dt>
+                  <dd>{number(data.overview.visitors)}</dd>
+                  <small>{comparison(data.overview.comparison.visitors)}</small>
                 </div>
-              </div>
-              <div className="analytics-technology">
-                <TechnologyList
-                  title="Dispositivos"
-                  items={technology?.devices ?? []}
-                />
-                <TechnologyList
-                  title="Sistemas"
-                  items={technology?.operatingSystems ?? []}
-                />
-                <TechnologyList
-                  title="Browsers"
-                  items={technology?.browsers ?? []}
-                />
-              </div>
-            </section>
-            <section className="workspace-panel">
-              <div className="workspace-panel-heading">
                 <div>
-                  <h2>Localização</h2>
-                  <p>Dados aproximados com amostra mínima.</p>
+                  <dt>Sessões</dt>
+                  <dd>{number(data.overview.sessions)}</dd>
+                  <small>Identificadas no período</small>
                 </div>
-              </div>
-              {locations?.items.length ? (
-                <ul className="analytics-location-list">
-                  {locations.items.slice(0, 8).map((location) => (
-                    <li
-                      key={`${location.country}:${location.region}:${location.city}`}
+                <div>
+                  <dt>Visualizações</dt>
+                  <dd>{number(data.overview.views)}</dd>
+                  <small>{comparison(data.overview.comparison.views)}</small>
+                </div>
+                <div>
+                  <dt>Cliques</dt>
+                  <dd>{number(data.overview.clicks)}</dd>
+                  <small>{comparison(data.overview.comparison.clicks)}</small>
+                </div>
+                <div>
+                  <dt>Conversões</dt>
+                  <dd>{number(data.overview.conversions)}</dd>
+                  <small>
+                    {comparison(data.overview.comparison.conversions)}
+                  </small>
+                </div>
+                <div>
+                  <dt>Taxa de conversão</dt>
+                  <dd>{percent(data.overview.conversionRate)}</dd>
+                  <small>Conversões por visitante único</small>
+                </div>
+                {data.overview.whatsappClicks ? (
+                  <div>
+                    <dt>Cliques no WhatsApp</dt>
+                    <dd>{number(data.overview.whatsappClicks)}</dd>
+                    <small>Não representa conversas</small>
+                  </div>
+                ) : null}
+              </dl>
+              <section className="workspace-panel analytics-performance">
+                <div className="workspace-panel-heading">
+                  <div>
+                    <h2>Desempenho no período</h2>
+                    <p>Uma métrica por vez para facilitar a leitura.</p>
+                  </div>
+                  <label className="analytics-metric">
+                    <span>Métrica</span>
+                    <select
+                      value={metric}
+                      onChange={(event) =>
+                        setMetric(event.target.value as Metric)
+                      }
                     >
-                      <span>
-                        {[location.city, location.region, location.country]
-                          .filter(Boolean)
-                          .join(", ")}
-                      </span>
-                      <strong>{number(location.events)}</strong>
+                      {Object.entries(metricLabels).map(([value, label]) => (
+                        <option key={value} value={value}>
+                          {label}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                </div>
+                <ol className="dashboard-chart-bars analytics-chart-bars">
+                  {data.series.points.map((point) => (
+                    <li
+                      key={point.date}
+                      title={`${point.date}: ${metricLabels[metric]} ${number(point[metric])}`}
+                    >
+                      <span
+                        style={{
+                          height: `${Math.max((point[metric] / highest) * 100, 2)}%`,
+                        }}
+                      />
+                      <small>{point.date.slice(5)}</small>
                     </li>
                   ))}
-                </ul>
-              ) : (
-                <p className="analytics-muted">
-                  Ainda não há volume suficiente para mostrar localização.
-                </p>
-              )}
-            </section>
-          </div>
-
-          <section className="workspace-panel analytics-time-panel">
-            <div className="workspace-panel-heading">
-              <div>
-                <h2>Horários</h2>
-                <p>Atividade por dia da semana e hora do dia.</p>
-              </div>
-            </div>
-            <div
-              className="analytics-heatmap"
-              role="img"
-              aria-label="Heatmap de atividade por dia e hora"
-            >
-              {[0, 1, 2, 3, 4, 5, 6].flatMap((weekday) =>
-                Array.from({ length: 24 }, (_, hour) => {
-                  const events =
-                    time?.items.find(
-                      (item) => item.weekday === weekday && item.hour === hour,
-                    )?.events ?? 0;
-                  return (
-                    <span
-                      key={`${weekday}:${hour}`}
-                      title={`${["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"][weekday]} ${hour}h: ${number(events)}`}
-                      style={{
-                        opacity: events
-                          ? Math.max(events / timeMaximum, 0.12)
-                          : 0.04,
-                      }}
-                    />
-                  );
-                }),
-              )}
-            </div>
-            <div className="analytics-heatmap-labels">
-              <span>Dom</span>
-              <span>Seg</span>
-              <span>Ter</span>
-              <span>Qua</span>
-              <span>Qui</span>
-              <span>Sex</span>
-              <span>Sáb</span>
-            </div>
-          </section>
-
-          <section className="workspace-panel">
-            <div className="workspace-panel-heading">
-              <div>
-                <h2>Jornadas</h2>
-                <p>Sequências agregadas, sem expor pessoas individualmente.</p>
-              </div>
-            </div>
-            {journeys?.items.length ? (
-              <ol className="analytics-journeys">
-                {journeys.items.map((item) => (
-                  <li key={item.journey}>
-                    <span>{item.journey.replaceAll("_", " ")}</span>
-                    <strong>{number(item.sessions)}</strong>
+                </ol>
+              </section>
+              <section className="workspace-panel analytics-funnel">
+                <div className="workspace-panel-heading">
+                  <div>
+                    <h2>Fluxo de resultado</h2>
+                    <p>Do alcance à conversão no período selecionado.</p>
+                  </div>
+                </div>
+                <ol>
+                  <li>
+                    <strong>{number(data.overview.visitors)}</strong>
+                    <span>Visitantes</span>
                   </li>
-                ))}
-              </ol>
-            ) : (
-              <p className="analytics-muted">
-                Ainda não há jornadas com mais de uma interação.
-              </p>
-            )}
-            {journeys?.sampled && (
-              <p className="analytics-muted">
-                Mostrando uma amostra recente de jornadas para preservar o tempo
-                de resposta.
-              </p>
-            )}
-          </section>
+                  <FiArrowDown aria-hidden="true" />
+                  <li>
+                    <strong>{number(data.overview.clicks)}</strong>
+                    <span>Interações</span>
+                  </li>
+                  <FiArrowDown aria-hidden="true" />
+                  <li>
+                    <strong>{number(data.overview.conversions)}</strong>
+                    <span>Conversões</span>
+                  </li>
+                </ol>
+              </section>
+            </>
+          ) : null}
+
+          {tab === "acquisition" ? (
+            <>
+              <section className="workspace-panel analytics-table-panel">
+                <div className="workspace-panel-heading">
+                  <div>
+                    <h2>De onde vieram seus visitantes?</h2>
+                    <p>
+                      Direct é preservado quando não foi possível identificar
+                      outra origem.
+                    </p>
+                  </div>
+                  <div
+                    className="analytics-mode-switch"
+                    role="group"
+                    aria-label="Dimensão de aquisição"
+                  >
+                    <button
+                      type="button"
+                      aria-pressed={acquisitionMode === "source"}
+                      onClick={() => setAcquisitionMode("source")}
+                    >
+                      Origem
+                    </button>
+                    <button
+                      type="button"
+                      aria-pressed={acquisitionMode === "channel"}
+                      onClick={() => setAcquisitionMode("channel")}
+                    >
+                      Canal
+                    </button>
+                  </div>
+                </div>
+                {currentAcquisition?.locked ? (
+                  <div className="analytics-locked-state">
+                    <p>
+                      Os relatórios completos por canal estão disponíveis no
+                      Premium.
+                    </p>
+                    <PremiumGate
+                      feature="Canais de aquisição"
+                      description="Veja todos os canais e amplie o histórico de Analytics com o LinkOr Premium."
+                    />
+                  </div>
+                ) : (
+                  <AcquisitionTable
+                    mode={acquisitionMode}
+                    items={currentAcquisition?.items ?? []}
+                  />
+                )}
+              </section>
+              <section className="workspace-panel analytics-table-panel">
+                <div className="workspace-panel-heading">
+                  <div>
+                    <h2>UTMs</h2>
+                    <p>Fontes, mídias e campanhas informadas nos acessos.</p>
+                  </div>
+                </div>
+                {data.utms.items.length ? (
+                  <div className="analytics-table-wrap">
+                    <table className="analytics-table">
+                      <thead>
+                        <tr>
+                          <th>utm_source</th>
+                          <th>utm_medium</th>
+                          <th>utm_campaign</th>
+                          <th>Visitantes</th>
+                          <th>Conversões</th>
+                          <th>CVR</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {data.utms.items.map((utm) => (
+                          <tr
+                            key={`${utm.utmSource}:${utm.utmMedium}:${utm.utmCampaign}`}
+                          >
+                            <td>{utm.utmSource ?? "Não informado"}</td>
+                            <td>{utm.utmMedium ?? "Não informado"}</td>
+                            <td>{utm.utmCampaign ?? "Não informado"}</td>
+                            <td>{number(utm.visitors)}</td>
+                            <td>{number(utm.conversions)}</td>
+                            <td>{percent(utm.conversionRate)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : (
+                  <p className="analytics-muted">
+                    Nenhum acesso com UTM neste período.
+                  </p>
+                )}
+              </section>
+              <section className="workspace-panel analytics-table-panel">
+                <div className="workspace-panel-heading">
+                  <div>
+                    <h2>Campanhas com resultado</h2>
+                    <p>Somente campanhas que receberam atividade no período.</p>
+                  </div>
+                </div>
+                {data.campaigns.items.length ? (
+                  <div className="analytics-table-wrap">
+                    <table className="analytics-table">
+                      <thead>
+                        <tr>
+                          <th>Campanha</th>
+                          <th>Visitantes</th>
+                          <th>Cliques</th>
+                          <th>Conversões</th>
+                          <th>CVR</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {data.campaigns.items.map((campaign) => (
+                          <tr key={campaign.campaignId}>
+                            <td>
+                              <Link
+                                className="analytics-table-link"
+                                href={analyticsHref({
+                                  tab: "acquisition",
+                                  period,
+                                  campaign: campaign.campaignId,
+                                })}
+                              >
+                                {campaign.name}
+                              </Link>
+                            </td>
+                            <td>{number(campaign.visitors)}</td>
+                            <td>{number(campaign.clicks)}</td>
+                            <td>{number(campaign.conversions)}</td>
+                            <td>{percent(campaign.conversionRate)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : (
+                  <p className="analytics-muted">
+                    Nenhuma campanha tem dados neste período.
+                  </p>
+                )}
+              </section>
+            </>
+          ) : null}
+
+          {tab === "content" ? (
+            <>
+              <ContentTable
+                title="Conteúdo que mais gera resultado"
+                assets={filteredAssets}
+                period={period}
+                variant="all"
+              />
+              <div className="workspace-overview-grid">
+                <ContentTable
+                  title="Top Smart Pages"
+                  assets={smartPages}
+                  period={period}
+                  variant="smart"
+                />
+                <ContentTable
+                  title="Top Links"
+                  assets={links}
+                  period={period}
+                  variant="link"
+                />
+                <ContentTable
+                  title="Performance de QR Codes"
+                  assets={qrCodes}
+                  period={period}
+                  variant="qr"
+                />
+              </div>
+            </>
+          ) : null}
+
+          {tab === "conversions" ? (
+            <>
+              {data.goals.primary ? (
+                <section className="workspace-panel analytics-primary-goal">
+                  <div>
+                    <span className="eyebrow">Objetivo principal</span>
+                    <h2>{data.goals.primary.name}</h2>
+                  </div>
+                  <dl>
+                    <div>
+                      <dt>Conversões</dt>
+                      <dd>{number(data.goals.primary.conversions)}</dd>
+                    </div>
+                    <div>
+                      <dt>CVR</dt>
+                      <dd>{percent(data.goals.primary.conversionRate)}</dd>
+                    </div>
+                  </dl>
+                  <Link
+                    className="button button-secondary"
+                    href={analyticsHref({
+                      tab: "conversions",
+                      period,
+                      goal: data.goals.primary.goalId,
+                    })}
+                    onClick={() => analytics.track("analytics_goal_clicked")}
+                  >
+                    Ver objetivo
+                  </Link>
+                </section>
+              ) : null}
+              {!data.goals.goalOptions.length && data.overview.visitors ? (
+                <section className="workspace-panel analytics-no-goals">
+                  <h2>Você já está recebendo acessos.</h2>
+                  <p>Agora defina o que representa um resultado para você.</p>
+                  <Link className="button" href="/untrack/analytics/goals">
+                    Criar objetivo
+                  </Link>
+                </section>
+              ) : null}
+              <section className="workspace-panel analytics-table-panel">
+                <div className="workspace-panel-heading">
+                  <div>
+                    <h2>Performance por objetivo</h2>
+                    <p>
+                      Conversões são registradas pelo Goal Engine, não por
+                      qualquer clique.
+                    </p>
+                  </div>
+                </div>
+                {data.goals.items.length ? (
+                  <div className="analytics-table-wrap">
+                    <table className="analytics-table">
+                      <thead>
+                        <tr>
+                          <th>Objetivo</th>
+                          <th>Conversões</th>
+                          <th>Visitantes</th>
+                          <th>CVR</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {data.goals.items.map((goal) => (
+                          <tr key={goal.goalId}>
+                            <td>{goal.name}</td>
+                            <td>{number(goal.conversions)}</td>
+                            <td>{number(goal.visitors)}</td>
+                            <td>{percent(goal.conversionRate)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : (
+                  <p className="analytics-muted">
+                    Ainda não há conversões neste período.
+                  </p>
+                )}
+              </section>
+              <div className="workspace-overview-grid">
+                <section className="workspace-panel analytics-table-panel">
+                  <div className="workspace-panel-heading">
+                    <div>
+                      <h2>Qual origem gera mais resultados?</h2>
+                    </div>
+                  </div>
+                  <AcquisitionTable mode="source" items={data.sources.items} />
+                </section>
+                <section className="workspace-panel analytics-table-panel">
+                  <div className="workspace-panel-heading">
+                    <div>
+                      <h2>Qual ativo gera mais resultados?</h2>
+                    </div>
+                  </div>
+                  {assets.length ? (
+                    <div className="analytics-table-wrap">
+                      <table className="analytics-table">
+                        <thead>
+                          <tr>
+                            <th>Ativo</th>
+                            <th>Conversões</th>
+                            <th>CVR</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {assets.map((asset) => (
+                            <tr key={`${asset.assetType}:${asset.assetId}`}>
+                              <td>{assetTypeLabel(asset.assetType)}</td>
+                              <td>{number(asset.conversions)}</td>
+                              <td>{percent(asset.conversionRate)}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  ) : (
+                    <p className="analytics-muted">
+                      Ainda não há ativos com conversão.
+                    </p>
+                  )}
+                </section>
+              </div>
+            </>
+          ) : null}
         </>
-      )}
+      ) : null}
     </div>
   );
 }

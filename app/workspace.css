@@ -1211,6 +1211,32 @@
 .analytics-heading {
   align-items: end;
 }
+.analytics-tabs {
+  display: flex;
+  width: fit-content;
+  max-width: 100%;
+  margin-bottom: 18px;
+  overflow-x: auto;
+  border-bottom: 1px solid var(--ws-line);
+}
+.analytics-tabs button,
+.analytics-mode-switch button {
+  min-height: 38px;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  padding: 0 12px;
+  background: transparent;
+  color: var(--ws-muted);
+  cursor: pointer;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 750;
+  white-space: nowrap;
+}
+.analytics-tabs button[aria-selected="true"] {
+  border-bottom-color: var(--ws-green);
+  color: var(--ws-green);
+}
 .analytics-filters {
   display: flex;
   flex-wrap: wrap;
@@ -1240,6 +1266,14 @@
 .analytics-period button[aria-pressed="true"] {
   background: var(--ws-accent-soft);
   color: var(--ws-green);
+}
+.analytics-period .premium-gate-trigger {
+  min-height: 32px;
+  border: 0;
+  border-radius: 5px;
+  padding: 0 10px;
+  background: transparent;
+  color: var(--ws-muted);
 }
 .analytics-custom-dates,
 .analytics-asset-filter,
@@ -1274,6 +1308,38 @@
 }
 .analytics-kpis > div {
   min-height: 120px;
+}
+.analytics-skeleton {
+  display: grid;
+  gap: 18px;
+}
+.analytics-skeleton-kpis {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 12px;
+}
+.analytics-skeleton-kpis span,
+.analytics-skeleton-chart,
+.analytics-skeleton-table {
+  display: block;
+  border-radius: 6px;
+  background: linear-gradient(90deg, #edf0eb 20%, #f8faf6 45%, #edf0eb 70%);
+  background-size: 220% 100%;
+  animation: analytics-loading 1.2s ease-in-out infinite;
+}
+.analytics-skeleton-kpis span {
+  min-height: 120px;
+}
+.analytics-skeleton-chart {
+  min-height: 230px;
+}
+.analytics-skeleton-table {
+  min-height: 180px;
+}
+@keyframes analytics-loading {
+  to {
+    background-position: -220% 0;
+  }
 }
 .analytics-performance {
   margin-bottom: 18px;
@@ -1323,6 +1389,84 @@
 .analytics-muted {
   color: var(--ws-muted);
   font-size: 13px;
+}
+.analytics-table-link {
+  color: var(--ws-green);
+  font-weight: 750;
+  text-decoration: none;
+}
+.analytics-table-link:hover {
+  text-decoration: underline;
+}
+.analytics-mode-switch {
+  display: inline-flex;
+  border: 1px solid var(--ws-line);
+  border-radius: 6px;
+}
+.analytics-mode-switch button[aria-pressed="true"] {
+  background: var(--ws-accent-soft);
+  color: var(--ws-green);
+}
+.analytics-funnel ol {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+.analytics-funnel li {
+  display: grid;
+  gap: 3px;
+  min-width: 100px;
+}
+.analytics-funnel strong {
+  font-size: 22px;
+}
+.analytics-funnel span,
+.analytics-funnel svg {
+  color: var(--ws-muted);
+  font-size: 12px;
+}
+.analytics-primary-goal {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+}
+.analytics-primary-goal h2,
+.analytics-no-goals h2,
+.analytics-error-state h2 {
+  margin: 4px 0 0;
+}
+.analytics-primary-goal dl {
+  display: flex;
+  gap: 20px;
+  margin: 0;
+}
+.analytics-primary-goal dt {
+  color: var(--ws-muted);
+  font-size: 11px;
+}
+.analytics-primary-goal dd {
+  margin: 4px 0 0;
+  font-size: 18px;
+  font-weight: 800;
+}
+.analytics-no-goals,
+.analytics-error-state {
+  display: grid;
+  gap: 12px;
+}
+.analytics-no-goals p,
+.analytics-error-state p {
+  margin: 0;
+  color: var(--ws-muted);
+}
+.analytics-locked-state {
+  display: grid;
+  gap: 10px;
+}
+.analytics-locked-state p {
+  margin: 0;
+  color: var(--ws-muted);
 }
 .analytics-technology {
   display: grid;
@@ -1540,12 +1684,23 @@
   .analytics-kpis {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
+  .analytics-skeleton-kpis {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
   .analytics-technology,
   .analytics-goal-form {
     grid-template-columns: 1fr;
   }
   .analytics-goal-choices {
     grid-template-columns: 1fr;
+  }
+  .analytics-primary-goal {
+    align-items: start;
+    flex-direction: column;
+  }
+  .analytics-funnel ol {
+    align-items: start;
+    flex-direction: column;
   }
 }
 .workspace-checklist li {

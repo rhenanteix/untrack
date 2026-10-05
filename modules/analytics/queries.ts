@@ -28,6 +28,7 @@ const clickEvents = [
 export type AnalyticsFilters = {
   from?: Date;
   to?: Date;
+  periodDays?: number;
   assetType?: AnalyticsAssetType;
   assetId?: string;
   campaignId?: string;
@@ -39,38 +40,110 @@ export type AnalyticsFilters = {
 export type ResolvedFilters = AnalyticsFilters & {
   from: Date;
   to: Date;
+  timezone: string;
   historyDays: number;
   advancedAnalytics: boolean;
 };
 
-function startOfDay(value: Date) {
-  return new Date(
-    Date.UTC(value.getUTCFullYear(), value.getUTCMonth(), value.getUTCDate()),
-  );
+function calendarDate(value: Date, timezone: string) {
+  try {
+    const values = Object.fromEntries(
+      new Intl.DateTimeFormat("en-CA", {
+        timeZone: timezone,
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+      })
+        .formatToParts(value)
+        .filter((part) => ["year", "month", "day"].includes(part.type))
+        .map((part) => [part.type, part.value]),
+    );
+    return new Date(
+      Date.UTC(
+        Number(values.year),
+        Number(values.month) - 1,
+        Number(values.day),
+      ),
+    );
+  } catch {
+    return new Date(
+      Date.UTC(value.getUTCFullYear(), value.getUTCMonth(), value.getUTCDate()),
+    );
+  }
 }
 
-function endOfDay(value: Date) {
-  const result = startOfDay(value);
-  result.setUTCDate(result.getUTCDate() + 1);
-  result.setMilliseconds(-1);
-  return result;
+function timezoneOffset(value: Date, timezone: string) {
+  try {
+    const label = new Intl.DateTimeFormat("en-US", {
+      timeZone: timezone,
+      timeZoneName: "longOffset",
+    })
+      .formatToParts(value)
+      .find((part) => part.type === "timeZoneName")?.value;
+    const match = label?.match(/^GMT(?:(\+|-)(\d{2}):(\d{2}))?$/);
+    if (!match || !match[1]) return 0;
+    const minutes = Number(match[2]) * 60 + Number(match[3]);
+    return (match[1] === "+" ? 1 : -1) * minutes * 60_000;
+  } catch {
+    return 0;
+  }
+}
+
+function startOfDay(value: Date, timezone: string) {
+  const target = Date.UTC(
+    value.getUTCFullYear(),
+    value.getUTCMonth(),
+    value.getUTCDate(),
+  );
+  let instant = target;
+  for (let attempt = 0; attempt < 2; attempt += 1)
+    instant = target - timezoneOffset(new Date(instant), timezone);
+  return new Date(instant);
+}
+
+function endOfDay(value: Date, timezone: string) {
+  const next = new Date(
+    Date.UTC(
+      value.getUTCFullYear(),
+      value.getUTCMonth(),
+      value.getUTCDate() + 1,
+    ),
+  );
+  return new Date(startOfDay(next, timezone).getTime() - 1);
 }
 
 export async function resolveAnalyticsFilters(
   actor: Actor,
   filters: AnalyticsFilters,
 ) {
-  const access = await getAccountAccessForUser(actor.userId);
+  const [access, workspace] = await Promise.all([
+    getAccountAccessForUser(actor.userId),
+    getPrisma().workspace.findUnique({
+      where: { id: actor.workspaceId },
+      select: { timezone: true },
+    }),
+  ]);
+  const timezone = workspace?.timezone ?? "UTC";
   const historyDays = getAnalyticsHistoryDays(access);
-  const today = startOfDay(new Date());
-  const earliest = new Date(today);
-  earliest.setUTCDate(earliest.getUTCDate() - historyDays + 1);
-  const requestedFrom = filters.from ? startOfDay(filters.from) : earliest;
-  const requestedTo = filters.to ? endOfDay(filters.to) : endOfDay(new Date());
+  const today = calendarDate(new Date(), timezone);
+  const earliestDay = new Date(today);
+  earliestDay.setUTCDate(earliestDay.getUTCDate() - historyDays + 1);
+  const earliest = startOfDay(earliestDay, timezone);
+  const periodStart = new Date(today);
+  periodStart.setUTCDate(
+    periodStart.getUTCDate() - (filters.periodDays ?? historyDays) + 1,
+  );
+  const requestedFrom = filters.from
+    ? startOfDay(filters.from, timezone)
+    : startOfDay(periodStart, timezone);
+  const requestedTo = filters.to
+    ? endOfDay(filters.to, timezone)
+    : endOfDay(today, timezone);
   return {
     ...filters,
     from: requestedFrom < earliest ? earliest : requestedFrom,
     to: requestedTo,
+    timezone,
     historyDays,
     advancedAnalytics: canUse(access, "advancedAnalytics"),
   } satisfies ResolvedFilters;
@@ -85,6 +158,13 @@ export function eventWhere(actor: Actor, filters: ResolvedFilters) {
     ...(filters.assetType ? { assetType: filters.assetType } : {}),
     ...(filters.assetId ? { assetId: filters.assetId } : {}),
     ...(filters.campaignId ? { campaignId: filters.campaignId } : {}),
+    ...(filters.goalId
+      ? {
+          visitor: {
+            conversions: { some: conversionWhere(actor, filters) },
+          },
+        }
+      : {}),
     ...(filters.source ? { source: filters.source } : {}),
     ...(filters.channel ? { channel: filters.channel } : {}),
   };
@@ -109,24 +189,31 @@ async function totals(actor: Actor, filters: ResolvedFilters) {
   const db = getPrisma();
   const where = eventWhere(actor, filters);
   const conversionsWhere = conversionWhere(actor, filters);
-  const [views, clicks, conversions, visitors, sessions] = await Promise.all([
-    db.analyticsEvent.count({ where: { ...where, name: { in: viewEvents } } }),
-    db.analyticsEvent.count({ where: { ...where, name: { in: clickEvents } } }),
-    db.analyticsConversion.count({ where: conversionsWhere }),
-    db.analyticsEvent.groupBy({
-      by: ["visitorHash"],
-      where: { ...where, visitorHash: { not: null } },
-    }),
-    db.analyticsEvent.groupBy({
-      by: ["sessionId"],
-      where: { ...where, sessionId: { not: null } },
-    }),
-  ]);
+  const [views, clicks, whatsappClicks, conversions, visitors, sessions] =
+    await Promise.all([
+      db.analyticsEvent.count({
+        where: { ...where, name: { in: viewEvents } },
+      }),
+      db.analyticsEvent.count({
+        where: { ...where, name: { in: clickEvents } },
+      }),
+      db.analyticsEvent.count({ where: { ...where, name: "whatsapp_click" } }),
+      db.analyticsConversion.count({ where: conversionsWhere }),
+      db.analyticsEvent.groupBy({
+        by: ["visitorId"],
+        where: { ...where, visitorId: { not: null } },
+      }),
+      db.analyticsEvent.groupBy({
+        by: ["sessionId"],
+        where: { ...where, sessionId: { not: null } },
+      }),
+    ]);
   return {
     visitors: visitors.length,
     sessions: sessions.length,
     views,
     clicks,
+    whatsappClicks,
     ctr: views ? Number(((clicks / views) * 100).toFixed(1)) : 0,
     conversions,
     conversionRate: conversionRate(conversions, visitors.length),
@@ -177,51 +264,116 @@ export async function analyticsTimeseries(
   input: AnalyticsFilters,
 ) {
   const filters = await resolveAnalyticsFilters(actor, input);
+  const eventConditions: Prisma.Sql[] = [
+    Prisma.sql`event."workspaceId" = ${actor.workspaceId}`,
+    Prisma.sql`event."occurredAt" >= ${filters.from}`,
+    Prisma.sql`event."occurredAt" <= ${filters.to}`,
+    Prisma.sql`event."isBot" = false`,
+    Prisma.sql`event."isTest" = false`,
+  ];
+  const conversionConditions: Prisma.Sql[] = [
+    Prisma.sql`conversion."workspaceId" = ${actor.workspaceId}`,
+    Prisma.sql`conversion."occurredAt" >= ${filters.from}`,
+    Prisma.sql`conversion."occurredAt" <= ${filters.to}`,
+    Prisma.sql`conversion."isBot" = false`,
+    Prisma.sql`conversion."isTest" = false`,
+  ];
+  if (filters.assetType) {
+    eventConditions.push(Prisma.sql`event."assetType" = ${filters.assetType}`);
+    conversionConditions.push(
+      Prisma.sql`conversion."assetType" = ${filters.assetType}`,
+    );
+  }
+  if (filters.assetId) {
+    eventConditions.push(Prisma.sql`event."assetId" = ${filters.assetId}`);
+    conversionConditions.push(
+      Prisma.sql`conversion."assetId" = ${filters.assetId}`,
+    );
+  }
+  if (filters.campaignId) {
+    eventConditions.push(
+      Prisma.sql`event."campaignId" = ${filters.campaignId}`,
+    );
+    conversionConditions.push(
+      Prisma.sql`conversion."campaignId" = ${filters.campaignId}`,
+    );
+  }
+  if (filters.source) {
+    eventConditions.push(Prisma.sql`event."source" = ${filters.source}`);
+    conversionConditions.push(
+      Prisma.sql`conversion."source" = ${filters.source}`,
+    );
+  }
+  if (filters.channel) {
+    eventConditions.push(Prisma.sql`event."channel" = ${filters.channel}`);
+    conversionConditions.push(
+      Prisma.sql`conversion."channel" = ${filters.channel}`,
+    );
+  }
+  if (filters.goalId) {
+    conversionConditions.push(
+      Prisma.sql`conversion."goalId" = ${filters.goalId}`,
+    );
+    eventConditions.push(Prisma.sql`
+      event."visitorId" IS NOT NULL AND event."visitorId" IN (
+        SELECT goal_conversion."visitorId"
+        FROM "AnalyticsConversion" AS goal_conversion
+        WHERE goal_conversion."workspaceId" = ${actor.workspaceId}
+          AND goal_conversion."goalId" = ${filters.goalId}
+          AND goal_conversion."occurredAt" >= ${filters.from}
+          AND goal_conversion."occurredAt" <= ${filters.to}
+          AND goal_conversion."isBot" = false
+          AND goal_conversion."isTest" = false
+          AND goal_conversion."visitorId" IS NOT NULL
+      )
+    `);
+  }
   const [rows, visitorRows, conversionRows] = await Promise.all([
-    getPrisma().analyticsEvent.groupBy({
-      by: ["day", "name"],
-      where: {
-        ...eventWhere(actor, filters),
-        day: { not: null },
-        name: { in: [...viewEvents, ...clickEvents] },
-      },
-      _count: { _all: true },
-    }),
-    getPrisma().analyticsEvent.groupBy({
-      by: ["day", "visitorHash"],
-      where: {
-        ...eventWhere(actor, filters),
-        day: { not: null },
-        visitorHash: { not: null },
-        name: { in: viewEvents },
-      },
-    }),
-    getPrisma().analyticsConversion.groupBy({
-      by: ["day"],
-      where: { ...conversionWhere(actor, filters), day: { not: null } },
-      _count: { _all: true },
-    }),
+    getPrisma().$queryRaw<Array<{ date: string; name: string; count: bigint }>>(
+      Prisma.sql`
+        SELECT TO_CHAR(event."occurredAt" AT TIME ZONE ${filters.timezone}, 'YYYY-MM-DD') AS "date", event."name", COUNT(*)::bigint AS "count"
+        FROM "AnalyticsEvent" AS event
+        WHERE ${Prisma.join(eventConditions, " AND ")}
+          AND event."name" IN (${Prisma.join([...viewEvents, ...clickEvents])})
+        GROUP BY 1, 2
+      `,
+    ),
+    getPrisma().$queryRaw<Array<{ date: string; visitorId: string }>>(
+      Prisma.sql`
+        SELECT TO_CHAR(event."occurredAt" AT TIME ZONE ${filters.timezone}, 'YYYY-MM-DD') AS "date", event."visitorId"
+        FROM "AnalyticsEvent" AS event
+        WHERE ${Prisma.join(eventConditions, " AND ")}
+          AND event."visitorId" IS NOT NULL
+        GROUP BY 1, 2
+      `,
+    ),
+    getPrisma().$queryRaw<Array<{ date: string; count: bigint }>>(
+      Prisma.sql`
+        SELECT TO_CHAR(conversion."occurredAt" AT TIME ZONE ${filters.timezone}, 'YYYY-MM-DD') AS "date", COUNT(*)::bigint AS "count"
+        FROM "AnalyticsConversion" AS conversion
+        WHERE ${Prisma.join(conversionConditions, " AND ")}
+        GROUP BY 1
+      `,
+    ),
   ]);
   const byDay = new Map<
     string,
     { visitors: number; views: number; clicks: number; conversions: number }
   >();
   for (const row of rows) {
-    if (!row.day) continue;
-    const key = row.day.toISOString().slice(0, 10);
+    const key = row.date;
     const values = byDay.get(key) ?? {
       visitors: 0,
       views: 0,
       clicks: 0,
       conversions: 0,
     };
-    if (viewEvents.includes(row.name)) values.views += row._count._all;
-    if (clickEvents.includes(row.name)) values.clicks += row._count._all;
+    if (viewEvents.includes(row.name)) values.views += Number(row.count);
+    if (clickEvents.includes(row.name)) values.clicks += Number(row.count);
     byDay.set(key, values);
   }
   for (const row of visitorRows) {
-    if (!row.day || !row.visitorHash) continue;
-    const key = row.day.toISOString().slice(0, 10);
+    const key = row.date;
     const values = byDay.get(key) ?? {
       visitors: 0,
       views: 0,
@@ -232,21 +384,21 @@ export async function analyticsTimeseries(
     byDay.set(key, values);
   }
   for (const row of conversionRows) {
-    if (!row.day) continue;
-    const key = row.day.toISOString().slice(0, 10);
+    const key = row.date;
     const values = byDay.get(key) ?? {
       visitors: 0,
       views: 0,
       clicks: 0,
       conversions: 0,
     };
-    values.conversions += row._count._all;
+    values.conversions += Number(row.count);
     byDay.set(key, values);
   }
   const points = [];
+  const lastDay = calendarDate(filters.to, filters.timezone);
   for (
-    let day = startOfDay(filters.from);
-    day <= filters.to;
+    let day = calendarDate(filters.from, filters.timezone);
+    day <= lastDay;
     day.setUTCDate(day.getUTCDate() + 1)
   ) {
     const date = day.toISOString().slice(0, 10);
@@ -261,7 +413,12 @@ export async function analyticsTimeseries(
     });
   }
   return {
-    range: { from: filters.from.toISOString(), to: filters.to.toISOString() },
+    range: {
+      from: filters.from.toISOString(),
+      to: filters.to.toISOString(),
+      timezone: filters.timezone,
+      granularity: "day",
+    },
     points,
   };
 }
@@ -276,12 +433,11 @@ async function dimensionBreakdown(
   const db = getPrisma();
   const [visits, clicks, conversions] = await Promise.all([
     db.analyticsEvent.groupBy({
-      by: [dimension, "visitorHash"],
+      by: [dimension, "visitorId"],
       where: {
         ...where,
-        name: { in: viewEvents },
         [dimension]: { not: null },
-        visitorHash: { not: null },
+        visitorId: { not: null },
       },
     }),
     db.analyticsEvent.groupBy({
@@ -364,15 +520,14 @@ export function analyticsChannels(actor: Actor, input: AnalyticsFilters) {
 export async function analyticsAssets(actor: Actor, input: AnalyticsFilters) {
   const filters = await resolveAnalyticsFilters(actor, input);
   const db = getPrisma();
-  const [visitors, clicks, conversions] = await Promise.all([
+  const [visitors, clicks, conversions, scans] = await Promise.all([
     db.analyticsEvent.groupBy({
-      by: ["assetType", "assetId", "visitorHash"],
+      by: ["assetType", "assetId", "visitorId"],
       where: {
         ...eventWhere(actor, filters),
         assetType: { not: null },
         assetId: { not: null },
-        visitorHash: { not: null },
-        name: { in: viewEvents },
+        visitorId: { not: null },
       },
     }),
     db.analyticsEvent.groupBy({
@@ -394,6 +549,16 @@ export async function analyticsAssets(actor: Actor, input: AnalyticsFilters) {
       },
       _count: { _all: true },
     }),
+    db.analyticsEvent.groupBy({
+      by: ["assetType", "assetId"],
+      where: {
+        ...eventWhere(actor, filters),
+        assetType: "qr_code",
+        assetId: { not: null },
+        name: "qr_scan",
+      },
+      _count: { _all: true },
+    }),
   ]);
   const assets = new Map<
     string,
@@ -402,6 +567,7 @@ export async function analyticsAssets(actor: Actor, input: AnalyticsFilters) {
       assetId: string;
       visitors: number;
       clicks: number;
+      scans: number;
       conversions: number;
     }
   >();
@@ -413,6 +579,7 @@ export async function analyticsAssets(actor: Actor, input: AnalyticsFilters) {
       assetId: row.assetId,
       visitors: 0,
       clicks: 0,
+      scans: 0,
       conversions: 0,
     };
     item.visitors += 1;
@@ -426,6 +593,7 @@ export async function analyticsAssets(actor: Actor, input: AnalyticsFilters) {
       assetId: row.assetId,
       visitors: 0,
       clicks: 0,
+      scans: 0,
       conversions: 0,
     };
     item.clicks += row._count._all;
@@ -439,16 +607,41 @@ export async function analyticsAssets(actor: Actor, input: AnalyticsFilters) {
       assetId: row.assetId,
       visitors: 0,
       clicks: 0,
+      scans: 0,
       conversions: 0,
     };
     item.conversions += row._count._all;
     assets.set(key, item);
   }
+  for (const row of scans) {
+    if (!row.assetType || !row.assetId) continue;
+    const key = `${row.assetType}:${row.assetId}`;
+    const item = assets.get(key) ?? {
+      assetType: row.assetType,
+      assetId: row.assetId,
+      visitors: 0,
+      clicks: 0,
+      scans: 0,
+      conversions: 0,
+    };
+    item.scans += row._count._all;
+    assets.set(key, item);
+  }
+  const assetDetails = await listAnalyticsAssetDetails(actor, [
+    ...assets.values(),
+  ]);
   const result = {
     range: { from: filters.from.toISOString(), to: filters.to.toISOString() },
     items: [...assets.values()]
       .map((item) => ({
         ...item,
+        name:
+          assetDetails.get(`${item.assetType}:${item.assetId}`)?.name ??
+          item.assetId,
+        context:
+          assetDetails.get(`${item.assetType}:${item.assetId}`)?.context ??
+          null,
+        interactions: item.clicks + item.scans,
         ctr: item.visitors
           ? Number(((item.clicks / item.visitors) * 100).toFixed(1))
           : 0,
@@ -461,6 +654,62 @@ export async function analyticsAssets(actor: Actor, input: AnalyticsFilters) {
     items: filters.advancedAnalytics ? result.items : result.items.slice(0, 5),
     locked: !filters.advancedAnalytics,
   };
+}
+
+async function listAnalyticsAssetDetails(
+  actor: Actor,
+  assets: Array<{ assetType: string; assetId: string }>,
+): Promise<Map<string, { name: string; context: string | null }>> {
+  const idsFor = (assetType: string) =>
+    assets
+      .filter((asset) => asset.assetType === assetType)
+      .map((asset) => asset.assetId);
+  const [pages, cards, links, qrCodes] = await Promise.all([
+    getPrisma().smartPage.findMany({
+      where: {
+        workspaceId: actor.workspaceId,
+        id: { in: idsFor("smart_page") },
+      },
+      select: { id: true, title: true },
+    }),
+    getPrisma().smartCard.findMany({
+      where: {
+        workspaceId: actor.workspaceId,
+        id: { in: idsFor("smart_card") },
+      },
+      select: { id: true, firstName: true, lastName: true },
+    }),
+    getPrisma().shortLink.findMany({
+      where: { workspaceId: actor.workspaceId, id: { in: idsFor("link") } },
+      select: { id: true, slug: true, title: true },
+    }),
+    getPrisma().qrAsset.findMany({
+      where: { workspaceId: actor.workspaceId, id: { in: idsFor("qr_code") } },
+      select: { id: true, name: true, context: true },
+    }),
+  ]);
+  const details = new Map<string, { name: string; context: string | null }>();
+  for (const page of pages)
+    details.set(`smart_page:${page.id}`, {
+      name: page.title,
+      context: null,
+    });
+  for (const card of cards)
+    details.set(`smart_card:${card.id}`, {
+      name: `${card.firstName} ${card.lastName}`.trim(),
+      context: null,
+    });
+  for (const link of links)
+    details.set(`link:${link.id}`, {
+      name: link.title || link.slug,
+      context: null,
+    });
+  for (const qrCode of qrCodes)
+    details.set(`qr_code:${qrCode.id}`, {
+      name: qrCode.name,
+      context: qrCode.context,
+    });
+  return details;
 }
 
 export async function analyticsConversions(
@@ -483,6 +732,201 @@ export async function analyticsConversions(
   };
 }
 
+export async function analyticsGoals(actor: Actor, input: AnalyticsFilters) {
+  const filters = await resolveAnalyticsFilters(actor, input);
+  const db = getPrisma();
+  const [conversionRows, visitorRows, goals] = await Promise.all([
+    db.analyticsConversion.groupBy({
+      by: ["goalId"],
+      where: conversionWhere(actor, filters),
+      _count: { _all: true },
+    }),
+    db.analyticsConversion.groupBy({
+      by: ["goalId", "visitorId"],
+      where: {
+        ...conversionWhere(actor, filters),
+        visitorId: { not: null },
+      },
+    }),
+    db.analyticsGoal.findMany({
+      where: { workspaceId: actor.workspaceId, status: { not: "ARCHIVED" } },
+      select: { id: true, name: true, goalType: true, isPrimary: true },
+    }),
+  ]);
+  const visitorsByGoal = new Map<string, number>();
+  for (const row of visitorRows) {
+    if (row.visitorId)
+      visitorsByGoal.set(row.goalId, (visitorsByGoal.get(row.goalId) ?? 0) + 1);
+  }
+  const goalsById = new Map(goals.map((goal) => [goal.id, goal]));
+  const items = conversionRows
+    .map((row) => {
+      const goal = goalsById.get(row.goalId);
+      const visitors = visitorsByGoal.get(row.goalId) ?? 0;
+      return {
+        goalId: row.goalId,
+        name: goal?.name ?? row.goalId,
+        goalType: goal?.goalType ?? null,
+        isPrimary: goal?.isPrimary ?? false,
+        conversions: row._count._all,
+        visitors,
+        conversionRate: conversionRate(row._count._all, visitors),
+      };
+    })
+    .sort((left, right) => right.conversions - left.conversions);
+  const primaryGoal = goals.find((goal) => goal.isPrimary);
+  const primary = primaryGoal
+    ? (items.find((item) => item.goalId === primaryGoal.id) ?? {
+        goalId: primaryGoal.id,
+        name: primaryGoal.name,
+        goalType: primaryGoal.goalType,
+        isPrimary: true,
+        conversions: 0,
+        visitors: 0,
+        conversionRate: 0,
+      })
+    : null;
+  return {
+    range: { from: filters.from.toISOString(), to: filters.to.toISOString() },
+    items,
+    primary,
+    goalOptions: goals.map((goal) => ({ id: goal.id, name: goal.name })),
+  };
+}
+
+type UtmConversionRow = {
+  utmSource: string | null;
+  utmMedium: string | null;
+  utmCampaign: string | null;
+  conversions: bigint;
+};
+
+function utmKey(
+  utmSource: string | null,
+  utmMedium: string | null,
+  utmCampaign: string | null,
+) {
+  return [utmSource ?? "", utmMedium ?? "", utmCampaign ?? ""].join("\u0000");
+}
+
+export async function analyticsUtms(actor: Actor, input: AnalyticsFilters) {
+  const filters = await resolveAnalyticsFilters(actor, input);
+  const db = getPrisma();
+  const conversionConditions = [
+    Prisma.sql`conversion."workspaceId" = ${actor.workspaceId}`,
+    Prisma.sql`conversion."occurredAt" >= ${filters.from}`,
+    Prisma.sql`conversion."occurredAt" <= ${filters.to}`,
+    Prisma.sql`conversion."isBot" = false`,
+    Prisma.sql`conversion."isTest" = false`,
+  ];
+  if (filters.goalId)
+    conversionConditions.push(
+      Prisma.sql`conversion."goalId" = ${filters.goalId}`,
+    );
+  if (filters.assetType)
+    conversionConditions.push(
+      Prisma.sql`conversion."assetType" = ${filters.assetType}`,
+    );
+  if (filters.assetId)
+    conversionConditions.push(
+      Prisma.sql`conversion."assetId" = ${filters.assetId}`,
+    );
+  if (filters.campaignId)
+    conversionConditions.push(
+      Prisma.sql`conversion."campaignId" = ${filters.campaignId}`,
+    );
+  if (filters.source)
+    conversionConditions.push(
+      Prisma.sql`conversion."source" = ${filters.source}`,
+    );
+  if (filters.channel)
+    conversionConditions.push(
+      Prisma.sql`conversion."channel" = ${filters.channel}`,
+    );
+  const [visitorRows, clickRows, conversionRows] = await Promise.all([
+    db.analyticsEvent.groupBy({
+      by: ["utmSource", "utmMedium", "utmCampaign", "visitorId"],
+      where: {
+        ...eventWhere(actor, filters),
+        utmSource: { not: null },
+        visitorId: { not: null },
+      },
+    }),
+    db.analyticsEvent.groupBy({
+      by: ["utmSource", "utmMedium", "utmCampaign"],
+      where: {
+        ...eventWhere(actor, filters),
+        utmSource: { not: null },
+        name: { in: clickEvents },
+      },
+      _count: { _all: true },
+    }),
+    db.$queryRaw<UtmConversionRow[]>(Prisma.sql`
+      SELECT
+        event."utmSource" AS "utmSource",
+        event."utmMedium" AS "utmMedium",
+        event."utmCampaign" AS "utmCampaign",
+        COUNT(*)::bigint AS "conversions"
+      FROM "AnalyticsConversion" AS conversion
+      INNER JOIN "AnalyticsEvent" AS event ON event."id" = conversion."eventId"
+      WHERE ${Prisma.join(conversionConditions, " AND ")}
+        AND event."utmSource" IS NOT NULL
+      GROUP BY 1, 2, 3
+    `),
+  ]);
+  const items = new Map<
+    string,
+    {
+      utmSource: string | null;
+      utmMedium: string | null;
+      utmCampaign: string | null;
+      visitors: number;
+      clicks: number;
+      conversions: number;
+    }
+  >();
+  const getItem = (
+    utmSource: string | null,
+    utmMedium: string | null,
+    utmCampaign: string | null,
+  ) => {
+    const key = utmKey(utmSource, utmMedium, utmCampaign);
+    const existing = items.get(key);
+    if (existing) return existing;
+    const created = {
+      utmSource,
+      utmMedium,
+      utmCampaign,
+      visitors: 0,
+      clicks: 0,
+      conversions: 0,
+    };
+    items.set(key, created);
+    return created;
+  };
+  for (const row of visitorRows)
+    getItem(row.utmSource, row.utmMedium, row.utmCampaign).visitors += 1;
+  for (const row of clickRows)
+    getItem(row.utmSource, row.utmMedium, row.utmCampaign).clicks +=
+      row._count._all;
+  for (const row of conversionRows)
+    getItem(row.utmSource, row.utmMedium, row.utmCampaign).conversions +=
+      Number(row.conversions);
+  return {
+    range: { from: filters.from.toISOString(), to: filters.to.toISOString() },
+    items: [...items.values()]
+      .map((item) => ({
+        ...item,
+        conversionRate: conversionRate(item.conversions, item.visitors),
+      }))
+      .sort(
+        (left, right) =>
+          right.conversions - left.conversions ||
+          right.visitors - left.visitors,
+      ),
+  };
+}
+
 export async function analyticsCampaigns(
   actor: Actor,
   input: AnalyticsFilters,
@@ -492,12 +936,11 @@ export async function analyticsCampaigns(
   const [visitorRows, clickRows, conversionRows, campaigns, primaryGoals] =
     await Promise.all([
       db.analyticsEvent.groupBy({
-        by: ["campaignId", "visitorHash"],
+        by: ["campaignId", "visitorId"],
         where: {
           ...eventWhere(actor, filters),
           campaignId: { not: null },
-          visitorHash: { not: null },
-          name: { in: viewEvents },
+          visitorId: { not: null },
         },
       }),
       db.analyticsEvent.groupBy({
