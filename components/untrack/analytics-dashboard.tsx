@@ -76,6 +76,15 @@ type Utm = {
   conversions: number;
   conversionRate: number;
 };
+type JourneyPreview = {
+  locked?: boolean;
+  items: Array<{
+    id: string;
+    path: Array<{ label: string }>;
+    conversions: number;
+    conversionRate: number;
+  }>;
+};
 type Data = {
   overview: Overview;
   series: Timeseries;
@@ -89,6 +98,7 @@ type Data = {
     goalOptions: Array<{ id: string; name: string }>;
   };
   utms: { items: Utm[] };
+  journeys: JourneyPreview;
 };
 
 const tabs: Array<{ value: Tab; label: string }> = [
@@ -143,6 +153,14 @@ function analyticsHref(values: Record<string, string | undefined>) {
   for (const [key, value] of Object.entries(values))
     if (value) query.set(key, value);
   return `/untrack/analytics?${query}`;
+}
+function journeyHref(values: Record<string, string | undefined>) {
+  const query = new URLSearchParams();
+  for (const [key, value] of Object.entries(values))
+    if (value) query.set(key, value);
+  return query.size
+    ? `/untrack/analytics/journey?${query}`
+    : "/untrack/analytics/journey";
 }
 
 function Skeleton() {
@@ -257,8 +275,7 @@ function ContentTable({
                   <td>
                     <Link
                       className="analytics-table-link"
-                      href={analyticsHref({
-                        tab: "content",
+                      href={journeyHref({
                         period,
                         assetType: asset.assetType,
                         asset: asset.assetId,
@@ -352,6 +369,7 @@ export function AnalyticsDashboard() {
       request<{ items: Campaign[] }>("campaigns"),
       request<Data["goals"]>("goals"),
       request<{ items: Utm[] }>("utms"),
+      request<JourneyPreview>("journeys"),
     ])
       .then(
         ([
@@ -363,6 +381,7 @@ export function AnalyticsDashboard() {
           campaigns,
           goals,
           utms,
+          journeys,
         ]) => {
           if (!controller.signal.aborted)
             setResponse({
@@ -376,6 +395,7 @@ export function AnalyticsDashboard() {
                 campaigns,
                 goals,
                 utms,
+                journeys,
               },
             });
         },
@@ -451,6 +471,18 @@ export function AnalyticsDashboard() {
           </p>
         </div>
         <div className="workspace-heading-actions">
+          <Link
+            className="button button-secondary"
+            href={journeyHref({
+              period,
+              assetType: assetType || undefined,
+              asset: assetId || undefined,
+              campaign: campaignId || undefined,
+              goal: goalId || undefined,
+            })}
+          >
+            Jornadas
+          </Link>
           <Link
             className="button button-secondary"
             href="/untrack/analytics/goals"
@@ -708,6 +740,60 @@ export function AnalyticsDashboard() {
                   </li>
                 </ol>
               </section>
+              <section className="workspace-panel analytics-table-panel journey-dashboard-preview">
+                <div className="workspace-panel-heading">
+                  <div>
+                    <h2>Principais jornadas</h2>
+                    <p>Veja os caminhos que conectaram origem e resultado.</p>
+                  </div>
+                  <Link
+                    className="analytics-table-link"
+                    href={journeyHref({
+                      period,
+                      assetType: assetType || undefined,
+                      asset: assetId || undefined,
+                      campaign: campaignId || undefined,
+                      goal: goalId || undefined,
+                    })}
+                  >
+                    Ver todas as jornadas
+                  </Link>
+                </div>
+                {data.journeys.locked ? (
+                  <p className="analytics-muted">
+                    As jornadas completas estão disponíveis no Premium.
+                  </p>
+                ) : data.journeys.items.length ? (
+                  <div className="analytics-table-wrap">
+                    <table className="analytics-table">
+                      <thead>
+                        <tr>
+                          <th>Caminho</th>
+                          <th>Conversões</th>
+                          <th>CVR</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {data.journeys.items.slice(0, 3).map((journey) => (
+                          <tr key={journey.id}>
+                            <td>
+                              {journey.path
+                                .map((node) => node.label)
+                                .join(" → ")}
+                            </td>
+                            <td>{number(journey.conversions)}</td>
+                            <td>{percent(journey.conversionRate)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : (
+                  <p className="analytics-muted">
+                    As jornadas aparecem quando uma sessão conclui um objetivo.
+                  </p>
+                )}
+              </section>
             </>
           ) : null}
 
@@ -828,11 +914,13 @@ export function AnalyticsDashboard() {
                             <td>
                               <Link
                                 className="analytics-table-link"
-                                href={analyticsHref({
-                                  tab: "acquisition",
+                                href={journeyHref({
                                   period,
                                   campaign: campaign.campaignId,
                                 })}
+                                onClick={() =>
+                                  analytics.track("journey_campaign_opened")
+                                }
                               >
                                 {campaign.name}
                               </Link>

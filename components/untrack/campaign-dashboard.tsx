@@ -643,6 +643,12 @@ export function CampaignDashboard({
           </p>
         </div>
         <div className="campaign-header-actions">
+          <Link
+            className="button button-secondary"
+            href={`/untrack/analytics/journey?campaign=${campaign.id}`}
+          >
+            Ver jornada
+          </Link>
           <button
             className="button button-secondary"
             type="button"
@@ -1110,9 +1116,7 @@ export function CampaignDashboard({
             <div>
               <span className="workspace-section-kicker">Monitoramento</span>
               <h2>Saúde dos pontos de distribuição</h2>
-              <p>
-                O LinkOr só apresenta verificações que já foram executadas.
-              </p>
+              <p>O LinkOr só apresenta verificações que já foram executadas.</p>
             </div>
           </div>
           <section className="workspace-panel">

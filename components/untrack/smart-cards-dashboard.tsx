@@ -1954,6 +1954,12 @@ export function SmartCardsDashboard({
                           registrar.
                         </p>
                       </div>
+                      <Link
+                        className="button button-secondary"
+                        href={`/untrack/analytics/journey?period=30d&assetType=smart_card&asset=${activeCard.id}`}
+                      >
+                        Ver jornada
+                      </Link>
                       <button
                         className="button button-secondary"
                         type="button"

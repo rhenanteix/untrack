@@ -93,6 +93,10 @@ export const ANALYTICS_EVENTS = [
   "analytics_filter_applied",
   "analytics_goal_clicked",
   "analytics_asset_opened",
+  "journey_viewed",
+  "journey_filter_changed",
+  "journey_path_opened",
+  "journey_campaign_opened",
   "checkout_started",
   "subscription_started",
   "premium_subscription_started",
@@ -143,6 +147,10 @@ export const CLIENT_ANALYTICS_EVENTS = [
   "analytics_filter_applied",
   "analytics_goal_clicked",
   "analytics_asset_opened",
+  "journey_viewed",
+  "journey_filter_changed",
+  "journey_path_opened",
+  "journey_campaign_opened",
 ] as const satisfies ReadonlyArray<AnalyticsEventName>;
 
 export const ANALYTICS_PATHS = [
@@ -167,6 +175,7 @@ export const ANALYTICS_PATHS = [
   "/untrack/whatsapp",
   "/untrack/campaigns",
   "/untrack/analytics",
+  "/untrack/analytics/journey",
   "/untrack/utm",
   "/untrack/qr",
   "/untrack/smart-pages",

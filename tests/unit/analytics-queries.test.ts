@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { getPrisma } from "@/lib/prisma";
 import {
   analyticsGoals,
+  analyticsJourneys,
   analyticsOverview,
   analyticsTimeseries,
 } from "@/modules/analytics/queries";
@@ -163,5 +164,132 @@ describe("analytics timeseries", () => {
       { date: "2026-10-02", visitors: 2, views: 2, clicks: 1, conversions: 1 },
     ]);
     expect(queryRaw).toHaveBeenCalledTimes(3);
+  });
+});
+
+describe("analytics journeys", () => {
+  it("reconstructs a conversion path inside one workspace session", async () => {
+    const eventFindMany = vi.fn().mockResolvedValue([
+      {
+        sessionId: "session_1",
+        visitorId: "visitor_1",
+        source: "instagram",
+        channel: "organic_social",
+        campaignId: "campaign_1",
+        assetType: "smart_page",
+        assetId: "page_1",
+        name: "smart_page_view",
+        occurredAt: new Date("2026-10-02T12:00:00.000Z"),
+      },
+      {
+        sessionId: "session_1",
+        visitorId: "visitor_1",
+        source: "instagram",
+        channel: "organic_social",
+        campaignId: "campaign_1",
+        assetType: "smart_page",
+        assetId: "page_1",
+        name: "whatsapp_click",
+        occurredAt: new Date("2026-10-02T12:02:00.000Z"),
+      },
+    ]);
+    const conversionFindMany = vi.fn().mockResolvedValue([
+      {
+        sessionId: "session_1",
+        visitorId: "visitor_1",
+        goalId: "goal_1",
+        source: "instagram",
+        channel: "organic_social",
+        campaignId: "campaign_1",
+        assetType: "smart_page",
+        assetId: "page_1",
+        occurredAt: new Date("2026-10-02T12:02:00.000Z"),
+      },
+    ]);
+    const goalFindMany = vi.fn().mockResolvedValue([
+      {
+        id: "goal_1",
+        name: "Lead capturado",
+        goalType: "LEAD_CREATED",
+        isPrimary: true,
+      },
+    ]);
+    vi.mocked(getPrisma).mockReturnValue({
+      user: {
+        findUniqueOrThrow: vi.fn().mockResolvedValue({
+          plan: "premium",
+          trial: null,
+        }),
+      },
+      workspace: {
+        findUnique: vi.fn().mockResolvedValue({ timezone: "UTC" }),
+      },
+      analyticsEvent: {
+        count: vi.fn().mockResolvedValue(2),
+        findMany: eventFindMany,
+      },
+      analyticsConversion: { findMany: conversionFindMany },
+      analyticsGoal: { findMany: goalFindMany },
+      campaign: {
+        findMany: vi
+          .fn()
+          .mockResolvedValue([{ id: "campaign_1", name: "Evento Outubro" }]),
+      },
+      smartPage: {
+        findMany: vi
+          .fn()
+          .mockResolvedValue([{ id: "page_1", title: "Smart Page Evento" }]),
+      },
+      smartCard: { findMany: vi.fn().mockResolvedValue([]) },
+      shortLink: { findMany: vi.fn().mockResolvedValue([]) },
+      qrAsset: { findMany: vi.fn().mockResolvedValue([]) },
+    } as unknown as ReturnType<typeof getPrisma>);
+
+    const result = await analyticsJourneys(
+      { userId: "user_1", workspaceId: "workspace_1", role: "owner" },
+      { periodDays: 30 },
+    );
+
+    expect(result.primaryGoal).toMatchObject({
+      goalId: "goal_1",
+      name: "Lead capturado",
+    });
+    expect(result.items).toMatchObject([
+      {
+        path: [
+          { type: "source", id: "instagram", label: "Instagram" },
+          {
+            type: "campaign",
+            id: "campaign_1",
+            label: "Evento Outubro",
+          },
+          {
+            type: "asset",
+            id: "page_1",
+            label: "Smart Page Evento",
+          },
+          {
+            type: "interaction",
+            id: "whatsapp_click",
+            label: "WhatsApp",
+          },
+          {
+            type: "conversion",
+            id: "goal_1",
+            label: "Lead capturado",
+          },
+        ],
+        visitors: 1,
+        sessions: 1,
+        interactions: 1,
+        conversions: 1,
+        conversionRate: 100,
+      },
+    ]);
+    for (const call of [
+      ...eventFindMany.mock.calls,
+      ...conversionFindMany.mock.calls,
+    ])
+      expect(call[0].where).toMatchObject({ workspaceId: "workspace_1" });
   });
 });

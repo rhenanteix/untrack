@@ -1425,6 +1425,194 @@
   color: var(--ws-muted);
   font-size: 12px;
 }
+.journey-page {
+  gap: 0;
+}
+.journey-context,
+.journey-low-data {
+  margin: 0 0 16px;
+  color: var(--ws-muted);
+  font-size: 12px;
+}
+.journey-context {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 14px;
+  align-items: center;
+}
+.journey-context span,
+.journey-low-data {
+  color: var(--ws-green);
+  font-weight: 750;
+}
+.journey-context strong {
+  color: var(--ws-ink);
+}
+.journey-filters {
+  margin-bottom: 18px;
+}
+.journey-clear-asset,
+.journey-close-detail {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 40px;
+  max-width: 230px;
+  border: 1px solid var(--ws-line);
+  border-radius: 6px;
+  padding: 8px 10px;
+  overflow: hidden;
+  background: #fff;
+  color: var(--ws-ink);
+  cursor: pointer;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.journey-close-detail {
+  width: 32px;
+  min-height: 32px;
+  justify-content: center;
+  padding: 0;
+}
+.journey-skeleton {
+  min-height: 260px;
+}
+.journey-locked-state,
+.journey-featured-path,
+.journey-detail,
+.journey-summary-grid {
+  margin-bottom: 18px;
+}
+.journey-locked-state p {
+  margin: 8px 0 18px;
+  color: var(--ws-muted);
+}
+.journey-flow {
+  display: flex;
+  align-items: stretch;
+  gap: 8px;
+  overflow: auto;
+  padding-bottom: 4px !important;
+}
+.journey-flow > li {
+  display: flex;
+  flex: 1 0 142px;
+  align-items: center;
+  gap: 8px;
+}
+.journey-node {
+  display: grid;
+  flex: 1;
+  min-height: 94px;
+  align-content: center;
+  gap: 4px;
+  border: 1px solid var(--ws-line);
+  border-radius: var(--ws-radius);
+  padding: 12px;
+  background: #fff;
+}
+.journey-node span,
+.journey-node small {
+  color: var(--ws-muted);
+  font-size: 10px;
+  font-weight: 750;
+}
+.journey-node strong {
+  overflow-wrap: anywhere;
+  font-size: 13px;
+}
+.journey-node-source {
+  border-color: #c8dce0;
+  background: #f7fcfc;
+}
+.journey-node-campaign {
+  border-color: #d7d8bc;
+  background: #fdfdf4;
+}
+.journey-node-asset {
+  border-color: #cfd9bf;
+  background: #f9fdf2;
+}
+.journey-node-interaction {
+  border-color: #e6d6ba;
+  background: #fffaf1;
+}
+.journey-node-conversion {
+  border-color: #bdd7c2;
+  background: #f3fbf2;
+}
+.journey-connector {
+  display: grid;
+  place-items: center;
+  color: var(--ws-muted);
+}
+.journey-connector svg:last-child {
+  display: none;
+}
+.journey-featured-metrics,
+.journey-detail-metrics {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+  margin: 18px 0 0;
+}
+.journey-featured-metrics div,
+.journey-detail-metrics div {
+  min-width: 0;
+  border-top: 1px solid #edf0eb;
+  padding-top: 10px;
+}
+.journey-featured-metrics dt,
+.journey-detail-metrics dt {
+  color: var(--ws-muted);
+  font-size: 10px;
+  font-weight: 750;
+}
+.journey-featured-metrics dd,
+.journey-detail-metrics dd {
+  margin: 4px 0 0;
+  overflow-wrap: anywhere;
+  font-size: 15px;
+  font-weight: 800;
+}
+.journey-detail-metrics dd {
+  font-size: 13px;
+}
+.journey-table td:first-child {
+  min-width: 310px;
+}
+.journey-path-button {
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: var(--ws-green);
+  cursor: pointer;
+  font: inherit;
+  font-weight: 750;
+  text-align: left;
+}
+.journey-path-button:hover {
+  text-decoration: underline;
+}
+.journey-collapsed-row td {
+  color: var(--ws-muted);
+  font-style: italic;
+}
+.journey-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+}
+.journey-summary-grid .workspace-panel-heading p {
+  max-width: none;
+  text-align: left;
+}
+.journey-summary-table {
+  min-width: 420px;
+}
 .analytics-primary-goal {
   display: flex;
   align-items: center;
@@ -1701,6 +1889,28 @@
   .analytics-funnel ol {
     align-items: start;
     flex-direction: column;
+  }
+  .journey-flow {
+    display: grid;
+    overflow: visible;
+  }
+  .journey-flow > li {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+  .journey-connector {
+    height: 20px;
+  }
+  .journey-connector svg:first-child {
+    display: none;
+  }
+  .journey-connector svg:last-child {
+    display: block;
+  }
+  .journey-featured-metrics,
+  .journey-detail-metrics,
+  .journey-summary-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 .workspace-checklist li {

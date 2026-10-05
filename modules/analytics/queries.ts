@@ -1161,6 +1161,53 @@ export async function analyticsTime(actor: Actor, input: AnalyticsFilters) {
   };
 }
 
+const journeyAssetTypes = new Set([
+  "smart_page",
+  "smart_card",
+  "link",
+  "qr_code",
+]);
+const journeyInteractionLabels: Record<string, string> = {
+  link_click: "Link",
+  button_click: "Botão",
+  social_click: "Rede social",
+  whatsapp_click: "WhatsApp",
+  form_submit: "Formulário",
+  qr_scan: "QR Code",
+};
+const journeySourceLabels: Record<string, string> = {
+  instagram: "Instagram",
+  google: "Google",
+  whatsapp: "WhatsApp",
+  qr: "QR",
+  linkedin: "LinkedIn",
+  direct: "Direct",
+  referral: "Referral",
+  other: "Other",
+};
+
+type JourneyNode = {
+  type: "source" | "campaign" | "asset" | "interaction" | "conversion";
+  id: string;
+  label: string;
+  context?: string | null;
+};
+
+function journeySourceLabel(source: string) {
+  const normalized = source.trim().toLocaleLowerCase("en-US");
+  return (
+    journeySourceLabels[normalized] ??
+    normalized.replace(
+      /(^|[_\s-])(\p{L})/gu,
+      (_, prefix, letter) => `${prefix}${letter.toLocaleUpperCase("pt-BR")}`,
+    )
+  );
+}
+
+function journeyPathKey(path: JourneyNode[]) {
+  return path.map((node) => `${node.type}:${node.id}`).join(" -> ");
+}
+
 export async function analyticsJourneys(actor: Actor, input: AnalyticsFilters) {
   const filters = await resolveAnalyticsFilters(actor, input);
   if (!filters.advancedAnalytics)
@@ -1168,46 +1215,386 @@ export async function analyticsJourneys(actor: Actor, input: AnalyticsFilters) {
       range: { from: filters.from.toISOString(), to: filters.to.toISOString() },
       sampled: false,
       items: [],
+      sources: [],
+      campaigns: [],
+      assets: [],
+      primaryGoal: null,
+      goalOptions: [],
+      campaignOptions: [],
+      sourceOptions: [],
+      hasTraffic: false,
+      hasGoals: false,
+      attribution: "last_touch" as const,
       locked: true,
     };
-  const events = await getPrisma().analyticsEvent.findMany({
-    where: { ...eventWhere(actor, filters), sessionId: { not: null } },
+  const db = getPrisma();
+  const [goals, hasTraffic] = await Promise.all([
+    db.analyticsGoal.findMany({
+      where: { workspaceId: actor.workspaceId },
+      select: { id: true, name: true, isPrimary: true, status: true },
+    }),
+    db.analyticsEvent.count({
+      where: eventWhere(actor, { ...filters, goalId: undefined }),
+    }),
+  ]);
+  const primaryGoal = goals.find(
+    (goal) => goal.isPrimary && goal.status !== "ARCHIVED",
+  );
+  const selectedGoalId = input.goalId ?? primaryGoal?.id;
+  const conversions = await db.analyticsConversion.findMany({
+    where: {
+      ...conversionWhere(actor, { ...filters, goalId: selectedGoalId }),
+      sessionId: { not: null },
+    },
     select: {
       sessionId: true,
+      visitorId: true,
+      goalId: true,
       source: true,
-      name: true,
+      channel: true,
+      campaignId: true,
       assetType: true,
+      assetId: true,
       occurredAt: true,
     },
     orderBy: { occurredAt: "desc" },
-    take: 5_000,
+    take: 2_000,
   });
-  const journeys = new Map<string, { source: string; steps: string[] }>();
-  for (const event of [...events].reverse()) {
+  const sessionIds = [
+    ...new Set(
+      conversions.flatMap((item): string[] =>
+        item.sessionId ? [item.sessionId] : [],
+      ),
+    ),
+  ];
+  const events = sessionIds.length
+    ? await db.analyticsEvent.findMany({
+        where: {
+          ...eventWhere(actor, {
+            ...filters,
+            assetType: undefined,
+            assetId: undefined,
+            campaignId: undefined,
+            goalId: undefined,
+            source: undefined,
+            channel: undefined,
+          }),
+          sessionId: { in: sessionIds },
+        },
+        select: {
+          sessionId: true,
+          visitorId: true,
+          source: true,
+          channel: true,
+          campaignId: true,
+          assetType: true,
+          assetId: true,
+          name: true,
+          occurredAt: true,
+        },
+        orderBy: [{ sessionId: "asc" }, { occurredAt: "asc" }],
+        take: 10_000,
+      })
+    : [];
+  const campaignIds = new Set(
+    [...conversions, ...events].flatMap((item) =>
+      item.campaignId ? [item.campaignId] : [],
+    ),
+  );
+  const assets = [...conversions, ...events].flatMap((item) =>
+    item.assetType && item.assetId && journeyAssetTypes.has(item.assetType)
+      ? [{ assetType: item.assetType, assetId: item.assetId }]
+      : [],
+  );
+  const [campaigns, assetDetails] = await Promise.all([
+    campaignIds.size
+      ? db.campaign.findMany({
+          where: {
+            workspaceId: actor.workspaceId,
+            id: { in: [...campaignIds] },
+          },
+          select: { id: true, name: true },
+        })
+      : [],
+    listAnalyticsAssetDetails(actor, assets),
+  ]);
+  const campaignNames = new Map(
+    campaigns.map((campaign) => [campaign.id, campaign.name]),
+  );
+  const goalsById = new Map(goals.map((goal) => [goal.id, goal]));
+  const eventsBySession = new Map<string, (typeof events)[number][]>();
+  for (const event of events) {
     if (!event.sessionId) continue;
-    const journey = journeys.get(event.sessionId) ?? {
-      source: event.source ?? "direct",
-      steps: [],
+    const sessionEvents = eventsBySession.get(event.sessionId) ?? [];
+    sessionEvents.push(event);
+    eventsBySession.set(event.sessionId, sessionEvents);
+  }
+  const conversionsBySession = new Map<
+    string,
+    Map<string, (typeof conversions)[number][]>
+  >();
+  for (const conversion of conversions) {
+    if (!conversion.sessionId) continue;
+    const byGoal = conversionsBySession.get(conversion.sessionId) ?? new Map();
+    const goalConversions = byGoal.get(conversion.goalId) ?? [];
+    goalConversions.push(conversion);
+    byGoal.set(conversion.goalId, goalConversions);
+    conversionsBySession.set(conversion.sessionId, byGoal);
+  }
+  const paths = new Map<
+    string,
+    {
+      path: JourneyNode[];
+      visitors: Set<string>;
+      sessions: Set<string>;
+      interactions: number;
+      conversions: number;
+      firstSeen: Date;
+      lastSeen: Date;
+      source: { id: string; label: string; filterValue: string };
+      campaign: { id: string; label: string } | null;
+      asset: { assetType: string; assetId: string; label: string } | null;
+    }
+  >();
+  for (const [sessionId, byGoal] of conversionsBySession) {
+    const sessionEvents = eventsBySession.get(sessionId) ?? [];
+    for (const [goalId, sessionConversions] of byGoal) {
+      const conversion = sessionConversions[0];
+      const source =
+        conversion.source ??
+        sessionEvents.find((event) => event.source)?.source ??
+        "direct";
+      const isQrJourney =
+        conversion.channel === "qr" ||
+        sessionEvents.some((event) => event.name === "qr_scan");
+      const qrEvent = sessionEvents.find(
+        (event) => event.assetType === "qr_code" && event.assetId,
+      );
+      const sourceNode: JourneyNode = isQrJourney
+        ? {
+            type: "source",
+            id: qrEvent?.assetId ?? "qr",
+            label: qrEvent
+              ? (assetDetails.get(`qr_code:${qrEvent.assetId}`)?.name ?? "QR")
+              : "QR",
+            context: qrEvent
+              ? (assetDetails.get(`qr_code:${qrEvent.assetId}`)?.context ??
+                null)
+              : null,
+          }
+        : { type: "source", id: source, label: journeySourceLabel(source) };
+      const campaignId =
+        conversion.campaignId ??
+        [...sessionEvents].reverse().find((event) => event.campaignId)
+          ?.campaignId;
+      const assetEvent = sessionEvents.find(
+        (event) =>
+          event.assetType &&
+          event.assetId &&
+          journeyAssetTypes.has(event.assetType) &&
+          (!isQrJourney || event.assetType !== "qr_code"),
+      );
+      const conversionAsset =
+        conversion.assetType &&
+        conversion.assetId &&
+        journeyAssetTypes.has(conversion.assetType) &&
+        (!isQrJourney || conversion.assetType !== "qr_code")
+          ? conversion
+          : null;
+      const asset = assetEvent ?? conversionAsset;
+      const interactionEvents = sessionEvents.filter(
+        (event) => journeyInteractionLabels[event.name],
+      );
+      const interaction = interactionEvents.at(-1);
+      const path: JourneyNode[] = [sourceNode];
+      if (campaignId)
+        path.push({
+          type: "campaign",
+          id: campaignId,
+          label: campaignNames.get(campaignId) ?? "Campanha",
+        });
+      if (asset?.assetType && asset.assetId) {
+        const detail = assetDetails.get(`${asset.assetType}:${asset.assetId}`);
+        path.push({
+          type: "asset",
+          id: asset.assetId,
+          label: detail?.name ?? "Ativo",
+          context: detail?.context ?? null,
+        });
+      }
+      if (interaction)
+        path.push({
+          type: "interaction",
+          id: interaction.name,
+          label: journeyInteractionLabels[interaction.name],
+        });
+      path.push({
+        type: "conversion",
+        id: goalId,
+        label: goalsById.get(goalId)?.name ?? "Conversão",
+      });
+      const firstSeen = sessionEvents[0]?.occurredAt ?? conversion.occurredAt;
+      const lastSeen =
+        sessionConversions.at(-1)?.occurredAt ?? conversion.occurredAt;
+      const key = journeyPathKey(path);
+      const item = paths.get(key) ?? {
+        path,
+        visitors: new Set<string>(),
+        sessions: new Set<string>(),
+        interactions: 0,
+        conversions: 0,
+        firstSeen,
+        lastSeen,
+        source: {
+          id: sourceNode.id,
+          label: sourceNode.label,
+          filterValue: source,
+        },
+        campaign: campaignId
+          ? {
+              id: campaignId,
+              label: campaignNames.get(campaignId) ?? "Campanha",
+            }
+          : null,
+        asset:
+          asset?.assetType && asset.assetId
+            ? {
+                assetType: asset.assetType,
+                assetId: asset.assetId,
+                label:
+                  assetDetails.get(`${asset.assetType}:${asset.assetId}`)
+                    ?.name ?? "Ativo",
+              }
+            : null,
+      };
+      const visitorId = conversion.visitorId ?? sessionEvents[0]?.visitorId;
+      if (visitorId) item.visitors.add(visitorId);
+      item.sessions.add(sessionId);
+      item.interactions += interactionEvents.length;
+      item.conversions += sessionConversions.length;
+      if (firstSeen < item.firstSeen) item.firstSeen = firstSeen;
+      if (lastSeen > item.lastSeen) item.lastSeen = lastSeen;
+      paths.set(key, item);
+    }
+  }
+  const sourceSummaries = new Map<
+    string,
+    {
+      id: string;
+      name: string;
+      filterValue: string;
+      visitors: Set<string>;
+      conversions: number;
+    }
+  >();
+  const campaignSummaries = new Map<
+    string,
+    {
+      campaignId: string;
+      name: string;
+      visitors: Set<string>;
+      conversions: number;
+    }
+  >();
+  const assetSummaries = new Map<
+    string,
+    {
+      assetType: string;
+      assetId: string;
+      name: string;
+      visitors: Set<string>;
+      conversions: number;
+    }
+  >();
+  for (const item of paths.values()) {
+    const source = sourceSummaries.get(item.source.id) ?? {
+      id: item.source.id,
+      name: item.source.label,
+      filterValue: item.source.filterValue,
+      visitors: new Set<string>(),
+      conversions: 0,
     };
-    const step = event.assetType
-      ? `${event.name}:${event.assetType}`
-      : event.name;
-    if (journey.steps.at(-1) !== step && journey.steps.length < 5)
-      journey.steps.push(step);
-    journeys.set(event.sessionId, journey);
+    for (const visitorId of item.visitors) source.visitors.add(visitorId);
+    source.conversions += item.conversions;
+    sourceSummaries.set(source.id, source);
+    if (item.campaign) {
+      const campaign = campaignSummaries.get(item.campaign.id) ?? {
+        campaignId: item.campaign.id,
+        name: item.campaign.label,
+        visitors: new Set<string>(),
+        conversions: 0,
+      };
+      for (const visitorId of item.visitors) campaign.visitors.add(visitorId);
+      campaign.conversions += item.conversions;
+      campaignSummaries.set(campaign.campaignId, campaign);
+    }
+    if (item.asset) {
+      const key = `${item.asset.assetType}:${item.asset.assetId}`;
+      const asset = assetSummaries.get(key) ?? {
+        ...item.asset,
+        name: item.asset.label,
+        visitors: new Set<string>(),
+        conversions: 0,
+      };
+      for (const visitorId of item.visitors) asset.visitors.add(visitorId);
+      asset.conversions += item.conversions;
+      assetSummaries.set(key, asset);
+    }
   }
-  const items = new Map<string, number>();
-  for (const journey of journeys.values()) {
-    if (journey.steps.length < 2) continue;
-    const key = [journey.source, ...journey.steps].join(" -> ");
-    items.set(key, (items.get(key) ?? 0) + 1);
-  }
+  const items = [...paths.entries()]
+    .map(([id, item]) => ({
+      id,
+      path: item.path,
+      visitors: item.visitors.size,
+      sessions: item.sessions.size,
+      interactions: item.interactions,
+      conversions: item.conversions,
+      conversionRate: conversionRate(item.conversions, item.visitors.size),
+      firstSeen: item.firstSeen.toISOString(),
+      lastSeen: item.lastSeen.toISOString(),
+    }))
+    .sort(
+      (left, right) =>
+        right.conversions - left.conversions || right.sessions - left.sessions,
+    );
+  const summary = <T extends { visitors: Set<string>; conversions: number }>(
+    values: Iterable<T>,
+  ) =>
+    [...values]
+      .map((value) => ({
+        ...value,
+        visitors: value.visitors.size,
+        conversionRate: conversionRate(value.conversions, value.visitors.size),
+      }))
+      .sort(
+        (left, right) =>
+          right.conversions - left.conversions ||
+          right.visitors - left.visitors,
+      );
   return {
     range: { from: filters.from.toISOString(), to: filters.to.toISOString() },
-    sampled: events.length === 5_000,
-    items: [...items.entries()]
-      .map(([journey, sessions]) => ({ journey, sessions }))
-      .sort((left, right) => right.sessions - left.sessions)
-      .slice(0, 20),
+    sampled: conversions.length === 2_000 || events.length === 10_000,
+    items,
+    sources: summary(sourceSummaries.values()),
+    campaigns: summary(campaignSummaries.values()),
+    assets: summary(assetSummaries.values()),
+    primaryGoal: primaryGoal
+      ? { goalId: primaryGoal.id, name: primaryGoal.name }
+      : null,
+    goalOptions: goals
+      .filter((goal) => goal.status !== "ARCHIVED")
+      .map((goal) => ({ id: goal.id, name: goal.name })),
+    campaignOptions: campaigns.map((campaign) => ({
+      id: campaign.id,
+      name: campaign.name,
+    })),
+    sourceOptions: summary(sourceSummaries.values()).map((source) => ({
+      id: source.filterValue,
+      name: source.name,
+    })),
+    hasTraffic: hasTraffic > 0,
+    hasGoals: goals.some((goal) => goal.status !== "ARCHIVED"),
+    attribution: "last_touch" as const,
+    locked: false,
   };
 }

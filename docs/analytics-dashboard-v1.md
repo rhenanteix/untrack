@@ -40,6 +40,8 @@ CVR can exceed 100% when one visitor completes more than one conversion. A
 - `view=goals`: Goal performance, configured Goal options, and primary Goal.
 - `view=utms`: `utm_source`, `utm_medium`, and `utm_campaign` values observed
   on recorded events.
+- `view=journeys`: conversion-backed session paths, source/campaign/asset
+  summaries, and options for Journey filters.
 
 Shared filters are `period` (`7d`, `30d`, `90d`), `from`, `to`, `assetType`,
 `assetId`, `campaignId`, `goalId`, `source`, and `channel`. The dashboard keeps
@@ -65,6 +67,36 @@ remains deterministic: explicit UTM, recognized referrer, server QR context,
 trusted first-party context, then referral or `direct`. Direct traffic is shown
 as `Direct`; no origin is fabricated.
 
+## Journey V1
+
+`/analytics/journey` redirects to the authenticated
+`/untrack/analytics/journey` view, preserving scalar URL filters. The Journey
+uses Last Touch in V1 and clearly labels that attribution choice in the UI.
+When an active Primary Goal exists, it is the default conversion scope; an
+explicit `goal` URL filter overrides it.
+
+The backend first loads `AnalyticsConversion` records scoped to the actor's
+workspace, selected period, and filters. It then loads ordered
+`AnalyticsEvent` records only from the same `sessionId` values. A path contains
+the real source, campaign when `campaignId` is present, a supported asset
+(Smart Page, Smart Card, Link, or QR Code), the final supported interaction,
+and the Goal-backed conversion. QR scans retain the QR asset name/context as
+the source when that event is present. Missing levels are omitted; no inferred
+campaign, asset, source, or cross-session stitching is introduced.
+
+The response contains aggregated paths plus Source, Campaign, and Asset
+conversion summaries. It never returns visitor IDs, session IDs, names, email
+addresses, phones, or raw events to the browser. Visitors are distinct
+pseudonymous IDs within each aggregate, sessions are distinct session IDs, and
+CVR uses the shared `conversionRate()` definition. Paths after the first five
+are visually collapsed as “Outras jornadas” only in the UI; the API retains
+the full aggregate response. To bound the initial query path, V1 marks a
+response as sampled at 2,000 conversions or 10,000 loaded events.
+
+Journey uses the existing `advancedAnalytics` entitlement. Free collection is
+never affected; the complete visualization is gated through `PremiumGate`, and
+Trial inherits Premium access through Account Access.
+
 ## Access And States
 
 - Free retains collection and receives seven days of useful overview, top
@@ -83,16 +115,17 @@ No visitor PII is rendered.
 
 ## Scope Boundaries
 
-V1 deliberately does not implement Journey, Audience, Geography, Technology,
-session replay, heatmaps, AI insights, revenue, checkout analytics, advanced
-attribution, multi-touch modeling, real-time processing, or exports. The data
-layer remains suitable for a future Journey CTA, but no inactive link is shown.
+V1 deliberately does not implement Audience, session replay, heatmaps, AI
+insights, revenue attribution, predictive journeys, advanced multi-touch
+attribution, cross-device stitching, real-time processing, or exports. It does
+not treat a WhatsApp click, form submit, or QR scan as a conversion unless the
+Goal Engine has created an `AnalyticsConversion` record.
 
 ## Verification
 
 Focused coverage is in `tests/unit/analytics-queries.test.ts`, including
-workspace scoping, Goal conversion aggregation, and timezone-bucketed daily
-series. Run:
+workspace scoping, Goal conversion aggregation, a structured session Journey,
+and timezone-bucketed daily series. Run:
 
 ```bash
 npm test -- tests/unit/analytics-queries.test.ts
