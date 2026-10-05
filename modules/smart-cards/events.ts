@@ -69,6 +69,24 @@ export async function recordPublicSmartCardEvent(
     referrer: headers.get("referer"),
   });
   const inherited = trustedCampaignContext(headers);
+  const inheritedCampaign = inherited.campaignId
+    ? await db.campaign.findFirst({
+        where: { id: inherited.campaignId, workspaceId: card.workspaceId },
+        select: { id: true },
+      })
+    : null;
+  const campaignId = inheritedCampaign?.id ?? card.campaignId ?? undefined;
+  const campaignAsset =
+    campaignId && inherited.campaignAssetId
+      ? await db.campaignAsset.findFirst({
+          where: {
+            id: inherited.campaignAssetId,
+            workspaceId: card.workspaceId,
+            campaignId,
+          },
+          select: { id: true },
+        })
+      : null;
   const name: RecordAnalyticsEventInput["name"] =
     input.event === "card_view" || input.event === "nfc_open"
       ? "smart_card_view"
@@ -103,7 +121,8 @@ export async function recordPublicSmartCardEvent(
     assetId: card.id,
     elementType: action ? "action" : input.event === "social_click" ? "social_link" : undefined,
     elementId: action?.id ?? input.providerId,
-    campaignId: inherited.campaignId ?? card.campaignId ?? undefined,
+    campaignId,
+    campaignAssetId: campaignAsset?.id,
     smartCardId: card.id,
     smartCardActionId: action?.id,
     path: `/c/${input.slug}`,
@@ -144,7 +163,8 @@ export async function recordPublicSmartCardEvent(
   return {
     recorded: result.recorded || result.duplicate,
     cookieHeaders: publicAnalyticsContextCookies(headers, context, attribution, {
-      campaignId: inherited.campaignId ?? card.campaignId ?? undefined,
+      campaignId,
+      campaignAssetId: campaignAsset?.id,
       qrContext: inherited.qrContext,
     }),
   };

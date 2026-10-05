@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { FiMail, FiMessageCircle, FiPlus } from "react-icons/fi";
+import { FiMail, FiMessageCircle, FiPlus, FiX } from "react-icons/fi";
 import { analytics } from "@/lib/client/analytics";
 import { apiRequest } from "./shared";
 import styles from "./audience-dashboard.module.css";
@@ -22,10 +22,17 @@ type FormSubmission = {
   source: string;
   medium: string | null;
   channel: string | null;
+  values?: Record<string, string | boolean>;
   consentGiven?: boolean;
+  consentText?: string | null;
   consentedAt?: string | null;
   submittedAt: string;
-  form: { id: string; name: string; title: string };
+  form: {
+    id: string;
+    name: string;
+    title?: string;
+    fields?: Array<{ id: string; label: string; fieldType: string }>;
+  };
   smartPage: { id: string; title: string; slug: string };
   campaign: { id: string; name: string } | null;
 };
@@ -77,14 +84,39 @@ type Contact = {
     campaign: { id: string; name: string } | null;
     smartPage: { title: string } | null;
   }>;
+  attribution?: {
+    firstCampaign: string | null;
+    lastCampaign: string | null;
+    firstDistribution: {
+      id: string;
+      name: string;
+      campaign: { name: string };
+      channel: { name: string };
+    } | null;
+    lastDistribution: {
+      id: string;
+      name: string;
+      campaign: { name: string };
+      channel: { name: string };
+    } | null;
+    landingAsset: string | null;
+    identifiedVia: string;
+  };
   timeline?: Array<{
     id: string;
-    kind: "event" | "note" | "contact";
+    kind: "event" | "note" | "contact" | "submission" | "exchange";
     name: string;
     occurredAt: string;
     content?: string;
     author?: string;
-    context: { source?: string; smartPage?: string; smartCard?: string };
+    context: {
+      source?: string;
+      smartPage?: string;
+      smartCard?: string;
+      form?: string;
+      campaign?: string;
+      distribution?: string;
+    };
   }>;
   _count?: { events: number; exchanges: number };
 };
@@ -100,6 +132,21 @@ function nameOf(contact: Contact) {
   return (
     `${contact.firstName} ${contact.lastName}`.trim() || "Contato sem nome"
   );
+}
+
+function entryOf(contact: Contact) {
+  const submission = contact.formSubmissions[0];
+  if (submission) return submission.smartPage.title;
+  const exchange = contact.exchanges[0];
+  if (exchange)
+    return `${exchange.smartCard.firstName} ${exchange.smartCard.lastName}`.trim();
+  return "Não informado";
+}
+
+function sourceLabel(source: string | null | undefined) {
+  if (!source || source.toLowerCase() === "direct") return "Direct";
+  if (source.toLowerCase() === "qr") return "QR";
+  return source.charAt(0).toUpperCase() + source.slice(1);
 }
 
 function formatDate(value: string) {
@@ -135,41 +182,71 @@ function eventLabel(event: { name: string }) {
   );
 }
 
+function submittedValues(submission: FormSubmission) {
+  return (submission.form.fields ?? []).flatMap((field) => {
+    const value = submission.values?.[field.id];
+    if (value === undefined) return [];
+    return [
+      {
+        label: field.label,
+        value: typeof value === "boolean" ? (value ? "Sim" : "Não") : value,
+      },
+    ];
+  });
+}
+
 export function AudienceDashboard({
   initial,
   overview: initialOverview,
   filters: initialFilters,
   options,
   canEdit,
+  managementLimit,
 }: {
   initial: { items: Contact[]; page: number; total: number; hasMore: boolean };
   overview: {
     total: number;
     newContacts: number;
     converted: number;
+    conversionRate: number;
     topSources: Array<{ source: string; count: number }>;
   };
   filters: {
     search: string;
     source?: string;
     campaignId?: string;
+    campaignAssetId?: string;
     status?: "new" | "engaged" | "converted";
+    conversion: "all" | "with";
     engagement?: "low" | "medium" | "high";
     tagId?: string;
     formId?: string;
     segmentId?: string;
-    period: "all" | "30d" | "90d";
-    sort: "recent" | "last_seen" | "name" | "engagement";
+    period: "all" | "7d" | "30d" | "90d" | "custom";
+    from?: string;
+    to?: string;
+    sort: "recent" | "last_seen" | "oldest" | "name" | "engagement";
   };
   options: {
     sources: string[];
     campaigns: Array<{ id: string; name: string }>;
     tags: Array<{ id: string; name: string; color: string }>;
+    forms: Array<{ id: string; name: string; title: string }>;
+    distributions: Array<{
+      id: string;
+      name: string;
+      campaign: { name: string };
+      channel: { name: string };
+    }>;
   };
   canEdit: boolean;
+  managementLimit: { count: number; limit: number } | null;
 }) {
   const [contacts, setContacts] = useState(initial.items);
   const [overview, setOverview] = useState(initialOverview);
+  const [page, setPage] = useState(initial.page);
+  const [total, setTotal] = useState(initial.total);
+  const [hasMore, setHasMore] = useState(initial.hasMore);
   const [selected, setSelected] = useState<Contact | null>(null);
   const [filters, setFilters] = useState(initialFilters);
   const [busy, setBusy] = useState(false);
@@ -181,37 +258,75 @@ export function AudienceDashboard({
     analytics.track("audience_viewed");
   }, []);
 
-  const filtered = contacts.filter((contact) =>
-    `${nameOf(contact)} ${contact.email ?? ""} ${contact.company ?? ""}`
-      .toLowerCase()
-      .includes(filters.search.trim().toLowerCase()),
-  );
-
-  function queryFor(next: typeof filters) {
+  function queryFor(next: typeof filters, requestedPage = 1) {
     const query = new URLSearchParams();
     for (const [key, value] of Object.entries(next))
-      if (value) query.set(key === "campaignId" ? "campaign" : key === "tagId" ? "tag" : key, value);
-    return query.toString();
+      if (value)
+        query.set(
+          key === "campaignId"
+            ? "campaign"
+            : key === "campaignAssetId"
+              ? "distribution"
+              : key === "tagId"
+                ? "tag"
+                : key === "formId"
+                  ? "form"
+                  : key,
+          value,
+        );
+    if (requestedPage > 1) query.set("page", String(requestedPage));
+    return query;
   }
 
-  async function applyFilters(event?: React.FormEvent<HTMLFormElement>) {
-    event?.preventDefault();
+  async function loadContacts(next: typeof filters, requestedPage = 1) {
     setBusy(true);
     setError("");
     try {
-      const query = queryFor(filters);
+      const query = queryFor(next, requestedPage);
       const [contactsResult, overviewResult] = await Promise.all([
-        apiRequest<{ items: Contact[] }>(`/api/audience/contacts?${query}`),
+        apiRequest<{
+          items: Contact[];
+          page: number;
+          total: number;
+          hasMore: boolean;
+        }>(`/api/audience/contacts?${query}`),
         apiRequest<typeof overview>(`/api/audience/overview?${query}`),
       ]);
       setContacts(contactsResult.items);
+      setPage(contactsResult.page);
+      setTotal(contactsResult.total);
+      setHasMore(contactsResult.hasMore);
       setOverview(overviewResult);
-      analytics.track("audience_filter_applied");
+      const search = query.toString();
+      window.history.replaceState(
+        null,
+        "",
+        `${window.location.pathname}${search ? `?${search}` : ""}`,
+      );
     } catch (requestError) {
       setError(requestError instanceof Error ? requestError.message : "Não foi possível filtrar os contatos.");
     } finally {
       setBusy(false);
     }
+  }
+
+  async function applyFilters(event?: React.FormEvent<HTMLFormElement>) {
+    event?.preventDefault();
+    setSelected(null);
+    await loadContacts(filters);
+    analytics.track("audience_filter_applied");
+  }
+
+  function clearFilters() {
+    const next = {
+      search: "",
+      conversion: "all" as const,
+      period: "all" as const,
+      sort: "recent" as const,
+    };
+    setFilters(next);
+    setSelected(null);
+    void loadContacts(next);
   }
 
   async function openContact(contact: Contact) {
@@ -277,6 +392,23 @@ export function AudienceDashboard({
     }
   }
 
+  async function removeTag(tagId: string) {
+    if (!selected || !canEdit) return;
+    setBusy(true);
+    setError("");
+    try {
+      await apiRequest(
+        `/api/audience/contacts/${selected.id}/tags?tagId=${encodeURIComponent(tagId)}`,
+        { method: "DELETE" },
+      );
+      setSelected(await apiRequest<Contact>(`/api/audience/contacts/${selected.id}`));
+    } catch (requestError) {
+      setError(requestError instanceof Error ? requestError.message : "Não foi possível remover a tag.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
   const latestExchange = selected?.exchanges[0];
   const latestSubmission = selected?.formSubmissions[0];
   const hasLatestSubmission =
@@ -292,8 +424,7 @@ export function AudienceDashboard({
           <span className="eyebrow">Audience</span>
           <h1>Pessoas com contexto.</h1>
           <p>
-            Todo compartilhamento de Smart Card chega com origem, interesse,
-            campanha e histórico.
+            Pessoas identificadas com origem, campanha e histórico real.
           </p>
         </div>
         <div className={styles.headingActions}>
@@ -306,15 +437,23 @@ export function AudienceDashboard({
         <div><dt>Total de contatos</dt><dd>{overview.total}</dd></div>
         <div><dt>Novos contatos</dt><dd>{overview.newContacts}</dd></div>
         <div><dt>Convertidos</dt><dd>{overview.converted}</dd></div>
+        <div><dt>Taxa de conversão</dt><dd>{overview.conversionRate}%</dd></div>
         <div><dt>Principais origens</dt><dd>{overview.topSources.map((item) => `${item.source} (${item.count})`).join(" · ") || "Sem dados"}</dd></div>
       </dl>
+      {managementLimit && <aside className={styles.limitNotice} role="status"><p>Você atingiu o limite de {managementLimit.limit} contatos disponíveis para gestão no plano Free. Novos contatos continuam sendo coletados.</p><Link className="button button-secondary" href="/upgrade">Conhecer Premium</Link></aside>}
       <form className={styles.filters} onSubmit={(event) => void applyFilters(event)}>
         <label>Buscar<input value={filters.search} onChange={(event) => setFilters((current) => ({ ...current, search: event.target.value }))} placeholder="Nome, e-mail, telefone ou empresa" /></label>
-        <label>Origem<select value={filters.source ?? ""} onChange={(event) => setFilters((current) => ({ ...current, source: event.target.value || undefined }))}><option value="">Todas</option>{options.sources.map((source) => <option key={source} value={source}>{source}</option>)}</select></label>
+        <label>Origem<select value={filters.source ?? ""} onChange={(event) => setFilters((current) => ({ ...current, source: event.target.value || undefined }))}><option value="">Todas</option>{options.sources.map((source) => <option key={source} value={source}>{sourceLabel(source)}</option>)}</select></label>
+        <label>Campanha<select value={filters.campaignId ?? ""} onChange={(event) => setFilters((current) => ({ ...current, campaignId: event.target.value || undefined }))}><option value="">Todas</option>{options.campaigns.map((campaign) => <option key={campaign.id} value={campaign.id}>{campaign.name}</option>)}</select></label>
+        <label>Distribuição<select value={filters.campaignAssetId ?? ""} onChange={(event) => setFilters((current) => ({ ...current, campaignAssetId: event.target.value || undefined }))}><option value="">Todas</option>{options.distributions.map((distribution) => <option key={distribution.id} value={distribution.id}>{distribution.name} · {distribution.campaign.name}</option>)}</select></label>
+        <label>Formulário<select value={filters.formId ?? ""} onChange={(event) => setFilters((current) => ({ ...current, formId: event.target.value || undefined }))}><option value="">Todos</option>{options.forms.map((form) => <option key={form.id} value={form.id}>{form.name}</option>)}</select></label>
         <label>Status<select value={filters.status ?? ""} onChange={(event) => setFilters((current) => ({ ...current, status: (event.target.value || undefined) as typeof current.status }))}><option value="">Todos</option>{Object.entries(audienceStatusLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
+        <label>Conversão<select value={filters.conversion} onChange={(event) => setFilters((current) => ({ ...current, conversion: event.target.value as typeof current.conversion }))}><option value="all">Todas</option><option value="with">Com conversão</option></select></label>
         <label>Engajamento<select value={filters.engagement ?? ""} onChange={(event) => setFilters((current) => ({ ...current, engagement: (event.target.value || undefined) as typeof current.engagement }))}><option value="">Todos</option>{Object.entries(engagementLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
         <label>Tag<select value={filters.tagId ?? ""} onChange={(event) => setFilters((current) => ({ ...current, tagId: event.target.value || undefined }))}><option value="">Todas</option>{options.tags.map((tag) => <option key={tag.id} value={tag.id}>{tag.name}</option>)}</select></label>
-        <label>Período<select value={filters.period} onChange={(event) => setFilters((current) => ({ ...current, period: event.target.value as typeof current.period }))}><option value="all">Todo período</option><option value="30d">Últimos 30 dias</option><option value="90d">Últimos 90 dias</option></select></label>
+        <label>Período<select value={filters.period} onChange={(event) => setFilters((current) => ({ ...current, period: event.target.value as typeof current.period, ...(event.target.value === "custom" ? {} : { from: undefined, to: undefined }) }))}><option value="all">Todo período</option><option value="7d">Últimos 7 dias</option><option value="30d">Últimos 30 dias</option><option value="90d">Últimos 90 dias</option><option value="custom">Personalizado</option></select></label>
+        {filters.period === "custom" && <><label>De<input required type="date" value={filters.from ?? ""} onChange={(event) => setFilters((current) => ({ ...current, from: event.target.value || undefined }))} /></label><label>Até<input required type="date" value={filters.to ?? ""} onChange={(event) => setFilters((current) => ({ ...current, to: event.target.value || undefined }))} /></label></>}
+        <label>Ordenar<select value={filters.sort} onChange={(event) => setFilters((current) => ({ ...current, sort: event.target.value as typeof current.sort }))}><option value="recent">Mais recentes</option><option value="last_seen">Última interação</option><option value="oldest">Mais antigos</option><option value="name">Nome</option></select></label>
         <button className="button button-secondary" type="submit" disabled={busy}>Aplicar</button>
       </form>
       {notice && (
@@ -328,13 +467,13 @@ export function AudienceDashboard({
         </p>
       )}
       <div className={styles.workspace}>
-        <section className={styles.list} aria-label="Contatos">
+        <section className={styles.list} aria-label="Contatos" aria-busy={busy}>
           <div className={styles.listTitle}>
             <h2>Contatos</h2>
-            <span>{overview.total}</span>
+            <span>{total}</span>
           </div>
-          {filtered.length ? (
-            filtered.map((contact) => {
+          {contacts.length ? (
+            contacts.map((contact) => {
               return (
                 <button
                   className={styles.contactRow}
@@ -355,10 +494,9 @@ export function AudienceDashboard({
                   </span>
                   <span>
                     <strong>{nameOf(contact)}</strong>
-                    <small>
-                      {contact.company || contact.email || "Sem empresa"}
-                    </small>
-                    <em>{contact.firstSource || "Direct"} · {contact.formSubmissions[0]?.campaign?.name || contact.firstCampaign || "Sem campanha"}</em>
+                    <small>{contact.email || contact.phone || contact.company || "Sem contato secundário"}</small>
+                    <em>Origem: {sourceLabel(contact.firstSource)} · {contact.formSubmissions[0]?.campaign?.name || contact.firstCampaign || "Sem campanha"}</em>
+                    <small>Entrada: {entryOf(contact)} · {contact.conversionCount ? "Convertido" : "Sem conversão"} · {formatDate(contact.lastSeenAt)}</small>
                   </span>
                   <i data-temperature={contact.engagementLevel}>
                     {engagementLabels[contact.engagementLevel]}
@@ -367,8 +505,9 @@ export function AudienceDashboard({
               );
             })
           ) : (
-            <p className={styles.empty}>Nenhum contato encontrado.</p>
+            <div className={styles.empty}>{total ? <><p>Nenhum contato encontrado.</p><button type="button" className="button button-secondary" onClick={clearFilters}>Limpar filtros</button></> : <><p>Seus contatos aparecerão aqui.</p><p>Adicione um formulário à sua Smart Page para transformar acessos em contatos.</p><Link className="button button-secondary" href="/untrack/smart-pages">Criar Smart Page</Link></>}</div>
           )}
+          {(page > 1 || hasMore) && <nav className={styles.pagination} aria-label="Paginação dos contatos"><button type="button" className="button button-secondary" disabled={busy || page === 1} onClick={() => void loadContacts(filters, page - 1)}>Anterior</button><span>Página {page}</span><button type="button" className="button button-secondary" disabled={busy || !hasMore} onClick={() => void loadContacts(filters, page + 1)}>Próxima</button></nav>}
         </section>
         {selected ? (
           <section className={styles.detail}>
@@ -414,8 +553,8 @@ export function AudienceDashboard({
               <dl>{[["E-mail", selected.email], ["Telefone", selected.phone || selected.whatsapp], ["Empresa", selected.company], ["Cargo", selected.jobTitle]].filter(([, value]) => value).map(([label, value]) => <div key={label}><dt>{label}</dt><dd>{value}</dd></div>)}</dl>
             </section>
             <section className={styles.context}>
-              <h3>Attribution</h3>
-              <dl><div><dt>Origem inicial</dt><dd>{selected.firstSource || "Direct"}</dd></div><div><dt>Última origem</dt><dd>{selected.lastSource || "Direct"}</dd></div><div><dt>Campanha inicial</dt><dd>{selected.firstCampaign || "Não informada"}</dd></div><div><dt>Campanha recente</dt><dd>{selected.lastCampaign || "Não informada"}</dd></div></dl>
+              <h3>Atribuição</h3>
+              <dl><div><dt>Origem inicial</dt><dd>{sourceLabel(selected.firstSource)}</dd></div><div><dt>Última origem</dt><dd>{sourceLabel(selected.lastSource)}</dd></div><div><dt>Campanha inicial</dt><dd>{selected.attribution?.firstCampaign || selected.firstCampaign || "Não informada"}</dd></div><div><dt>Campanha recente</dt><dd>{selected.attribution?.lastCampaign || selected.lastCampaign || "Não informada"}</dd></div><div><dt>Distribuição inicial</dt><dd>{selected.attribution?.firstDistribution?.name || "Não informada"}</dd></div><div><dt>Distribuição recente</dt><dd>{selected.attribution?.lastDistribution?.name || "Não informada"}</dd></div><div><dt>Ativo de entrada</dt><dd>{selected.attribution?.landingAsset || "Não informado"}</dd></div><div><dt>Identificado via</dt><dd>{{ form: "Formulário", smart_card_exchange: "Smart Card" }[selected.attribution?.identifiedVia || selected.creationSource] || "Não informado"}</dd></div></dl>
             </section>
             {(latestExchange || latestSubmission) && (
               <section className={styles.context}>
@@ -484,8 +623,9 @@ export function AudienceDashboard({
             <section className={styles.context}>
               <h3>Jornada</h3>
               <ol className={styles.journey}>
-                <li>{selected.firstSource || "Direct"}</li>
-                {selected.firstCampaign && <li>{selected.firstCampaign}</li>}
+                <li>{sourceLabel(selected.firstSource)}</li>
+                {(selected.attribution?.firstCampaign || selected.firstCampaign) && <li>{selected.attribution?.firstCampaign || selected.firstCampaign}</li>}
+                {selected.attribution?.firstDistribution && <li>{selected.attribution.firstDistribution.name}</li>}
                 {selected.formSubmissions[0]?.smartPage && <li>{selected.formSubmissions[0].smartPage.title}</li>}
                 {selected.formSubmissions[0]?.form && <li>{selected.formSubmissions[0].form.name}</li>}
                 <li>Lead capturado</li>
@@ -498,13 +638,17 @@ export function AudienceDashboard({
             {selected.formSubmissions.find((submission) => submission.consentGiven) && (
               <section className={styles.context}>
                 <h3>Consentimento</h3>
-                {selected.formSubmissions.filter((submission) => submission.consentGiven).slice(-1).map((submission) => <dl key={submission.id}><div><dt>Aceito</dt><dd>{formatDate(submission.consentedAt || submission.submittedAt)}</dd></div><div><dt>Formulário</dt><dd>{submission.form.name}</dd></div></dl>)}
+                {selected.formSubmissions.filter((submission) => submission.consentGiven).slice(-1).map((submission) => <dl key={submission.id}><div><dt>Aceito</dt><dd>{formatDate(submission.consentedAt || submission.submittedAt)}</dd></div><div><dt>Formulário</dt><dd>{submission.form.name}</dd></div>{submission.consentText && <div><dt>Texto</dt><dd>{submission.consentText}</dd></div>}</dl>)}
               </section>
             )}
             <section className={styles.context}>
+              <h3>Formulários</h3>
+              {selected.formSubmissions.length ? <div className={styles.submissions}>{selected.formSubmissions.map((submission) => <details key={submission.id} className={styles.submission}><summary><span><strong>{submission.form.name}</strong><small>{submission.smartPage.title} · {formatDate(submission.submittedAt)}</small></span><span>{submission.consentGiven ? "Consentimento registrado" : "Sem consentimento"}</span></summary>{submittedValues(submission).length > 0 && <dl>{submittedValues(submission).map((item) => <div key={item.label}><dt>{item.label}</dt><dd>{item.value}</dd></div>)}</dl>}</details>)}</div> : <p>Sem submissões de formulário.</p>}
+            </section>
+            <section className={styles.context}>
               <h3>Tags</h3>
               <div className={styles.tags}>
-                {selected.tags?.map(({ tag }) => <span key={tag.id} style={{ borderColor: tag.color }}>{tag.name}</span>)}
+                {selected.tags?.map(({ tag }) => <span key={tag.id} style={{ borderColor: tag.color }}>{tag.name}{canEdit && <button type="button" title={`Remover ${tag.name}`} aria-label={`Remover ${tag.name}`} disabled={busy} onClick={() => void removeTag(tag.id)}><FiX aria-hidden="true" /></button>}</span>)}
                 {canEdit && <select aria-label="Adicionar tag" defaultValue="" disabled={busy} onChange={(event) => { void addTag(event.target.value); event.currentTarget.value = ""; }}><option value="">+ Adicionar tag</option>{options.tags.filter((tag) => !selected.tags?.some((item) => item.tag.id === tag.id)).map((tag) => <option key={tag.id} value={tag.id}>{tag.name}</option>)}</select>}
               </div>
             </section>
@@ -519,7 +663,11 @@ export function AudienceDashboard({
                         <strong>{eventLabel(event)}</strong>
                         {event.content && <p>{event.content}</p>}
                         {event.context.smartPage && <p>Smart Page: {event.context.smartPage}</p>}
-                        {event.context.source && <p>Origem: {event.context.source}</p>}
+                        {event.context.smartCard && <p>Smart Card: {event.context.smartCard}</p>}
+                        {event.context.form && <p>Formulário: {event.context.form}</p>}
+                        {event.context.campaign && <p>Campanha: {event.context.campaign}</p>}
+                        {event.context.distribution && <p>Distribuição: {event.context.distribution}</p>}
+                        {event.context.source && <p>Origem: {sourceLabel(event.context.source)}</p>}
                       </div>
                     </li>
                   ))

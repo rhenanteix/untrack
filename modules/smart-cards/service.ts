@@ -413,7 +413,25 @@ export async function captureSmartCardContact(
     referrer: headers.get("referer"),
   });
   const inherited = trustedCampaignContext(headers);
-  const campaignId = inherited.campaignId ?? card.campaignId ?? undefined;
+  const inheritedCampaign = inherited.campaignId
+    ? await getPrisma().campaign.findFirst({
+        where: { id: inherited.campaignId, workspaceId: card.workspaceId },
+        select: { id: true },
+      })
+    : null;
+  const campaignId = inheritedCampaign?.id ?? card.campaignId ?? undefined;
+  const campaignAsset =
+    campaignId && inherited.campaignAssetId
+      ? await getPrisma().campaignAsset.findFirst({
+          where: {
+            id: inherited.campaignAssetId,
+            workspaceId: card.workspaceId,
+            campaignId,
+          },
+          select: { id: true },
+        })
+      : null;
+  const campaignAssetId = campaignAsset?.id;
   const values = validContactValues(form, input.values);
   if (
     input.intent &&
@@ -456,6 +474,18 @@ export async function captureSmartCardContact(
       city: values.city ?? null,
       customFields: json(customFields),
     };
+    const firstTouch = {
+      firstSource: attribution.source,
+      firstMedium: attribution.medium,
+      firstChannel: attribution.channel,
+      firstCampaign: attribution.campaign ?? null,
+    };
+    const lastTouch = {
+      lastSource: attribution.source,
+      lastMedium: attribution.medium,
+      lastChannel: attribution.channel,
+      lastCampaign: attribution.campaign ?? null,
+    };
     let saved;
     if (existing) {
       saved = await tx.audienceContact.update({
@@ -467,6 +497,11 @@ export async function captureSmartCardContact(
           ...(existing.creationSource === "unknown"
             ? { creationSource: "smart_card_exchange" }
             : {}),
+          firstSource: existing.firstSource ?? firstTouch.firstSource,
+          firstMedium: existing.firstMedium ?? firstTouch.firstMedium,
+          firstChannel: existing.firstChannel ?? firstTouch.firstChannel,
+          firstCampaign: existing.firstCampaign ?? firstTouch.firstCampaign,
+          ...lastTouch,
           customFields: json({
             ...(existing.customFields as Record<string, unknown>),
             ...customFields,
@@ -479,6 +514,8 @@ export async function captureSmartCardContact(
           workspaceId: card.workspaceId,
           creationSource: "smart_card_exchange",
           ...data,
+          ...firstTouch,
+          ...lastTouch,
         },
       });
     }
@@ -508,7 +545,21 @@ export async function captureSmartCardContact(
         }),
       },
     });
-    return saved;
+    if (!existing) {
+      await tx.audienceContactEvent.create({
+        data: {
+          workspaceId: card.workspaceId,
+          contactId: saved.id,
+          name: "lead_created",
+          metadata: json({
+            smartCardId: card.id,
+            exchangeId: exchange.id,
+            source: attribution.source,
+          }),
+        },
+      });
+    }
+    return { contact: saved, leadCreated: !existing };
   });
   if (tracking.trackingAllowed)
     try {
@@ -518,10 +569,11 @@ export async function captureSmartCardContact(
         workspaceId: card.workspaceId,
         visitorKey: tracking.identity.visitorId,
         sessionKey: tracking.identity.sessionId,
-        audienceContactId: contact.id,
+        audienceContactId: contact.contact.id,
         assetType: "smart_card",
         assetId: card.id,
         campaignId,
+        campaignAssetId,
         smartCardId: card.id,
         path: `/c/${slug}`,
         attribution: tracking.attribution,
@@ -532,39 +584,41 @@ export async function captureSmartCardContact(
       if (formEvent.visitorId)
         await getPrisma().analyticsVisitor.update({
           where: { id: formEvent.visitorId },
-          data: { audienceContactId: contact.id },
+          data: { audienceContactId: contact.contact.id },
         });
-      await recordAnalyticsEvent({
-        eventId: randomUUID(),
-        name: "lead_created",
-        workspaceId: card.workspaceId,
-        visitorKey: tracking.identity.visitorId,
-        sessionKey: tracking.identity.sessionId,
-        audienceContactId: contact.id,
-        assetType: "smart_card",
-        assetId: card.id,
-        campaignId,
-        smartCardId: card.id,
-        path: `/c/${slug}`,
-        attribution: tracking.attribution,
-        origin: "server",
-        headers,
-      });
+      if (contact.leadCreated)
+        await recordAnalyticsEvent({
+          eventId: randomUUID(),
+          name: "lead_created",
+          workspaceId: card.workspaceId,
+          visitorKey: tracking.identity.visitorId,
+          sessionKey: tracking.identity.sessionId,
+          audienceContactId: contact.contact.id,
+          assetType: "smart_card",
+          assetId: card.id,
+          campaignId,
+          campaignAssetId,
+          smartCardId: card.id,
+          path: `/c/${slug}`,
+          attribution: tracking.attribution,
+          origin: "server",
+          headers,
+        });
     } catch (error) {
       console.error("Smart Card conversion analytics was not recorded", error);
     }
-  void refreshAudienceContactSummary(card.workspaceId, contact.id).catch(
+  void refreshAudienceContactSummary(card.workspaceId, contact.contact.id).catch(
     (error) =>
       console.error("Smart Card contact summary was not refreshed", error),
   );
   return {
-    contact,
+    contact: contact.contact,
     consentText: contactConsentText(card),
     analyticsCookieHeaders: publicAnalyticsContextCookies(
       headers,
       tracking,
       attribution,
-      { campaignId, qrContext: inherited.qrContext },
+      { campaignId, campaignAssetId, qrContext: inherited.qrContext },
     ),
   };
 }

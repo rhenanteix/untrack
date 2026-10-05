@@ -3,6 +3,8 @@ import { redirect } from "next/navigation";
 import { AudienceDashboard } from "@/components/untrack/audience-dashboard";
 import { WorkspaceLoadError } from "@/components/untrack/load-error";
 import { sessionFromHeaders } from "@/lib/session";
+import { getLimit, getUsage } from "@/modules/billing/entitlements";
+import { getAccountAccessForUser } from "@/modules/billing/account-access";
 import {
   getAudienceFilterOptions,
   getAudienceOverview,
@@ -23,12 +25,25 @@ async function loadAudiencePage(
   try {
     const actor = await actorFor(userId, requestHeaders);
     const filters = parseAudienceContactFilters(rawFilters);
-    const [initial, overview, options] = await Promise.all([
+    const [initial, overview, options, access, usage] = await Promise.all([
       listAudienceContacts(actor, 1, filters),
       getAudienceOverview(actor, filters),
       getAudienceFilterOptions(actor),
+      getAccountAccessForUser(userId),
+      getUsage(actor.workspaceId),
     ]);
-    return { ok: true as const, actor, initial, overview, options };
+    const limit = getLimit(access, "audienceContacts");
+    return {
+      ok: true as const,
+      actor,
+      initial,
+      overview,
+      options,
+      managementLimit:
+        access.effectivePlan === "free" && usage.audienceContacts >= limit
+          ? { count: usage.audienceContacts, limit }
+          : null,
+    };
   } catch (error) {
     const failure = workspaceLoadError(error);
     if (!["WORKSPACE_FORBIDDEN", "INVALID_WORKSPACE"].includes(failure.code))
@@ -72,6 +87,7 @@ export default async function AudiencePage({
       filters={data.initial.filters}
       options={data.options}
       canEdit={data.actor.role !== "viewer"}
+      managementLimit={data.managementLimit}
     />
   );
 }

@@ -593,6 +593,8 @@ model AudienceContact {
   @@index([workspaceId, firstCampaign])
   @@index([workspaceId, lastCampaign])
   @@index([workspaceId, firstSource])
+  @@index([workspaceId, firstSeenAt])
+  @@index([workspaceId, lastSeenAt])
   @@index([workspaceId, audienceStatus, lastSeenAt])
   @@index([workspaceId, engagementLevel, lastSeenAt])
   @@unique([id, workspaceId])

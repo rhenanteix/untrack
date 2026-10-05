@@ -8,7 +8,15 @@ import { apiRequest } from "./shared";
 import styles from "./audience-dashboard.module.css";
 
 type Rule = {
-  field: "source" | "campaign" | "tag" | "status" | "engagement";
+  field:
+    | "source"
+    | "campaign"
+    | "distribution"
+    | "tag"
+    | "status"
+    | "conversion"
+    | "form"
+    | "engagement";
   value: string;
 };
 type Segment = {
@@ -22,21 +30,34 @@ type Options = {
   sources: string[];
   campaigns: Array<{ id: string; name: string }>;
   tags: Array<{ id: string; name: string }>;
+  forms: Array<{ id: string; name: string; title: string }>;
+  distributions: Array<{
+    id: string;
+    name: string;
+    campaign: { name: string };
+    channel: { name: string };
+  }>;
 };
 
 const labels = {
   source: "Origem",
   campaign: "Campanha",
+  distribution: "Distribuição",
   tag: "Tag",
   status: "Status",
+  conversion: "Conversão",
+  form: "Formulário",
   engagement: "Engajamento",
 };
 
 function valuesFor(field: Rule["field"], options: Options) {
   if (field === "source") return options.sources.map((value) => ({ value, label: value }));
   if (field === "campaign") return options.campaigns.map((item) => ({ value: item.id, label: item.name }));
+  if (field === "distribution") return options.distributions.map((item) => ({ value: item.id, label: `${item.name} · ${item.campaign.name}` }));
   if (field === "tag") return options.tags.map((item) => ({ value: item.id, label: item.name }));
   if (field === "status") return [["new", "Novo"], ["engaged", "Engajado"], ["converted", "Convertido"]].map(([value, label]) => ({ value, label }));
+  if (field === "conversion") return [{ value: "with", label: "Com conversão" }];
+  if (field === "form") return options.forms.map((item) => ({ value: item.id, label: item.name }));
   return [["low", "Baixo"], ["medium", "Médio"], ["high", "Alto"]].map(([value, label]) => ({ value, label }));
 }
 
