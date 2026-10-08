@@ -581,6 +581,23 @@ export async function captureSmartCardContact(
         headers,
         includeIdentity: true,
       });
+      await recordAnalyticsEvent({
+        eventId: randomUUID(),
+        name: "contact_exchange_submit",
+        workspaceId: card.workspaceId,
+        visitorKey: tracking.identity.visitorId,
+        sessionKey: tracking.identity.sessionId,
+        audienceContactId: contact.contact.id,
+        assetType: "smart_card",
+        assetId: card.id,
+        campaignId,
+        campaignAssetId,
+        smartCardId: card.id,
+        path: `/c/${slug}`,
+        attribution: tracking.attribution,
+        origin: "server",
+        headers,
+      });
       if (formEvent.visitorId)
         await getPrisma().analyticsVisitor.update({
           where: { id: formEvent.visitorId },
@@ -666,6 +683,9 @@ export async function smartCardMetrics(actor: Actor, id: string, days: number) {
     visitors,
     contacts,
     conversions,
+    exchangeOpens,
+    exchangeSubmits,
+    leadsCreated,
     topActions,
     sources,
   ] = await Promise.all([
@@ -706,6 +726,27 @@ export async function smartCardMetrics(actor: Actor, id: string, days: number) {
         day: { gte: start },
       },
     }),
+    db.analyticsEvent.count({
+      where: {
+        smartCardId: card.id,
+        name: "contact_exchange_open",
+        day: { gte: start },
+      },
+    }),
+    db.analyticsEvent.count({
+      where: {
+        smartCardId: card.id,
+        name: "contact_exchange_submit",
+        day: { gte: start },
+      },
+    }),
+    db.analyticsEvent.count({
+      where: {
+        smartCardId: card.id,
+        name: "lead_created",
+        day: { gte: start },
+      },
+    }),
     db.analyticsEvent.groupBy({
       by: ["smartCardActionId"],
       where: { ...interactionWhere, smartCardActionId: { not: null } },
@@ -731,6 +772,10 @@ export async function smartCardMetrics(actor: Actor, id: string, days: number) {
   const actionNames = new Map(
     actions.map((action) => [action.id, action.label]),
   );
+  const exchangeOpenRate =
+    exchangeOpens > 0
+      ? Math.round((exchangeSubmits / exchangeOpens) * 100)
+      : null;
   return {
     periodDays: days,
     views,
@@ -742,6 +787,10 @@ export async function smartCardMetrics(actor: Actor, id: string, days: number) {
     interactions,
     contacts,
     conversions,
+    exchangeOpens,
+    exchangeSubmits,
+    leadsCreated,
+    exchangeOpenRate,
     funnel: [
       { key: "views", label: "Visualizações", value: views },
       {
@@ -749,6 +798,9 @@ export async function smartCardMetrics(actor: Actor, id: string, days: number) {
         label: "CTA de Wallet clicada",
         value: appleWalletClicks + googleWalletClicks,
       },
+      { key: "exchange_opens", label: "Aberturas de troca de contatos", value: exchangeOpens },
+      { key: "exchange_submits", label: "Envios de troca de contatos", value: exchangeSubmits },
+      { key: "leads_created", label: "Novos contatos", value: leadsCreated },
     ],
     topActions: topActions.flatMap((item) =>
       item.smartCardActionId
@@ -775,7 +827,7 @@ export async function smartCardDashboardMetrics(actor: Actor) {
     workspaceId: actor.workspaceId,
     smartCardId: { not: null },
   };
-  const [active, views, contacts, saves, conversions] = await Promise.all([
+  const [active, views, contacts, saves, conversions, exchangeOpens, exchangeSubmits, leadsCreated] = await Promise.all([
     db.smartCard.count({
       where: { workspaceId: actor.workspaceId, status: "published" },
     }),
@@ -791,6 +843,15 @@ export async function smartCardDashboardMetrics(actor: Actor) {
     db.analyticsEvent.count({
       where: { ...cardEventWhere, name: "booking_click" },
     }),
+    db.analyticsEvent.count({
+      where: { ...cardEventWhere, name: "contact_exchange_open" },
+    }),
+    db.analyticsEvent.count({
+      where: { ...cardEventWhere, name: "contact_exchange_submit" },
+    }),
+    db.analyticsEvent.count({
+      where: { ...cardEventWhere, name: "lead_created" },
+    }),
   ]);
-  return { active, views, contacts, saves, conversions };
+  return { active, views, contacts, saves, conversions, exchangeOpens, exchangeSubmits, leadsCreated };
 }

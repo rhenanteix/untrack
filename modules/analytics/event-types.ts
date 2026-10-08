@@ -29,6 +29,8 @@ export const AnalyticsEvents = {
   CHECKOUT_STARTED: "checkout_started",
   CHECKOUT_COMPLETED: "checkout_completed",
   PAYMENT_COMPLETED: "payment_completed",
+  CONTACT_EXCHANGE_OPEN: "contact_exchange_open",
+  CONTACT_EXCHANGE_SUBMIT: "contact_exchange_submit",
 } as const;
 
 export const universalEventNames = [
@@ -62,6 +64,8 @@ export const universalEventNames = [
   AnalyticsEvents.CHECKOUT_STARTED,
   AnalyticsEvents.CHECKOUT_COMPLETED,
   AnalyticsEvents.PAYMENT_COMPLETED,
+  AnalyticsEvents.CONTACT_EXCHANGE_OPEN,
+  AnalyticsEvents.CONTACT_EXCHANGE_SUBMIT,
 ] as const;
 
 export type UniversalEventName = (typeof universalEventNames)[number];

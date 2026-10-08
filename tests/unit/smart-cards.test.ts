@@ -274,9 +274,12 @@ describe("Smart Card contact capture", () => {
       new Headers(),
     );
 
-    expect(recordAnalyticsEvent).toHaveBeenCalledTimes(1);
+    expect(recordAnalyticsEvent).toHaveBeenCalledTimes(2);
     expect(recordAnalyticsEvent).toHaveBeenCalledWith(
       expect.objectContaining({ name: "form_submit" }),
+    );
+    expect(recordAnalyticsEvent).toHaveBeenCalledWith(
+      expect.objectContaining({ name: "contact_exchange_submit" }),
     );
     expect(contactEventCreate).toHaveBeenCalledTimes(1);
     expect(updateContact).toHaveBeenCalledWith(

@@ -85,6 +85,36 @@ function initials(card: PublicSmartCardData) {
   return `${card.firstName[0] ?? ""}${card.lastName[0] ?? ""}`.toUpperCase();
 }
 
+function validateContactFields(values: Record<string, string>, fields: ContactField[]): string | null {
+    // Check if at least one contact method (email or phone) is provided
+    const hasEmail = fields.some(f => f.type === "email" && values[f.key]?.trim());
+    const hasPhone = fields.some(f => f.type === "tel" && values[f.key]?.trim());
+    
+    if (!hasEmail && !hasPhone) {
+      return "Informe pelo menos um meio de contato (e-mail ou telefone).";
+    }
+    
+    // Validate email format
+    const emailField = fields.find(f => f.type === "email");
+    if (emailField && values[emailField.key]?.trim()) {
+      const email = values[emailField.key].trim();
+      if (!/^\S+@\S+\.\S+$/.test(email)) {
+        return "Informe um e-mail válido.";
+      }
+    }
+    
+    // Validate phone format
+    const phoneField = fields.find(f => f.type === "tel");
+    if (phoneField && values[phoneField.key]?.trim()) {
+      const phone = values[phoneField.key].trim();
+      if (!/^\+?[0-9 ()-]{7,24}$/.test(phone)) {
+        return "Informe um telefone válido.";
+      }
+    }
+    
+    return null;
+  }
+
 function actionEvent(action: CardAction) {
   if (action.type === "whatsapp") return "whatsapp_click";
   if (action.type === "calendar") return "booking_click";
@@ -100,6 +130,8 @@ type PublicCardEvent =
   | "google_wallet_add_click"
   | "contact_save"
   | "contact_form_open"
+  | "contact_exchange_open"
+  | "contact_exchange_submit"
   | "link_click"
   | "social_click"
   | "whatsapp_click"
@@ -171,7 +203,7 @@ export function PublicSmartCard({
   function openContactForm() {
     setFormOpen(true);
     setFormError("");
-    void track("contact_form_open", card.slug, source);
+    void track("contact_exchange_open", card.slug, source);
   }
 
   async function copyCardLink() {
@@ -194,6 +226,14 @@ export function PublicSmartCard({
         String(formData.get(field.key) ?? ""),
       ]),
     );
+    
+    const validationError = validateContactFields(values, contactForm.fields);
+    if (validationError) {
+      setFormError(validationError);
+      setBusy(false);
+      return;
+    }
+    
     try {
       const response = await fetch(
         `/api/smart-cards/public/${encodeURIComponent(card.slug)}/contacts`,
@@ -220,6 +260,7 @@ export function PublicSmartCard({
           payload.message ?? "Não foi possível compartilhar agora.",
         );
       persistContactId(card.slug, payload.contact.id);
+      void track("contact_exchange_submit", card.slug, source);
       setSubmitted(true);
     } catch (error) {
       setFormError(
@@ -438,8 +479,8 @@ export function PublicSmartCard({
             </button>
             {submitted ? (
               <div className={styles.submitted}>
-                <h2 id="contact-exchange-title">Dados compartilhados</h2>
-                <p>{displayName} poderá entrar em contato com você.</p>
+                <h2 id="contact-exchange-title">Contato compartilhado!</h2>
+                <p>Suas informações foram enviadas com sucesso.</p>
                 <button
                   className={styles.primaryButton}
                   type="button"

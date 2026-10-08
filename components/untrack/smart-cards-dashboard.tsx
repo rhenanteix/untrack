@@ -150,13 +150,17 @@ type Metrics = {
   interactions: number;
   contacts: number;
   conversions: number;
+  exchangeOpens: number;
+  exchangeSubmits: number;
+  leadsCreated: number;
+  exchangeOpenRate: number | null;
   funnel: { key: string; label: string; value: number }[];
   topActions: { actionId: string; label: string; clicks: number }[];
   trafficSources: { name: string; views: number }[];
 };
 
 type Tab =
-  "identity" | "contact" | "socials" | "appearance" | "wallet" | "analytics";
+  "identity" | "contact" | "socials" | "appearance" | "exchange" | "wallet" | "analytics";
 type Filter = "all" | "mine" | "team" | "active" | "archived";
 type SaveStatus = "saved" | "saving" | "error";
 
@@ -291,6 +295,9 @@ export function SmartCardsDashboard({
     contacts: number;
     saves: number;
     conversions: number;
+    exchangeOpens: number;
+    exchangeSubmits: number;
+    leadsCreated: number;
   };
   canEdit: boolean;
 }) {
@@ -767,6 +774,18 @@ export function SmartCardsDashboard({
           <span>Conversões</span>
           <strong>{overview.conversions}</strong>
         </div>
+        <div>
+          <span>Aberturas de troca</span>
+          <strong>{overview.exchangeOpens}</strong>
+        </div>
+        <div>
+          <span>Envios de troca</span>
+          <strong>{overview.exchangeSubmits}</strong>
+        </div>
+        <div>
+          <span>Novos contatos</span>
+          <strong>{overview.leadsCreated}</strong>
+        </div>
       </section>
 
       <div className={styles.toolbar}>
@@ -908,6 +927,7 @@ export function SmartCardsDashboard({
                   "contact",
                   "socials",
                   "appearance",
+                  "exchange",
                   "wallet",
                   "analytics",
                 ] as const
@@ -928,6 +948,7 @@ export function SmartCardsDashboard({
                       contact: "Contato",
                       socials: "Redes",
                       appearance: "Aparência",
+                      exchange: "Troca de contatos",
                       wallet: "Wallet",
                       analytics: "Analytics",
                     }[value]
@@ -1786,6 +1807,210 @@ export function SmartCardsDashboard({
                   </div>
                 )}
 
+                {tab === "exchange" && (
+                  <div className={styles.panel}>
+                    <h3>Troca de contatos</h3>
+                    <p>
+                      Configure como visitantes podem compartilhar os dados de contato
+                      com você através do seu Smart Card.
+                    </p>
+                    <label className={styles.toggle}>
+                      <input
+                        disabled={!canEdit}
+                        type="checkbox"
+                        checked={activeCard.contactForm.primaryCta === "share_contact"}
+                        onChange={(event) =>
+                          updateDraft({
+                            contactForm: {
+                              ...activeCard.contactForm,
+                              primaryCta: event.target.checked
+                                ? "share_contact"
+                                : "save_contact",
+                            },
+                          })
+                        }
+                      />{" "}
+                      Ativar botão &quot;Trocar contatos&quot; no cartão
+                    </label>
+                    <div className={styles.fieldGrid}>
+                      <label>
+                        Texto do botão
+                        <input
+                          disabled={!canEdit}
+                          value={activeCard.contactForm.primaryCta === "share_contact" ? "Trocar contatos" : "Salvar contato"}
+                          onChange={(event) =>
+                            updateDraft({
+                              contactForm: {
+                                ...activeCard.contactForm,
+                                // Store custom button text in a field
+                              },
+                            })
+                          }
+                        />
+                      </label>
+                    </div>
+                    <details className={styles.advanced}>
+                      <summary>Campos do formulário</summary>
+                      <p>
+                        Personalize quais campos opcionais serão exibidos. O campo
+                        &quot;Nome&quot; é sempre obrigatório. Pelo menos um meio de contato
+                        (e-mail ou telefone) será exigido do visitante.
+                      </p>
+                      <div className={styles.captureFields}>
+                        {activeCard.contactForm.fields.map((field, index) => (
+                          <div key={field.key} className={styles.captureField}>
+                            <label>
+                              Campo
+                              <input
+                                disabled={!canEdit || index === 0}
+                                value={field.label}
+                                onChange={(event) => {
+                                  const fields =
+                                    activeCard.contactForm.fields.map(
+                                      (item, position) =>
+                                        position === index
+                                          ? {
+                                              ...item,
+                                              label: event.target.value,
+                                            }
+                                          : item,
+                                    );
+                                  updateDraft({
+                                    contactForm: {
+                                      ...activeCard.contactForm,
+                                      fields,
+                                    },
+                                  });
+                                }}
+                              />
+                            </label>
+                            <label>
+                              Tipo
+                              <select
+                                disabled={!canEdit || index === 0}
+                                value={field.type}
+                                onChange={(event) => {
+                                  const fields =
+                                    activeCard.contactForm.fields.map(
+                                      (item, position) =>
+                                        position === index
+                                          ? {
+                                              ...item,
+                                              type: event.target
+                                                .value as ContactField["type"],
+                                            }
+                                          : item,
+                                    );
+                                  updateDraft({
+                                    contactForm: {
+                                      ...activeCard.contactForm,
+                                      fields,
+                                    },
+                                  });
+                                }}
+                              >
+                                <option value="text">Texto</option>
+                                <option value="email">E-mail</option>
+                                <option value="tel">Telefone</option>
+                                <option value="select">Seleção</option>
+                              </select>
+                            </label>
+                            <label className={styles.toggle}>
+                              <input
+                                disabled={!canEdit || index === 0}
+                                type="checkbox"
+                                checked={field.required}
+                                onChange={(event) => {
+                                  const fields =
+                                    activeCard.contactForm.fields.map(
+                                      (item, position) =>
+                                        position === index
+                                          ? {
+                                              ...item,
+                                              required: event.target.checked,
+                                            }
+                                          : item,
+                                    );
+                                  updateDraft({
+                                    contactForm: {
+                                      ...activeCard.contactForm,
+                                      fields,
+                                    },
+                                  });
+                                }}
+                              />{" "}
+                              Obrigatório
+                            </label>
+                            {canEdit && index > 0 && (
+                              <button
+                                type="button"
+                                title="Remover campo"
+                                aria-label="Remover campo"
+                                onClick={() =>
+                                  updateDraft({
+                                    contactForm: {
+                                      ...activeCard.contactForm,
+                                      fields:
+                                        activeCard.contactForm.fields.filter(
+                                          (_, position) => position !== index,
+                                        ),
+                                    },
+                                  })
+                                }
+                              >
+                                <FiTrash2 />
+                              </button>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                      {canEdit && activeCard.contactForm.fields.length < 10 && (
+                        <button
+                          className="button button-secondary"
+                          type="button"
+                          onClick={() =>
+                            updateDraft({
+                              contactForm: {
+                                ...activeCard.contactForm,
+                                fields: [
+                                  ...activeCard.contactForm.fields,
+                                  {
+                                    key: `custom${activeCard.contactForm.fields.length + 1}`,
+                                    label: "Novo campo",
+                                    type: "text",
+                                    required: false,
+                                    options: [],
+                                  },
+                                ],
+                              },
+                            })
+                          }
+                        >
+                          <FiPlus aria-hidden="true" /> Adicionar campo
+                        </button>
+                      )}
+                    </details>
+                    <details className={styles.advanced}>
+                      <summary>Mensagem de sucesso</summary>
+                      <label>
+                        Texto exibido após o envio bem-sucedido
+                        <textarea
+                          disabled={!canEdit}
+                          value="Contato compartilhado! Suas informações foram enviadas com sucesso."
+                          onChange={(event) =>
+                            updateDraft({
+                              contactForm: {
+                                ...activeCard.contactForm,
+                                // Store custom success message
+                              },
+                            })
+                          }
+                        />
+                      </label>
+                    </details>
+                  </div>
+                )}
+
                 {tab === "wallet" && (
                   <div className={styles.panel}>
                     <h3>Wallet e distribuição</h3>
@@ -1997,6 +2222,24 @@ export function SmartCardsDashboard({
                             <div>
                               <span>Adições confirmadas</span>
                               <strong>{metrics.walletAddsConfirmed}</strong>
+                            </div>
+                          )}
+                          <div>
+                            <span>Aberturas de troca</span>
+                            <strong>{metrics.exchangeOpens}</strong>
+                          </div>
+                          <div>
+                            <span>Envios de troca</span>
+                            <strong>{metrics.exchangeSubmits}</strong>
+                          </div>
+                          <div>
+                            <span>Novos contatos</span>
+                            <strong>{metrics.leadsCreated}</strong>
+                          </div>
+                          {metrics.exchangeOpenRate !== null && (
+                            <div>
+                              <span>Taxa de envio</span>
+                              <strong>{metrics.exchangeOpenRate}%</strong>
                             </div>
                           )}
                         </div>

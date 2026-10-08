@@ -21,6 +21,8 @@ export const publicSmartCardEventNames = [
   "google_wallet_add_click",
   "contact_save",
   "contact_form_open",
+  "contact_exchange_open",
+  "contact_exchange_submit",
   "link_click",
   "social_click",
   "whatsapp_click",
@@ -87,7 +89,7 @@ export async function recordPublicSmartCardEvent(
           select: { id: true },
         })
       : null;
-  const name: RecordAnalyticsEventInput["name"] =
+const name: RecordAnalyticsEventInput["name"] =
     input.event === "card_view" || input.event === "nfc_open"
       ? "smart_card_view"
       : input.event === "card_share"
@@ -98,19 +100,23 @@ export async function recordPublicSmartCardEvent(
               ? "apple_wallet_add_click"
               : input.event === "google_wallet_add_click"
                 ? "google_wallet_add_click"
-          : input.event === "contact_save"
-            ? "save_contact_click"
-            : input.event === "contact_form_open"
-              ? "form_view"
-              : input.event === "whatsapp_click"
-                ? "whatsapp_click"
-                : input.event === "social_click"
-                  ? "social_click"
-                : input.event === "booking_click"
-                  ? "button_click"
-                  : action?.type === "website"
-                    ? "website_click"
-                    : "link_click";
+            : input.event === "contact_save"
+              ? "save_contact_click"
+              : input.event === "contact_form_open"
+                ? "form_view"
+                : input.event === "contact_exchange_open"
+                  ? "contact_exchange_open"
+                  : input.event === "contact_exchange_submit"
+                    ? "contact_exchange_submit"
+                    : input.event === "whatsapp_click"
+                      ? "whatsapp_click"
+                      : input.event === "social_click"
+                        ? "social_click"
+                        : input.event === "booking_click"
+                          ? "button_click"
+                          : action?.type === "website"
+                            ? "website_click"
+                            : "link_click";
   const result = await recordAnalyticsEvent({
     name,
     eventId: input.eventId,
@@ -145,7 +151,11 @@ export async function recordPublicSmartCardEvent(
               ? "whatsapp_clicked"
               : input.event === "booking_click"
                 ? "booking_clicked"
-                : input.event;
+                : input.event === "contact_exchange_open"
+                  ? "contact_exchange_opened"
+                  : input.event === "contact_exchange_submit"
+                    ? "contact_exchange_submitted"
+                    : input.event;
       await db.audienceContactEvent.create({
         data: {
           workspaceId: card.workspaceId,

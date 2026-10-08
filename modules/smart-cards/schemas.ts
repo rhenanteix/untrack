@@ -302,6 +302,8 @@ export const smartCardEventSchema = z
       "google_wallet_add_click",
       "contact_save",
       "contact_form_open",
+      "contact_exchange_open",
+      "contact_exchange_submit",
       "link_click",
       "social_click",
       "whatsapp_click",
