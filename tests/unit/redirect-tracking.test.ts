@@ -96,6 +96,51 @@ describe("tracked redirects", () => {
     );
   });
 
+  it("sets a signed digital link context before redirecting and records asynchronously", async () => {
+    const response = await redirectResponse(
+      new Request("http://localhost:3000/s/digital-link"),
+      "digital-link",
+      "digital",
+      true,
+    );
+
+    expect(response.status).toBe(302);
+    expect(response.headers.get("Location")).toBe(
+      "https://linkor.test/minha-pagina",
+    );
+    expect(response.headers.get("Set-Cookie")).toContain(
+      "linkor_analytics_context=",
+    );
+    await vi.waitFor(() =>
+      expect(recordAnalyticsEvent).toHaveBeenCalledWith(
+        expect.objectContaining({
+          name: "link_click",
+          assetType: "link",
+          assetId: "link_1",
+          campaignId: "campaign_1",
+          campaignAssetId: "distribution_stand",
+        }),
+      ),
+    );
+  });
+
+  it("sets a signed r route context before redirecting", async () => {
+    const response = await redirectResponse(
+      new Request("http://localhost:3000/r/r-link"),
+      "r-link",
+      "digital",
+      true,
+    );
+
+    expect(response.status).toBe(302);
+    expect(response.headers.get("Location")).toBe(
+      "https://linkor.test/minha-pagina",
+    );
+    expect(response.headers.get("Set-Cookie")).toContain(
+      "linkor_analytics_context=",
+    );
+  });
+
   it("does not create tracking context for HEAD requests", async () => {
     const response = await redirectResponse(
       new Request("http://localhost:3000/q/qr-stand", { method: "HEAD" }),

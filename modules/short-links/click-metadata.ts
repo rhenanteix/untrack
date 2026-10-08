@@ -1,16 +1,12 @@
+import { classifyBot } from "@/modules/analytics/device";
+
 export function clickMetadata(headers: Headers, now = new Date()) {
   if (headers.get("dnt") === "1" || headers.get("sec-gpc") === "1")
     return null;
-  const agent = headers.get("user-agent") ?? "";
-  if (
-    /bot|crawler|spider|preview|facebookexternalhit|slack|whatsapp|telegram/i.test(
-      agent,
-    ) ||
-    /prefetch/i.test(
-      `${headers.get("purpose") ?? ""} ${headers.get("sec-purpose") ?? ""}`,
-    )
-  )
+  const bot = classifyBot(headers);
+  if (bot.isBot)
     return null;
+  const agent = headers.get("user-agent") ?? "";
   let referrer = "Direto";
   try {
     const url = new URL(headers.get("referer") ?? "");

@@ -46,6 +46,8 @@ export function classifyBot(headers: Headers): BotDetails {
   const purpose = `${headers.get("purpose") ?? ""} ${headers.get("sec-purpose") ?? ""}`.toLowerCase();
   if (/facebookexternalhit|slackbot|telegrambot|whatsapp|discordbot|twitterbot/.test(agent))
     return { isBot: true, botType: "preview" };
+  if (/slack|whatsapp|telegram/i.test(agent))
+    return { isBot: true, botType: "preview" };
   if (/bot|crawler|spider|google-inspectiontool/.test(agent))
     return { isBot: true, botType: "crawler" };
   if (/prefetch|prerender/.test(purpose))
