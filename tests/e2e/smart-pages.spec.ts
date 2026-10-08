@@ -29,6 +29,7 @@ test("cria, publica, abre e mede uma Smart Page", async ({
   const slug = `pagina-${randomUUID().slice(0, 8)}`;
   await page.goto("/untrack/smart-pages");
   await page.getByRole("button", { name: /Nova página/ }).click();
+  await page.getByRole("button", { name: "Começar do zero" }).click();
   await page.getByLabel("Nome ou marca").fill("Consultoria Aurora");
   await page.locator('.smart-page-create input[name="slug"]').fill(slug);
   await page.getByLabel("Descrição curta").fill("Estratégia e crescimento.");
@@ -118,6 +119,7 @@ test("publica blocos ricos e mantém o layout responsivo", async ({
   const slug = `blocos-${randomUUID().slice(0, 8)}`;
   await page.goto("/untrack/smart-pages");
   await page.getByRole("button", { name: /Nova página/ }).click();
+  await page.getByRole("button", { name: "Começar do zero" }).click();
   await page.getByLabel("Nome ou marca").fill("Ateliê de Conteúdo");
   await page.locator('.smart-page-create input[name="slug"]').fill(slug);
   await page.getByRole("button", { name: "Criar página" }).click();

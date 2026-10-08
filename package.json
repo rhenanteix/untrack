@@ -23,7 +23,9 @@
     "setup:local": "node scripts/setup-local.mjs && npm run db:up && npm run prisma:generate && npm run prisma:deploy",
     "db:stop": "docker compose --env-file .env.local stop db",
     "predev": "npm run prisma:generate",
-    "pretest:e2e": "npm run prisma:generate"
+    "pretest:e2e": "npm run prisma:generate",
+    "db:seed:templates": "node scripts/seed-templates.mjs",
+    "typecheck": "next typegen && tsc --noEmit"
   },
   "dependencies": {
     "@better-auth/prisma-adapter": "^1.7.6",
@@ -62,6 +64,7 @@
     "tailwindcss": "^4",
     "typescript": "^5",
     "vite": "^8.3.1",
-    "vitest": "5.0.2"
+    "vitest": "5.0.2",
+    "axe-core": "4.13.0"
   }
 }

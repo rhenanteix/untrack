@@ -32,12 +32,16 @@ test("Smart Pages loads, previews profile changes, saves and publishes", async (
   await register(context.request, baseURL!);
   await page.goto("/untrack/smart-pages");
   await expect(
-    page.getByRole("heading", { name: "Smart Pages", exact: true }),
+    page.getByRole("heading", {
+      name: "Suas páginas, em um só lugar.",
+      exact: true,
+    }),
   ).toBeVisible();
   await expect(
     page.getByText("Não foi possível carregar o workspace.", { exact: true }),
   ).toHaveCount(0);
   await page.getByRole("button", { name: /Nova página/ }).click();
+  await page.getByRole("button", { name: "Começar do zero" }).click();
   await page.getByLabel("Nome ou marca").fill("Aurora Studio");
   await page
     .locator('form.smart-page-create input[name="slug"]')
@@ -79,7 +83,9 @@ test("Smart Pages loads, previews profile changes, saves and publishes", async (
   await page.getByRole("tab", { name: "Conteúdo", exact: true }).click();
   await page.getByRole("button", { name: "+ Adicionar", exact: true }).click();
   const addContent = page.getByRole("dialog", { name: "Adicionar conteúdo" });
-  await addContent.getByRole("button", { name: /^Link/ }).click();
+  await addContent
+    .getByRole("button", { name: /^Link Qualquer endereço da web/ })
+    .click();
   await addContent
     .locator('input[name="title"]')
     .fill("Conheça nossos projetos");
@@ -90,9 +96,9 @@ test("Smart Pages loads, previews profile changes, saves and publishes", async (
     .getByRole("button", { name: "Adicionar link", exact: true })
     .click();
   await expect(
-    page.getByRole("button", { name: /Conheça nossos projetos/ }),
+    page.getByRole("button", { name: /^Conheça nossos projetos/ }),
   ).toBeVisible();
-  await page.getByRole("button", { name: /Conheça nossos projetos/ }).click();
+  await page.getByRole("button", { name: /^Conheça nossos projetos/ }).click();
   await page
     .locator('.sp-content-block-editor input[name="title"]')
     .fill("Projetos Aurora");
@@ -183,7 +189,10 @@ test("a foreign workspace cookie has a recoverable selector, without exposing it
   await expect(selector).toBeVisible();
   await selector.selectOption(ownId!);
   await expect(
-    page.getByRole("heading", { name: "Smart Pages", exact: true }),
+    page.getByRole("heading", {
+      name: "Suas páginas, em um só lugar.",
+      exact: true,
+    }),
   ).toBeVisible();
   await other.close();
 });
@@ -264,6 +273,7 @@ test("field errors explain slug issues; career templates preserve and publish re
   await register(context.request, baseURL!);
   await page.goto("/untrack/smart-pages");
   await page.getByRole("button", { name: /Nova página/ }).click();
+  await page.getByRole("button", { name: "Começar do zero" }).click();
   await page.getByLabel("Nome ou marca").fill("Ana Silva");
   const createSlug = page.locator('.smart-page-create input[name="slug"]');
   await createSlug.fill("ana--silva");
@@ -372,6 +382,7 @@ test("server conflicts and invalid social URLs point to the correct form field",
     await register(context.request, baseURL!);
     await page.goto("/untrack/smart-pages");
     await page.getByRole("button", { name: /Nova página/ }).click();
+    await page.getByRole("button", { name: "Começar do zero" }).click();
     await page.getByLabel("Nome ou marca").fill("Perfil profissional");
     const slug = page.locator('.smart-page-create input[name="slug"]');
     await slug.fill(takenSlug);
@@ -508,7 +519,10 @@ test("live card customization, upload isolation, reorder and downgrade", async (
       select: { userId: true },
     });
     if (!owner) throw new Error("Workspace de teste sem owner.");
-    await db.user.update({ where: { id: owner.userId }, data: { plan: "free" } });
+    await db.user.update({
+      where: { id: owner.userId },
+      data: { plan: "free" },
+    });
   });
   expect(
     (

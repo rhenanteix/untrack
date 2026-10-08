@@ -41,6 +41,10 @@ import { CopyButton } from "@/components/copy-button";
 import { ActionStatus, apiRequest, useAction } from "./shared";
 
 import { ThemeGallery } from "@/components/smart-pages/theme-gallery";
+import {
+  TemplateGallery,
+  type SmartPageTemplateDetail,
+} from "@/components/smart-pages/template-gallery";
 import type { SmartPageTheme } from "@/modules/smart-pages/themes";
 import {
   socialProviders,
@@ -175,6 +179,8 @@ export function SmartPagesDashboard({
   canUnpublish = canEdit,
   readOnlyReason = "Você tem acesso de leitura. Peça a um editor ou administrador para alterar páginas.",
   publicOrigin = "",
+  userPlan = "free",
+  hasActiveTrial = false,
 }: {
   initial: { items: SmartPageSummary[]; page: number; hasMore: boolean };
   managedLinks: ManagedLink[];
@@ -183,6 +189,8 @@ export function SmartPagesDashboard({
   canUnpublish?: boolean;
   readOnlyReason?: string;
   publicOrigin?: string;
+  userPlan?: "free" | "premium";
+  hasActiveTrial?: boolean;
 }) {
   const router = useRouter(),
     params = useSearchParams();
@@ -225,6 +233,7 @@ export function SmartPagesDashboard({
   const [listPage, setListPage] = useState(initial.page);
   const [hasMore, setHasMore] = useState(initial.hasMore);
   const [showCreate, setShowCreate] = useState(params.get("create") === "1");
+  const [showTemplateGallery, setShowTemplateGallery] = useState(false);
   const [socialPickerOpen, setSocialPickerOpen] = useState(false);
   const [activeSocialNetwork, setActiveSocialNetwork] =
     useState<SocialNetwork | null>(null);
@@ -631,8 +640,6 @@ export function SmartPagesDashboard({
         }),
       });
       setPages((current) => [page, ...current]);
-      // Render the editor only after its detail request finishes. This avoids
-      // a late response resetting fields the user has already started editing.
       openEditor(page.id);
       setMetrics(null);
       setProfileDraft({});
@@ -651,6 +658,56 @@ export function SmartPagesDashboard({
       );
       form.reset();
     });
+  }
+
+  function handleTemplateSelect(template: SmartPageTemplateDetail) {
+    void handleTemplateCreate(template);
+    setShowTemplateGallery(false);
+  }
+
+  async function handleTemplateCreate(template: SmartPageTemplateDetail) {
+    if (
+      hasUnsaved &&
+      !window.confirm(
+        "Descartar alterações não salvas para criar outra página?",
+      )
+    )
+      return;
+
+    await action.run(async () => {
+      const page = await apiRequest<SmartPageDetail>(
+        `/api/smart-pages/templates/${template.id}/create`,
+        {
+          method: "POST",
+          body: JSON.stringify({
+            slug: `${template.slug.slice(0, 45)}-${crypto.randomUUID().slice(0, 8)}`,
+            title: template.name,
+            description: template.description,
+          }),
+        },
+      );
+      setPages((current) => [page, ...current]);
+      openEditor(page.id);
+      setMetrics(null);
+      setProfileDraft({});
+      setEditorSection("profile");
+      setDirty(false);
+      setDirtyBlocks([]);
+      setBlockDrafts({});
+      blockDraftVersions.current = {};
+      failedBlockDraftVersions.current = {};
+      setAutosaveError("");
+      setAutosaveState("saved");
+      setContentModalOpen(false);
+      action.setNotice(
+        "Página criada a partir do template. Personalize e publique quando estiver pronto.",
+      );
+    });
+  }
+
+  function handleTemplateGalleryClose() {
+    setShowCreate(true);
+    setShowTemplateGallery(false);
   }
 
   async function addBlock(event: FormEvent<HTMLFormElement>) {
@@ -1193,9 +1250,9 @@ export function SmartPagesDashboard({
           <button
             className="button"
             disabled={action.busy}
-            onClick={() => setShowCreate((open) => !open)}
+            onClick={() => setShowTemplateGallery((open) => !open)}
           >
-            {showCreate ? "Fechar nova página" : "+ Nova página"}
+            {showTemplateGallery ? "Fechar galeria" : "+ Nova página"}
           </button>
         )}
       </div>
@@ -1209,6 +1266,14 @@ export function SmartPagesDashboard({
           className="smart-pages-sidebar"
           aria-label="Suas Smart Pages"
         >
+          {canEdit && showTemplateGallery && (
+            <TemplateGallery
+              onSelectTemplate={handleTemplateSelect}
+              onClose={handleTemplateGalleryClose}
+              userPlan={userPlan ?? "free"}
+              hasActiveTrial={hasActiveTrial ?? false}
+            />
+          )}
           {canEdit && showCreate && (
             <SmartForm
               className="smart-page-create"

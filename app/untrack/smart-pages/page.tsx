@@ -100,6 +100,8 @@ export default async function SmartPagesPage({
         canEdit={actor.role !== "viewer"}
         canUnpublish={actor.role !== "viewer"}
         publicOrigin={appUrl().origin}
+        userPlan={access.effectivePlan}
+        hasActiveTrial={access.trialStatus === "active"}
         initial={{
           ...initial,
           items: initial.items.map((page) => ({

@@ -7,6 +7,7 @@ const eslintConfig = defineConfig([
   ...nextTs,
   // Override default ignores of eslint-config-next.
   globalIgnores([
+    ".kilo/**",
     // Default ignores of eslint-config-next:
     ".next/**",
     ".next-e2e/**",

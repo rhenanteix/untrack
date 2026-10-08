@@ -1,0 +1,242 @@
+[
+  {
+    "slug": "criador-essencial",
+    "name": "Criador essencial",
+    "category": "Criadores",
+    "plan": "free",
+    "description": "Criador essencial: apresente seu trabalho e reúna seus principais links.",
+    "theme": {
+      "preset": "creator"
+    },
+    "socialLinks": [],
+    "blocks": [
+      {
+        "type": "title",
+        "settings": {
+          "text": "Bem-vindo",
+          "level": "h2"
+        },
+        "visible": true,
+        "analyticsEnabled": false
+      },
+      {
+        "type": "link",
+        "settings": {
+          "title": "Conheça meu trabalho",
+          "destinationUrl": "https://example.com/portfolio"
+        },
+        "visible": true,
+        "analyticsEnabled": true
+      },
+      {
+        "type": "link",
+        "settings": {
+          "title": "Entre em contato",
+          "destinationUrl": "https://example.com/contato"
+        },
+        "visible": true,
+        "analyticsEnabled": true
+      }
+    ]
+  },
+  {
+    "slug": "negocio-local",
+    "name": "Negócio local",
+    "category": "Negócios",
+    "plan": "free",
+    "description": "Negócio local: apresente seu trabalho e reúna seus principais links.",
+    "theme": {
+      "preset": "business"
+    },
+    "socialLinks": [],
+    "blocks": [
+      {
+        "type": "title",
+        "settings": {
+          "text": "Bem-vindo",
+          "level": "h2"
+        },
+        "visible": true,
+        "analyticsEnabled": false
+      },
+      {
+        "type": "link",
+        "settings": {
+          "title": "Conheça meu trabalho",
+          "destinationUrl": "https://example.com/portfolio"
+        },
+        "visible": true,
+        "analyticsEnabled": true
+      },
+      {
+        "type": "link",
+        "settings": {
+          "title": "Entre em contato",
+          "destinationUrl": "https://example.com/contato"
+        },
+        "visible": true,
+        "analyticsEnabled": true
+      }
+    ]
+  },
+  {
+    "slug": "portfolio-minimal",
+    "name": "Portfólio minimal",
+    "category": "Portfólio",
+    "plan": "free",
+    "description": "Portfólio minimal: apresente seu trabalho e reúna seus principais links.",
+    "theme": {
+      "preset": "minimal"
+    },
+    "socialLinks": [],
+    "blocks": [
+      {
+        "type": "title",
+        "settings": {
+          "text": "Bem-vindo",
+          "level": "h2"
+        },
+        "visible": true,
+        "analyticsEnabled": false
+      },
+      {
+        "type": "link",
+        "settings": {
+          "title": "Conheça meu trabalho",
+          "destinationUrl": "https://example.com/portfolio"
+        },
+        "visible": true,
+        "analyticsEnabled": true
+      },
+      {
+        "type": "link",
+        "settings": {
+          "title": "Entre em contato",
+          "destinationUrl": "https://example.com/contato"
+        },
+        "visible": true,
+        "analyticsEnabled": true
+      }
+    ]
+  },
+  {
+    "slug": "atelier-editorial",
+    "name": "Atelier editorial",
+    "category": "Portfólio",
+    "plan": "premium",
+    "description": "Atelier editorial: apresente seu trabalho e reúna seus principais links.",
+    "theme": {
+      "preset": "editorial"
+    },
+    "socialLinks": [],
+    "blocks": [
+      {
+        "type": "title",
+        "settings": {
+          "text": "Bem-vindo",
+          "level": "h2"
+        },
+        "visible": true,
+        "analyticsEnabled": false
+      },
+      {
+        "type": "link",
+        "settings": {
+          "title": "Conheça meu trabalho",
+          "destinationUrl": "https://example.com/portfolio"
+        },
+        "visible": true,
+        "analyticsEnabled": true
+      },
+      {
+        "type": "link",
+        "settings": {
+          "title": "Entre em contato",
+          "destinationUrl": "https://example.com/contato"
+        },
+        "visible": true,
+        "analyticsEnabled": true
+      }
+    ]
+  },
+  {
+    "slug": "musica-em-destaque",
+    "name": "Música em destaque",
+    "category": "Criadores",
+    "plan": "premium",
+    "description": "Música em destaque: apresente seu trabalho e reúna seus principais links.",
+    "theme": {
+      "preset": "music"
+    },
+    "socialLinks": [],
+    "blocks": [
+      {
+        "type": "title",
+        "settings": {
+          "text": "Bem-vindo",
+          "level": "h2"
+        },
+        "visible": true,
+        "analyticsEnabled": false
+      },
+      {
+        "type": "link",
+        "settings": {
+          "title": "Conheça meu trabalho",
+          "destinationUrl": "https://example.com/portfolio"
+        },
+        "visible": true,
+        "analyticsEnabled": true
+      },
+      {
+        "type": "link",
+        "settings": {
+          "title": "Entre em contato",
+          "destinationUrl": "https://example.com/contato"
+        },
+        "visible": true,
+        "analyticsEnabled": true
+      }
+    ]
+  },
+  {
+    "slug": "consultoria-executiva",
+    "name": "Consultoria executiva",
+    "category": "Negócios",
+    "plan": "premium",
+    "description": "Consultoria executiva: apresente seu trabalho e reúna seus principais links.",
+    "theme": {
+      "preset": "executive"
+    },
+    "socialLinks": [],
+    "blocks": [
+      {
+        "type": "title",
+        "settings": {
+          "text": "Bem-vindo",
+          "level": "h2"
+        },
+        "visible": true,
+        "analyticsEnabled": false
+      },
+      {
+        "type": "link",
+        "settings": {
+          "title": "Conheça meu trabalho",
+          "destinationUrl": "https://example.com/portfolio"
+        },
+        "visible": true,
+        "analyticsEnabled": true
+      },
+      {
+        "type": "link",
+        "settings": {
+          "title": "Entre em contato",
+          "destinationUrl": "https://example.com/contato"
+        },
+        "visible": true,
+        "analyticsEnabled": true
+      }
+    ]
+  }
+]
