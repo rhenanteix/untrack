@@ -1,4 +1,5 @@
 import { AuthenticatedFrame } from "@/components/untrack/authenticated-frame";
+import { GoogleAnalytics } from "@/components/google-analytics";
 import type { Metadata, Viewport } from "next";
 import { Manrope } from "next/font/google";
 import { Footer } from "@/components/footer";
@@ -64,6 +65,9 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       className={manrope.variable}
       data-scroll-behavior="smooth"
     >
+      <head>
+        <GoogleAnalytics />
+      </head>
       <body>
         <PublicLanguageProvider>
           <a className="skip-link" href="#conteudo">
