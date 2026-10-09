@@ -25,7 +25,8 @@
     "predev": "npm run prisma:generate",
     "pretest:e2e": "npm run prisma:generate",
     "db:seed:templates": "node scripts/seed-templates.mjs",
-    "typecheck": "next typegen && tsc --noEmit"
+    "typecheck": "next typegen && tsc --noEmit",
+    "test:connect": "node scripts/test-connect.mjs"
   },
   "dependencies": {
     "@better-auth/prisma-adapter": "^1.7.6",

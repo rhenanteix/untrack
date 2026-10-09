@@ -46,6 +46,17 @@ export type RecordAnalyticsEventInput = {
   occurredAt?: Date;
   headers?: Headers;
   includeIdentity?: boolean;
+  connectContext?: {
+    eventVersion: number;
+    sourceType: string;
+    sourceConnectionId: string;
+    receivedAt: Date;
+    processedAt: Date;
+    consentContext: Prisma.InputJsonValue;
+    correlationId: string;
+    connectPayloadHash: string;
+    connectOriginalEventId: string;
+  };
 };
 
 export type RecordAnalyticsEventResult = {
@@ -225,6 +236,15 @@ async function resolveIdentity(
 /** Records a pseudonymous universal event and treats repeated event IDs as idempotent. */
 export async function recordAnalyticsEvent(
   input: RecordAnalyticsEventInput,
+  options: {
+    transaction?: Prisma.TransactionClient;
+    resolvedIdentity?: {
+      visitorId?: string;
+      sessionId?: string;
+      visitorHash?: string;
+      audienceContactId?: string;
+    };
+  } = {},
 ): Promise<RecordAnalyticsEventResult> {
   const eventId = input.eventId ?? randomUUID();
   const occurredAt = input.occurredAt ?? new Date();
@@ -241,20 +261,23 @@ export async function recordAnalyticsEvent(
   const path = pathOnly(input.path);
 
   try {
-    const persisted = await getPrisma().$transaction(async (tx) => {
-      const identity = await resolveIdentity(
-        tx,
-        input,
-        occurredAt,
-        attribution,
-        referrer,
-        path,
-      );
+    const persist = async (tx: Prisma.TransactionClient) => {
+      const identity =
+        options.resolvedIdentity ??
+        (await resolveIdentity(
+          tx,
+          input,
+          occurredAt,
+          attribution,
+          referrer,
+          path,
+        ));
       const audienceContactId =
         input.audienceContactId ?? identity.audienceContactId;
       const event = await tx.analyticsEvent.create({
         data: {
           eventId,
+          ...input.connectContext,
           name: input.name,
           origin: input.origin ?? "server",
           occurredAt,
@@ -325,6 +348,25 @@ export async function recordAnalyticsEvent(
             },
           })
         : 0;
+      if (options.transaction && !isTest) {
+        const aggregate = {
+          workspaceId: input.workspaceId,
+          occurredAt,
+          name: input.name,
+          assetType: input.assetType,
+          assetId: input.assetId,
+          source: attribution.source,
+          channel: attribution.channel,
+          campaignId: input.campaignId,
+          isBot: bot.isBot,
+        };
+        await aggregateAnalyticsEvent(aggregate, tx);
+        for (let i = 0; i < completedGoals; i++)
+          await aggregateAnalyticsEvent(
+            { ...aggregate, name: "goal_completed" },
+            tx,
+          );
+      }
       return {
         eventId,
         recorded: true,
@@ -334,15 +376,22 @@ export async function recordAnalyticsEvent(
         sessionId: identity.sessionId,
         audienceContactId,
       };
-    });
-    if (input.workspaceId && persisted.audienceContactId)
+    };
+    const persisted = options.transaction
+      ? await persist(options.transaction)
+      : await getPrisma().$transaction(persist);
+    if (
+      !options.transaction &&
+      input.workspaceId &&
+      persisted.audienceContactId
+    )
       void refreshAudienceContactSummary(
         input.workspaceId,
         persisted.audienceContactId,
       ).catch((error) =>
         console.error("Audience contact summary was not refreshed", error),
       );
-    if (!isTest) {
+    if (!isTest && !options.transaction) {
       void aggregateAnalyticsEvent({
         workspaceId: input.workspaceId,
         occurredAt,
@@ -389,6 +438,7 @@ export async function recordAnalyticsEvent(
         : {}),
     };
   } catch (error) {
+    if (options.transaction) throw error;
     if (
       error instanceof Prisma.PrismaClientKnownRequestError &&
       error.code === "P2002"

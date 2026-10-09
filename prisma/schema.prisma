@@ -213,6 +213,15 @@ model AnalyticsEvent {
   smartCardAction  SmartCardAction? @relation(fields: [smartCardActionId], references: [id], onDelete: SetNull)
   goal             AnalyticsGoal?  @relation("AnalyticsGoalCompletionEvents", fields: [goalId], references: [id], onDelete: SetNull)
   conversions      AnalyticsConversion[]
+  eventVersion     Int?
+  sourceType       String? @db.VarChar(32)
+  sourceConnectionId String?
+  receivedAt       DateTime?
+  processedAt      DateTime?
+  consentContext   Json?
+  correlationId    String? @db.VarChar(36)
+  connectPayloadHash String? @db.VarChar(64)
+  connectOriginalEventId String? @db.VarChar(36)
 
   @@index([name, occurredAt])
   @@index([workspaceId, occurredAt])
@@ -996,6 +1005,7 @@ model Workspace {
   analyticsGoals AnalyticsGoal[]
   analyticsConversions AnalyticsConversion[]
   analyticsAggregates AnalyticsAggregate[]
+  connectSources ConnectSource[]
   projects Project[]
   tags Tag[]
   collections Collection[]
@@ -1521,4 +1531,109 @@ model SmartPageImage {
 model AnonymousUse {
   keyHash String @id @db.VarChar(64)
   createdAt DateTime @default(now())
+}
+
+// Connect is an ingestion ledger and durable inbox; AnalyticsEvent remains the analytics store.
+enum ConnectSourceType {
+  owned_asset
+  external_site
+  conversion_api
+  connector
+}
+
+enum ConnectSourceTrust {
+  public
+  authenticated
+  internal
+}
+
+enum ConnectProjection {
+  isolated
+  native
+}
+
+enum ConnectReceiptState {
+  queued
+  processing
+  normalized
+  rejected
+  dead_letter
+}
+
+model ConnectSource {
+  id                      String @id @default(cuid())
+  workspaceId             String
+  key                     String @db.VarChar(80)
+  type                    ConnectSourceType
+  trust                   ConnectSourceTrust
+  projection              ConnectProjection @default(isolated)
+  enabled                 Boolean @default(true)
+  credentialHash          String? @unique @db.VarChar(64)
+  allowedOrigins          String[] @default([])
+  allowedEvents           String[]
+  requiresConsent         Boolean @default(true)
+  expectedIntervalSeconds Int?
+  lastReceivedAt          DateTime?
+  lastProcessedAt         DateTime?
+  eventWatermark          DateTime?
+  createdAt               DateTime @default(now())
+  updatedAt               DateTime @updatedAt
+  workspace               Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  receipts                ConnectReceipt[]
+
+  @@unique([workspaceId, key])
+  @@unique([id, workspaceId])
+}
+
+model ConnectReceipt {
+  id                   String @id @default(uuid())
+  workspaceId          String
+  sourceConnectionId   String
+  eventId              String? @db.VarChar(36)
+  eventName            String? @db.VarChar(80)
+  eventVersion         Int?
+  idempotencyKey       String @db.VarChar(80)
+  payloadHash          String @db.VarChar(64)
+  correlationId        String @db.VarChar(36)
+  state                ConnectReceiptState @default(queued)
+  rawPayload           Json?
+  normalizedPayload    Json?
+  occurredAt           DateTime?
+  receivedAt           DateTime @default(now())
+  processedAt          DateTime?
+  rawExpiresAt         DateTime
+  expiresAt            DateTime
+  attempts             Int @default(0)
+  duplicateCount       Int @default(0)
+  conflictCount        Int @default(0)
+  nextAttemptAt        DateTime @default(now())
+  leaseUntil           DateTime?
+  leaseToken           String? @db.VarChar(36)
+  errorCode            String? @db.VarChar(64)
+  analyticsEventId     String? @db.VarChar(255)
+  replayCount          Int @default(0)
+  source               ConnectSource @relation(fields: [sourceConnectionId, workspaceId], references: [id, workspaceId], onDelete: Cascade)
+  deliveries           ConnectDeliveryAttempt[]
+
+  @@unique([workspaceId, sourceConnectionId, idempotencyKey])
+  @@unique([id, workspaceId])
+  @@index([workspaceId, sourceConnectionId, receivedAt])
+  @@index([state, nextAttemptAt, leaseUntil])
+  @@index([expiresAt])
+  @@index([rawExpiresAt])
+}
+
+model ConnectDeliveryAttempt {
+  id            String @id @default(uuid())
+  workspaceId   String
+  receiptId     String
+  number        Int
+  state         String @db.VarChar(24)
+  startedAt     DateTime @default(now())
+  finishedAt    DateTime?
+  errorCode     String? @db.VarChar(64)
+  receipt       ConnectReceipt @relation(fields: [receiptId, workspaceId], references: [id, workspaceId], onDelete: Cascade)
+
+  @@unique([receiptId, number])
+  @@index([workspaceId, startedAt, state])
 }
