@@ -1,4 +1,8 @@
 export const AnalyticsEvents = {
+  CTA_CLICK: "cta_click",
+  CUSTOM_EVENT: "custom_event",
+  PIXEL_TEST: "pixel_test",
+  PIXEL_DIAGNOSTIC: "pixel_diagnostic",
   PAGE_VIEW: "page_view",
   BLOCK_VIEW: "block_view",
   SMART_PAGE_VIEW: "smart_page_view",
@@ -34,6 +38,10 @@ export const AnalyticsEvents = {
 } as const;
 
 export const universalEventNames = [
+  AnalyticsEvents.CTA_CLICK,
+  AnalyticsEvents.CUSTOM_EVENT,
+  AnalyticsEvents.PIXEL_TEST,
+  AnalyticsEvents.PIXEL_DIAGNOSTIC,
   AnalyticsEvents.PAGE_VIEW,
   AnalyticsEvents.BLOCK_VIEW,
   AnalyticsEvents.SMART_PAGE_VIEW,

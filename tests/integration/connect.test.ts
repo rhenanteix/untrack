@@ -37,6 +37,8 @@ import {
 } from "@/app/api/connect/public/[sourceId]/route";
 import { recordAnalyticsEvent } from "@/modules/analytics/service";
 
+import { createPixel, pixelStatus } from "@/modules/pixel/service";
+
 const enabled = process.env.CONNECT_INTEGRATION_TESTS === "1";
 if (enabled && !new URL(process.env.DATABASE_URL!).pathname.endsWith("_test"))
   throw new Error("Test database required");
@@ -111,6 +113,69 @@ describe.skipIf(!enabled)("Connect PostgreSQL integration", () => {
   });
   afterAll(async () => {
     await getPrisma().$disconnect();
+  });
+
+  it("Pixel setup, exact domain, real test receipt, diagnostics and cross-tenant isolation", async () => {
+    const s = await createPixel(actor, {
+      origins: ["https://one.example", "https://two.example"],
+    });
+    expect((await pixelStatus(actor, s.id)).status).toBe("Não instalado");
+    await expect(pixelStatus(other, s.id)).rejects.toMatchObject({
+      status: 404,
+    });
+    const testId = randomUUID();
+    const input = event({
+      event_name: "pixel_test",
+      properties: { test_id: testId },
+    });
+    const send = (payload: unknown, origin = "https://two.example") =>
+      postPublic(
+        new Request("https://linkor.example/api/connect/public/" + s.id, {
+          method: "POST",
+          headers: { "content-type": "application/json", origin },
+          body: JSON.stringify(payload),
+        }),
+        { params: Promise.resolve({ sourceId: s.id }) },
+      );
+    expect((await send(input, "https://evil.example")).status).toBe(403);
+    expect((await send(input)).status).toBe(202);
+    const result = await pixelStatus(actor, s.id, testId);
+    expect(result.test?.id).toBeTruthy();
+    expect(result.status).toBe("Instalado, sem eventos recentes");
+    expect((await pixelStatus(actor, s.id, randomUUID())).test).toBeNull();
+    expect((await send(input)).status).toBe(200);
+    expect((await pixelStatus(actor, s.id)).status).not.toBe(
+      "Possível duplicidade",
+    );
+    await processOne(result.test!.id);
+    expect((await pixelStatus(actor, s.id, testId)).test?.state).toBe(
+      "normalized",
+    );
+    expect(
+      (
+        await send(
+          event({ event_name: "cta_click", properties: { goal: "quote" } }),
+        )
+      ).status,
+    ).toBe(202);
+    expect((await pixelStatus(actor, s.id)).status).toBe("Recebendo eventos");
+    expect(
+      (
+        await send(
+          event({
+            event_name: "pixel_diagnostic",
+            properties: { reason: "duplicate_installation" },
+          }),
+        )
+      ).status,
+    ).toBe(202);
+    expect((await pixelStatus(actor, s.id)).status).toBe(
+      "Possível duplicidade",
+    );
+    expect(
+      (await send(event({ consent_context: { analytics: "denied" } }))).status,
+    ).toBe(422);
+    expect((await pixelStatus(actor, s.id)).status).toBe("Precisa de atenção");
   });
 
   it("normalizes isolated events without entering native analytics", async () => {

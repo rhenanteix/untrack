@@ -30,6 +30,17 @@ export const consentSchema = z
   })
   .strict();
 
+const pixelProperties = z
+  .object({
+    goal: z
+      .enum(["quote", "whatsapp", "appointment", "registration"])
+      .optional(),
+  })
+  .strict();
+const testProperties = z.object({ test_id: z.string().uuid() }).strict();
+const diagnosticProperties = z
+  .object({ reason: z.literal("duplicate_installation") })
+  .strict();
 const emptyProperties = z.object({}).strict();
 const viewProperties = z
   .object({
@@ -87,16 +98,23 @@ export const inboundEventSchema = z
   })
   .strict()
   .superRefine((event, ctx) => {
-    const schema = ["payment_completed", "checkout_completed"].includes(
-      event.event_name,
-    )
-      ? transactionProperties
-      : event.event_name.endsWith("_view")
-        ? viewProperties
-        : event.event_name.endsWith("_click") ||
-            event.event_name.endsWith("_scan")
-          ? interactionProperties
-          : emptyProperties;
+    const schema =
+      event.event_name === "pixel_test"
+        ? testProperties
+        : event.event_name === "pixel_diagnostic"
+          ? diagnosticProperties
+          : ["cta_click", "custom_event"].includes(event.event_name)
+            ? pixelProperties
+            : ["payment_completed", "checkout_completed"].includes(
+                  event.event_name,
+                )
+              ? transactionProperties
+              : event.event_name.endsWith("_view")
+                ? viewProperties
+                : event.event_name.endsWith("_click") ||
+                    event.event_name.endsWith("_scan")
+                  ? interactionProperties
+                  : emptyProperties;
     if (!schema.safeParse(event.properties).success)
       ctx.addIssue({
         code: "custom",
@@ -132,6 +150,10 @@ export type CanonicalEvent = InboundEvent & {
 };
 
 export const publicEventNames = new Set([
+  "cta_click",
+  "custom_event",
+  "pixel_test",
+  "pixel_diagnostic",
   "page_view",
   "block_view",
   "smart_page_view",

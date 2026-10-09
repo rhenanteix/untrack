@@ -1,3 +1,5 @@
+import { enforceRateLimit } from "@/lib/rate-limit";
+import { ApiError } from "@/lib/api-response";
 import { publicRequestSource } from "@/modules/connect/sources";
 import { connectError, receiveEvent } from "@/modules/connect/http";
 
@@ -13,7 +15,10 @@ function cors(origin: string) {
 }
 export async function OPTIONS(request: Request, context: Context) {
   try {
+    await enforceRateLimit(request, "connect-public");
     const { sourceId } = await context.params;
+    if (!/^[a-zA-Z0-9_-]{1,128}$/.test(sourceId))
+      throw new ApiError(403, "SOURCE_FORBIDDEN", "Fonte inválida.");
     const origin = request.headers.get("origin");
     await publicRequestSource(sourceId, origin);
     return new Response(null, { status: 204, headers: cors(origin!) });
@@ -23,7 +28,10 @@ export async function OPTIONS(request: Request, context: Context) {
 }
 export async function POST(request: Request, context: Context) {
   try {
+    await enforceRateLimit(request, "connect-public");
     const { sourceId } = await context.params;
+    if (!/^[a-zA-Z0-9_-]{1,128}$/.test(sourceId))
+      throw new ApiError(403, "SOURCE_FORBIDDEN", "Fonte inválida.");
     const origin = request.headers.get("origin");
     const source = await publicRequestSource(sourceId, origin);
     return await receiveEvent(request, source, cors(origin!));

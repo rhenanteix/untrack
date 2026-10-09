@@ -22,6 +22,7 @@ export const sourceConfigSchema = z
             const url = new URL(value);
             return (
               value === url.origin &&
+              !url.hostname.includes("*") &&
               (url.protocol === "https:" ||
                 (["localhost", "127.0.0.1"].includes(url.hostname) &&
                   url.protocol === "http:"))
