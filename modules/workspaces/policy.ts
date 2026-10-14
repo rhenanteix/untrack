@@ -19,6 +19,7 @@ export const RESOURCES = [
   "projects",
   "collections",
   "whatsappLinks",
+  "charges",
 ] as const;
 export type Resource = (typeof RESOURCES)[number];
 export const PLAN_LIMITS: Record<Plan, Record<Resource, number>> = {
@@ -41,6 +42,7 @@ export const PLAN_LIMITS: Record<Plan, Record<Resource, number>> = {
     projects: 10,
     collections: 20,
     whatsappLinks: 50,
+    charges: 100,
   },
   premium: {
     members: 10,
@@ -61,6 +63,7 @@ export const PLAN_LIMITS: Record<Plan, Record<Resource, number>> = {
     projects: 100,
     collections: 250,
     whatsappLinks: 5000,
+    charges: 50000,
   },
 };
 export type Permission = "read" | "write" | "manage" | "owner";

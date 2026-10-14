@@ -8,6 +8,7 @@ import {
   FiChevronDown,
   FiChevronsLeft,
   FiChevronsRight,
+  FiCreditCard,
   FiGrid,
   FiHome,
   FiLink,
@@ -74,6 +75,12 @@ const groups: NavigationGroup[] = [
       { href: "/untrack/utm", label: "UTM Builder", icon: FiTool },
       { href: "/untrack/qr", label: "QR Codes", icon: FiGrid },
       { href: "/untrack/whatsapp", label: "WhatsApp", icon: FiMessageCircle },
+    ],
+  },
+  {
+    label: "LinkOr Pay",
+    items: [
+      { href: "/untrack/pay", label: "Cobranças", icon: FiCreditCard },
     ],
   },
   {

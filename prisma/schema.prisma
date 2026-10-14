@@ -86,6 +86,52 @@ enum ProductType {
   subscription
 }
 
+enum OfferStatus {
+  draft
+  active
+  paused
+  archived
+}
+
+enum CheckoutProvider {
+  abacatepay
+  mercadopago
+  stripe
+}
+
+enum CheckoutSessionStatus {
+  pending
+  redirecting
+  completed
+  expired
+  failed
+  cancelled
+}
+
+enum PaymentStatus {
+  pending
+  authorized
+  captured
+  failed
+  refunded
+  cancelled
+}
+
+enum PaymentRefundStatus {
+  pending
+  processed
+  failed
+}
+
+enum ChargeStatus {
+  draft
+  pending
+  paid
+  expired
+  cancelled
+  refunded
+}
+
 enum ProjectStatus {
   active
   archived
@@ -616,6 +662,7 @@ model AudienceContact {
   notes       AudienceContactNote[]
   tags        AudienceContactTag[]
   analyticsEvents AnalyticsEvent[]
+  charges     Charge[]
 
   @@index([workspaceId, createdAt])
   @@index([workspaceId, email])
@@ -729,6 +776,154 @@ model Product {
 
   @@unique([workspaceId, slug])
   @@index([workspaceId, status, updatedAt])
+}
+
+model Offer {
+  id                    String            @id @default(cuid())
+  workspaceId           String
+  name                  String            @db.VarChar(120)
+  description           String            @default("") @db.VarChar(5000)
+  amount                Int               @db.Integer
+  currency              String            @default("BRL") @db.VarChar(3)
+  status                OfferStatus       @default(draft)
+  checkoutProvider      CheckoutProvider?
+  checkoutConfiguration  Json?             @default("{}")
+  images                Json              @default("[]")
+  metadata              Json              @default("{}")
+  visible               Boolean           @default(true)
+  createdAt             DateTime          @default(now())
+  updatedAt             DateTime          @updatedAt
+  workspace             Workspace         @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  checkoutSessions      CheckoutSession[]
+  commerceLinks         CommerceLink[]
+  charges               Charge[]
+
+  @@unique([workspaceId, name])
+  @@index([workspaceId, status, updatedAt])
+  @@index([workspaceId, checkoutProvider])
+}
+
+model CheckoutSession {
+  id                  String               @id @default(cuid())
+  workspaceId         String
+  offerId             String
+  commerceLinkId      String?
+  provider            CheckoutProvider
+  providerSessionId   String              @db.VarChar(255)
+  trackingSessionId   String?             @db.VarChar(36)
+  journeyId           String?             @db.VarChar(36)
+  status              CheckoutSessionStatus @default(pending)
+  destinationUrl      String              @db.VarChar(4096)
+  metadata            Json                @default("{}")
+  expiresAt           DateTime?
+  createdAt           DateTime            @default(now())
+  updatedAt           DateTime            @updatedAt
+  workspace           Workspace           @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  offer               Offer               @relation(fields: [offerId], references: [id], onDelete: Cascade)
+  commerceLink        CommerceLink?       @relation(fields: [commerceLinkId], references: [id], onDelete: SetNull)
+  paymentRecords      PaymentRecord[]
+
+  @@unique([provider, providerSessionId])
+  @@unique([id, workspaceId])
+  @@index([workspaceId, offerId, status])
+  @@index([workspaceId, status, updatedAt])
+  @@index([workspaceId, provider])
+  @@index([expiresAt])
+}
+
+model PaymentRecord {
+  id                    String            @id @default(cuid())
+  workspaceId           String
+  checkoutSessionId     String
+  providerPaymentId     String            @db.VarChar(255)
+  amount                Int               @db.Integer
+  currency              String            @db.VarChar(3)
+  status                PaymentStatus     @default(pending)
+  confirmedAt           DateTime?
+  createdAt             DateTime          @default(now())
+  updatedAt             DateTime          @updatedAt
+  workspace             Workspace         @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  checkoutSession       CheckoutSession   @relation(fields: [checkoutSessionId], references: [id], onDelete: Cascade)
+  refunds               PaymentRefund[]
+
+  @@unique([checkoutSessionId, providerPaymentId])
+  @@unique([id, workspaceId])
+  @@index([workspaceId, status, updatedAt])
+  @@index([workspaceId, providerPaymentId])
+  @@index([checkoutSessionId, status])
+}
+
+model PaymentRefund {
+  id                String            @id @default(cuid())
+  workspaceId       String
+  paymentRecordId   String
+  providerRefundId  String            @db.VarChar(255)
+  amount            Int               @db.Integer
+  status            PaymentRefundStatus @default(pending)
+  reason            String?           @db.VarChar(500)
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+  workspace         Workspace         @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  paymentRecord     PaymentRecord     @relation(fields: [paymentRecordId], references: [id], onDelete: Cascade)
+
+  @@unique([paymentRecordId, providerRefundId])
+  @@unique([id, workspaceId])
+  @@index([workspaceId, paymentRecordId, status])
+}
+
+model CommerceLink {
+  id             String            @id @default(cuid())
+  workspaceId    String
+  offerId        String
+  code           String            @unique @db.VarChar(64)
+  campaignId     String?
+  distributionId String?
+  channel        String            @db.VarChar(40)
+  status         String            @default("active") @db.VarChar(20)
+  destination    String            @db.VarChar(4096)
+  metadata       Json              @default("{}")
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+  workspace      Workspace         @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  offer          Offer             @relation(fields: [offerId], references: [id], onDelete: Cascade)
+  campaign       Campaign?         @relation(fields: [campaignId, workspaceId], references: [id, workspaceId])
+  checkoutSessions CheckoutSession[]
+  shortLink      ShortLink?        @relation(fields: [shortLinkId], references: [id], onDelete: SetNull)
+  shortLinkId    String?           @unique
+
+  @@unique([id, workspaceId])
+  @@index([workspaceId, offerId, status])
+  @@index([workspaceId, channel])
+  @@index([workspaceId, campaignId])
+  @@index([code])
+}
+
+model Charge {
+  id            String        @id @default(cuid())
+  workspaceId   String
+  description   String        @db.VarChar(500)
+  amountInCents Int           @db.Integer
+  currency      String        @default("BRL") @db.VarChar(3)
+  customerId    String?
+  dueAt         DateTime?
+  status        ChargeStatus  @default(draft)
+  offerId       String?
+  paidAt        DateTime?
+  cancelledAt   DateTime?
+  expiredAt     DateTime?
+  refundedAt    DateTime?
+  metadata      Json          @default("{}")
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+  workspace     Workspace     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  customer      AudienceContact? @relation(fields: [customerId, workspaceId], references: [id, workspaceId], onDelete: SetNull)
+  offer         Offer?        @relation(fields: [offerId], references: [id], onDelete: SetNull)
+
+  @@unique([id, workspaceId])
+  @@index([workspaceId, status, createdAt])
+  @@index([workspaceId, customerId])
+  @@index([workspaceId, offerId])
+  @@index([workspaceId, dueAt])
 }
 
 model SmartPageBlock {
@@ -868,6 +1063,7 @@ model ShortLink {
   smartPageBlocks SmartPageBlock[]
   whatsappLink   WhatsappLink? @relation("WhatsappSmartLink")
   campaignAssets CampaignAsset[]
+  commerceLinks  CommerceLink[]
 
   @@unique([domainKey, slug])
   @@unique([id, workspaceId])
@@ -992,6 +1188,7 @@ model Workspace {
   qrs QrAsset[]
   channels CampaignChannel[]
   checklistItems CampaignChecklist[]
+  commerceLinks CommerceLink[]
   approvals CampaignApproval[]
   monitorChecks CampaignMonitorCheck[]
   incidents CampaignIncident[]
@@ -1013,12 +1210,17 @@ model Workspace {
   recentResources RecentResource[]
   whatsappLinks WhatsappLink[]
   products Product[]
+  offers Offer[]
   smartCards SmartCard[]
   smartCardWalletPasses SmartCardWalletPass[]
   audienceContacts AudienceContact[]
   smartCardContactExchanges SmartCardContactExchange[]
   audienceContactEvents AudienceContactEvent[]
   audienceSegments AudienceSegment[]
+  checkoutSessions CheckoutSession[]
+  paymentRecords PaymentRecord[]
+  paymentRefunds PaymentRefund[]
+  charges Charge[]
 }
 
 model Project {
@@ -1234,8 +1436,9 @@ model Campaign {
   qrs QrAsset[]
   channels CampaignChannel[]
   assets CampaignAsset[]
-  checklistItems CampaignChecklist[]
-  monitoringChecks CampaignMonitorCheck[]
+   checklistItems CampaignChecklist[]
+   commerceLinks CommerceLink[]
+   monitoringChecks CampaignMonitorCheck[]
   incidents CampaignIncident[]
   approvals CampaignApproval[]
   whatsappLinks WhatsappLink[]

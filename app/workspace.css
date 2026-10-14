@@ -8741,3 +8741,185 @@ main:has(.smart-pages-dashboard.sp-studio) {
     text-align: left;
   }
 }
+
+.pay-page {
+  gap: 0;
+}
+.pay-page .workspace-page-heading {
+  align-items: flex-start;
+}
+.pay-page .workspace-page-heading > div {
+  flex: 1;
+}
+.pay-create-form {
+  display: grid;
+  gap: 16px;
+  margin-bottom: 24px;
+}
+.pay-create-form .form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+.pay-create-form .form-grid label {
+  display: grid;
+  gap: 6px;
+  color: var(--ws-muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+.pay-create-form input,
+.pay-create-form select {
+  min-height: 40px;
+  border: 1px solid var(--ws-line);
+  border-radius: 6px;
+  padding: 9px 10px;
+  background: #fff;
+  color: var(--ws-ink);
+  font: inherit;
+}
+.pay-create-form .action-row {
+  display: flex;
+  gap: 8px;
+}
+.pay-empty {
+  display: grid;
+  justify-items: start;
+  gap: 8px;
+  padding: 34px;
+}
+.pay-empty h2,
+.pay-empty p {
+  margin: 0;
+}
+.pay-empty p {
+  color: var(--ws-muted);
+}
+.pay-list {
+  display: grid;
+  gap: 14px;
+}
+.pay-card {
+  display: grid;
+  gap: 12px;
+  border: 1px solid var(--ws-line);
+  border-radius: var(--ws-radius);
+  background: var(--ws-panel);
+  padding: 18px;
+}
+.pay-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+.pay-amount {
+  font-size: 20px;
+  font-weight: 700;
+}
+.pay-status-badge {
+  display: inline-flex;
+  min-width: 80px;
+  justify-content: center;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+.pay-status-badge.status-draft {
+  background: #f2f1ed;
+  color: var(--ws-muted);
+}
+.pay-status-badge.status-pending {
+  background: #fff2cc;
+  color: #89610c;
+}
+.pay-status-badge.status-paid {
+  background: #e6f5de;
+  color: #276a35;
+}
+.pay-status-badge.status-expired {
+  background: #fde8e6;
+  color: #b92b2b;
+}
+.pay-status-badge.status-cancelled {
+  background: #f2f1ed;
+  color: #65736e;
+}
+.pay-status-badge.status-refunded {
+  background: #e6f3f9;
+  color: #0b6a9a;
+}
+.pay-description {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.5;
+}
+.pay-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 18px;
+  color: var(--ws-muted);
+  font-size: 11px;
+}
+.pay-actions {
+  display: flex;
+  gap: 6px;
+  justify-content: flex-end;
+}
+.pay-actions button {
+  width: 32px;
+  height: 32px;
+  display: inline-grid;
+  place-items: center;
+  border: 1px solid var(--ws-line);
+  border-radius: 5px;
+  background: #fff;
+  color: var(--ws-ink);
+  cursor: pointer;
+  font: inherit;
+}
+.pay-actions button:hover {
+  border-color: var(--ws-green);
+  color: var(--ws-green);
+}
+.pay-actions button[type="button"]:last-child:hover {
+  border-color: #b92b2b;
+  color: #b92b2b;
+}
+.pay-edit-form {
+  display: grid;
+  gap: 12px;
+}
+.pay-edit-form label {
+  display: grid;
+  gap: 4px;
+  color: var(--ws-muted);
+  font-size: 11px;
+  font-weight: 700;
+}
+.pay-edit-form input {
+  min-height: 36px;
+  border: 1px solid var(--ws-line);
+  border-radius: 6px;
+  padding: 7px 9px;
+  background: #fff;
+  color: var(--ws-ink);
+  font: inherit;
+}
+.pay-edit-form .action-row {
+  display: flex;
+  gap: 8px;
+}
+@media (max-width: 700px) {
+  .pay-create-form .form-grid {
+    grid-template-columns: 1fr;
+  }
+  .pay-card-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+}
