@@ -94,6 +94,11 @@ export const ANALYTICS_EVENTS = [
   "charge_created",
   "charge_updated",
   "charge_cancelled",
+  "payment_link_created",
+  "payment_link_viewed",
+  "payment_link_shared",
+  "payment_link_copied",
+  "payment_link_qr_downloaded",
   "first_page_view",
   "first_click",
   "upgrade_clicked",
@@ -204,6 +209,8 @@ export const CLIENT_ANALYTICS_EVENTS = [
   "segment_created",
   "segment_opened",
   "audience_filter_applied",
+  "payment_link_copied",
+  "payment_link_qr_downloaded",
 ] as const satisfies ReadonlyArray<AnalyticsEventName>;
 
 export const ANALYTICS_PATHS = [
@@ -228,6 +235,7 @@ export const ANALYTICS_PATHS = [
   "/untrack/whatsapp",
   "/untrack/campaigns",
   "/untrack/pay",
+  "/pay",
   "/untrack/analytics",
   "/untrack/analytics/journey",
   "/untrack/audience",
@@ -249,7 +257,8 @@ export const ANALYTICS_PATHS = [
 export function isAnalyticsPath(value: string): boolean {
   return (
     (ANALYTICS_PATHS as readonly string[]).includes(value) ||
-    /^\/produtos\/[a-z0-9-]+$/.test(value)
+    /^\/produtos\/[a-z0-9-]+$/.test(value) ||
+    /^\/pay\/[a-f0-9]+$/.test(value)
   );
 }
 

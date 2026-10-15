@@ -1,7 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { FiEdit2, FiPlus, FiTrash2, FiSend, FiX } from "react-icons/fi";
+import { useRouter } from "next/navigation";
+import { FiEdit2, FiPlus, FiTrash2, FiSend, FiX, FiShare2 } from "react-icons/fi";
 import { ActionStatus, apiRequest, useAction } from "./shared";
 import { analytics } from "@/lib/client/analytics";
 
@@ -18,6 +19,7 @@ type Charge = {
   expiredAt: string | null;
   refundedAt: string | null;
   paidAt: string | null;
+  shareToken: string | null;
   customer: { id: string; firstName: string; lastName: string; email: string | null } | null;
   offer: { id: string; name: string; amount: number } | null;
 };
@@ -70,6 +72,7 @@ export function PayDashboard({
   offers: Offer[];
 }) {
   const action = useAction();
+  const router = useRouter();
   const [charges, setCharges] = useState<Charge[]>(initial.items);
   const [page, setPage] = useState(initial.page);
   const [hasMore, setHasMore] = useState(initial.hasMore);
@@ -231,6 +234,19 @@ export function PayDashboard({
   }
 
   const cancelableStatuses = new Set(["draft", "pending"]);
+
+  async function generateShareLink(charge: Charge) {
+    try {
+      const result = await apiRequest<{ shareToken: string }>(
+        `/api/charges/${charge.id}/share-token`,
+        { method: "POST", body: JSON.stringify({}) },
+      );
+      const shareUrl = `/pay/${result.shareToken}`;
+      router.push(shareUrl);
+    } catch {
+      // Error handled by apiRequest throw
+    }
+  }
 
   return (
     <section className="workspace-page pay-page">
@@ -434,45 +450,59 @@ export function PayDashboard({
                     )}
                   </div>
 
-                  {charge.status === "draft" && canEdit && (
-                    <div className="pay-actions">
-                      <button
-                        type="button"
-                        title="Editar"
-                        onClick={() => startEdit(charge)}
-                      >
-                        <FiEdit2 aria-hidden="true" />
-                      </button>
-                      <button
-                        type="button"
-                        title="Ativar cobrança"
-                        onClick={() => void activateCharge(charge)}
-                      >
-                        <FiSend aria-hidden="true" />
-                      </button>
-                      <button
-                        type="button"
-                        title="Cancelar"
-                        onClick={() => void cancelCharge(charge)}
-                      >
-                        <FiTrash2 aria-hidden="true" />
-                      </button>
-                    </div>
-                  )}
+                   {charge.status === "draft" && canEdit && (
+                     <div className="pay-actions">
+                       <button
+                         type="button"
+                         title="Editar"
+                         onClick={() => startEdit(charge)}
+                       >
+                         <FiEdit2 aria-hidden="true" />
+                       </button>
+                       <button
+                         type="button"
+                         title="Ativar cobrança"
+                         onClick={() => void activateCharge(charge)}
+                       >
+                         <FiSend aria-hidden="true" />
+                       </button>
+                       <button
+                         type="button"
+                         title="Cancelar"
+                         onClick={() => void cancelCharge(charge)}
+                       >
+                         <FiTrash2 aria-hidden="true" />
+                       </button>
+                       <button
+                         type="button"
+                         title="Compartilhar"
+                         onClick={() => void generateShareLink(charge)}
+                       >
+                         <FiShare2 aria-hidden="true" />
+                       </button>
+                     </div>
+                   )}
 
-                  {cancelableStatuses.has(charge.status) &&
-                    charge.status !== "draft" &&
-                    canEdit && (
-                      <div className="pay-actions">
-                        <button
-                          type="button"
-                          title="Cancelar"
-                          onClick={() => void cancelCharge(charge)}
-                        >
-                          <FiTrash2 aria-hidden="true" />
-                        </button>
-                      </div>
-                    )}
+                   {cancelableStatuses.has(charge.status) &&
+                     charge.status !== "draft" &&
+                     canEdit && (
+                       <div className="pay-actions">
+                         <button
+                           type="button"
+                           title="Compartilhar"
+                           onClick={() => void generateShareLink(charge)}
+                         >
+                           <FiShare2 aria-hidden="true" />
+                         </button>
+                         <button
+                           type="button"
+                           title="Cancelar"
+                           onClick={() => void cancelCharge(charge)}
+                         >
+                           <FiTrash2 aria-hidden="true" />
+                         </button>
+                       </div>
+                     )}
                 </>
               )}
             </article>

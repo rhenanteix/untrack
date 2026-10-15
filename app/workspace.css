@@ -8923,3 +8923,128 @@ main:has(.smart-pages-dashboard.sp-studio) {
     gap: 8px;
   }
 }
+
+.pay-public {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: var(--color-bg-subtle, #f5f5f5);
+}
+
+.pay-public-error {
+  text-align: center;
+}
+
+.pay-public-card {
+  background: #fff;
+  border-radius: 12px;
+  padding: 32px;
+  max-width: 480px;
+  width: 100%;
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.08);
+}
+
+.pay-public-header .eyebrow {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: #666;
+}
+
+.pay-public-header h1 {
+  font-size: 20px;
+  font-weight: 700;
+  margin-top: 4px;
+}
+
+.pay-public-body {
+  margin: 24px 0;
+}
+
+.pay-public-description {
+  font-size: 14px;
+  color: #555;
+  margin-bottom: 16px;
+}
+
+.pay-public-amount {
+  font-size: 32px;
+  font-weight: 700;
+  display: block;
+  margin-bottom: 12px;
+}
+
+.pay-public-due {
+  font-size: 14px;
+  color: #666;
+  margin-bottom: 8px;
+}
+
+.pay-public-status {
+  display: inline-block;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.pay-public-status.badge-pending {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.pay-public-status.badge-paid {
+  background: #dcfce7;
+  color: #15803d;
+}
+
+.pay-public-status.badge-expired,
+.pay-public-status.badge-refunded,
+.pay-public-status.badge-cancelled {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.pay-public-offer {
+  font-size: 13px;
+  color: #666;
+  margin-top: 8px;
+}
+
+.pay-public-footer {
+  border-top: 1px solid #eee;
+  padding-top: 20px;
+}
+
+.pay-checkout-button {
+  width: 100%;
+  padding: 12px;
+  font-size: 16px;
+}
+
+.pay-checkout-note {
+  font-size: 12px;
+  color: #999;
+  margin-top: 8px;
+}
+
+.pay-unavailable {
+  color: #c53030;
+  font-weight: 500;
+}
+
+.pay-public-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 16px;
+  flex-wrap: wrap;
+}
+
+.pay-public-actions .button {
+  flex: 1 1 auto;
+}
+

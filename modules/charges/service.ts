@@ -1,8 +1,11 @@
-import { Prisma } from "@prisma/client";
-import { ChargeStatus } from "@prisma/client";
+import { Prisma, ChargeStatus } from "@prisma/client";
+import { randomUUID } from "node:crypto";
 import { ApiError } from "@/lib/api-response";
-import { PAGE_SIZE } from "@/lib/pagination";
+import { appUrl } from "@/lib/app-url";
+import { track } from "@/lib/analytics";
 import { getPrisma } from "@/lib/prisma";
+import { PAGE_SIZE } from "@/lib/pagination";
+import { requirePremium } from "@/modules/billing/plans";
 import {
   audit,
   reserveQuota,
@@ -211,4 +214,117 @@ export async function cancelCharge(
     });
     return charge;
   });
+}
+
+const SHARE_TOKEN_LENGTH = 32;
+
+export function generateShareToken(): string {
+  return randomUUID().replace(/-/g, "").slice(0, SHARE_TOKEN_LENGTH);
+}
+
+export async function generateChargeShareToken(actor: Actor, id: string) {
+  return workspaceTransaction(actor, "manage", async (tx, access) => {
+    requirePremium(access);
+    const existing = await tx.charge.findFirst({
+      where: { id, workspaceId: actor.workspaceId },
+    });
+    if (!existing) {
+      throw new ApiError(404, "CHARGE_NOT_FOUND", "Cobrança não encontrada.");
+    }
+    if (existing.status !== "draft" && existing.status !== "pending") {
+      throw new ApiError(
+        400,
+        "CHARGE_NOT_SHAREABLE",
+        "Apenas cobranças em rascunho ou pendentes podem ser compartilhadas.",
+      );
+    }
+    let token = existing.shareToken;
+    if (!token) {
+      token = generateShareToken();
+      await tx.charge.update({
+        where: { id },
+        data: { shareToken: token },
+      });
+    }
+    await track("payment_link_created", { chargeId: id });
+    return { shareToken: token };
+  });
+}
+
+export type ChargeWithRelations = {
+  id: string;
+  description: string;
+  amountInCents: number;
+  currency: string;
+  status: ChargeStatus;
+  dueAt: Date | null;
+  paidAt: Date | null;
+  cancelledAt: Date | null;
+  expiredAt: Date | null;
+  refundedAt: Date | null;
+  shareToken: string | null;
+  metadata: Record<string, unknown>;
+  createdAt: Date;
+  updatedAt: Date;
+  customer: { firstName: string; lastName: string; email: string | null } | null;
+  offer: { name: string; amount: number } | null;
+  workspace: { name: string; notifications: unknown };
+};
+
+export async function getChargeByShareToken(token: string) {
+  if (!/^[a-f0-9]{32}$/.test(token)) {
+    throw new ApiError(404, "CHARGE_NOT_FOUND", "Cobrança não encontrada.");
+  }
+  const charge = await getPrisma().charge.findUnique({
+    where: { shareToken: token },
+    include: {
+      customer: {
+        select: { firstName: true, lastName: true, email: true },
+      },
+      offer: {
+        select: { name: true, amount: true },
+      },
+      workspace: {
+        select: { name: true, notifications: true },
+      },
+    },
+  });
+  if (!charge) {
+    throw new ApiError(404, "CHARGE_NOT_FOUND", "Cobrança não encontrada.");
+  }
+  if (charge.status === "cancelled") {
+    throw new ApiError(
+      410,
+      "CHARGE_CANCELLED",
+      "Esta cobrança foi cancelada.",
+    );
+  }
+  if (charge.status === "expired") {
+    throw new ApiError(
+      410,
+      "CHARGE_EXPIRED",
+      "Esta cobrança venceu.",
+    );
+  }
+  if (
+    charge.dueAt &&
+    charge.dueAt < new Date() &&
+    charge.status === "pending"
+  ) {
+    throw new ApiError(
+      410,
+      "CHARGE_EXPIRED",
+      "Esta cobrança venceu.",
+    );
+  }
+   await track("payment_link_viewed", { chargeId: charge.id });
+  return charge as ChargeWithRelations;
+}
+
+export function chargeShareUrl(token: string): string {
+  return new URL(`/pay/${token}`, appUrl()).href;
+}
+
+export async function recordPaymentLinkShare(chargeId: string) {
+  await track("payment_link_shared", { chargeId });
 }

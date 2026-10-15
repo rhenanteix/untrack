@@ -911,8 +911,9 @@ model Charge {
   paidAt        DateTime?
   cancelledAt   DateTime?
   expiredAt     DateTime?
-  refundedAt    DateTime?
-  metadata      Json          @default("{}")
+   refundedAt    DateTime?
+   shareToken    String?       @unique @db.VarChar(64)
+   metadata      Json          @default("{}")
   createdAt     DateTime      @default(now())
   updatedAt     DateTime      @updatedAt
   workspace     Workspace     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
@@ -923,7 +924,7 @@ model Charge {
   @@index([workspaceId, status, createdAt])
   @@index([workspaceId, customerId])
   @@index([workspaceId, offerId])
-  @@index([workspaceId, dueAt])
+   @@index([workspaceId, dueAt])
 }
 
 model SmartPageBlock {
