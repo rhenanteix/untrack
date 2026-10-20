@@ -49,13 +49,6 @@ export function Footer() {
         [copy.nav.pricing, "/precos"],
       ],
     },
-    {
-      title: copy.footer.support,
-      links: [
-        [copy.footer.email, "mailto:rhenancontato@gmail.com"],
-        [copy.footer.whatsapp, "https://wa.me/5541988950911"],
-      ],
-    },
   ];
   if (
     pathname.startsWith("/untrack") ||
